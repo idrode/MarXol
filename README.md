@@ -1,4 +1,6 @@
-![marXol](assets/marXol.jpg)
+<p align="center">
+  <img src="assets/marXol.jpg" alt="marXol" width="400">
+</p>
 # marXol
 
 CLI en Rust para análisis on-chain de operadores en **pump.fun** (Solana). Proyecto hermano de [marXi](https://github.com/idrode/MarXi), misma filosofía, red distinta.
