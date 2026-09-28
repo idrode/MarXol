@@ -33,6 +33,13 @@ pub fn event_authority_pda() -> Pubkey {
     Pubkey::find_program_address(&[b"__event_authority"], &program_id()).0
 }
 
+/// Autoridad del mint durante la bonding curve. Solo la tocan las
+/// instrucciones de creación: sus firmas son una vía barata para listar
+/// creaciones sin recorrer todo el tráfico del programa.
+pub fn mint_authority_pda() -> Pubkey {
+    Pubkey::find_program_address(&[b"mint-authority"], &program_id()).0
+}
+
 pub fn bonding_curve_pda(mint: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[b"bonding-curve", mint.as_ref()], &program_id()).0
 }

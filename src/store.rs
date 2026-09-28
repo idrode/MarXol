@@ -68,6 +68,91 @@ CREATE TABLE IF NOT EXISTS migrations (
     signature          TEXT NOT NULL
 );
 
+-- TradeEvent de la ventana temprana de cada token (H1, CLAUDE.md 8). Solo se
+-- guardan trades de mints con `creations` conocida y dentro de la ventana.
+-- `creator` es el embebido en el evento: el creator vigente en ese trade.
+CREATE TABLE IF NOT EXISTS early_trades (
+    mint                    TEXT NOT NULL,
+    user                    TEXT NOT NULL,
+    is_buy                  INTEGER NOT NULL,
+    sol_amount              INTEGER,
+    quote_amount            INTEGER,
+    token_amount            INTEGER,
+    quote_mint              TEXT,
+    creator                 TEXT,
+    ix_name                 TEXT,
+    virtual_sol_reserves    INTEGER,
+    virtual_token_reserves  INTEGER,
+    virtual_quote_reserves  INTEGER,
+    timestamp               INTEGER NOT NULL,
+    slot                    INTEGER NOT NULL,
+    signature               TEXT NOT NULL,
+    ev_index                INTEGER NOT NULL,
+    PRIMARY KEY (signature, ev_index)
+);
+CREATE INDEX IF NOT EXISTS early_trades_mint ON early_trades(mint, timestamp);
+
+-- Cobertura de la ventana temprana por mint: solo con complete = 1 están
+-- todos los trades de la ventana y H1 es evaluable.
+CREATE TABLE IF NOT EXISTS trade_windows (
+    mint          TEXT PRIMARY KEY,
+    window_secs   INTEGER NOT NULL,
+    sigs_in_window INTEGER NOT NULL,
+    fetch_errors  INTEGER NOT NULL,
+    complete      INTEGER NOT NULL,
+    note          TEXT,
+    fetched_at    INTEGER NOT NULL
+);
+
+-- Puntos de precio de la bonding curve para H1b: reservas virtuales tras
+-- cada TradeEvent (kind = 'trade') y las iniciales del CreateEvent
+-- (kind = 'create'), en unidades del quote_mint del token.
+CREATE TABLE IF NOT EXISTS price_points (
+    mint            TEXT NOT NULL,
+    kind            TEXT NOT NULL CHECK (kind IN ('create', 'trade')),
+    quote_reserves  INTEGER NOT NULL,
+    token_reserves  INTEGER NOT NULL,
+    timestamp       INTEGER NOT NULL,
+    slot            INTEGER NOT NULL,
+    signature       TEXT NOT NULL,
+    ev_index        INTEGER NOT NULL,
+    PRIMARY KEY (signature, ev_index)
+);
+CREATE INDEX IF NOT EXISTS price_points_mint ON price_points(mint, timestamp);
+
+-- Cobertura de la ventana de precio (H1b) por mint.
+CREATE TABLE IF NOT EXISTS price_windows (
+    mint           TEXT PRIMARY KEY,
+    horizon_secs   INTEGER NOT NULL,
+    sigs_in_window INTEGER NOT NULL,
+    fetch_errors   INTEGER NOT NULL,
+    complete       INTEGER NOT NULL,
+    note           TEXT,
+    fetched_at     INTEGER NOT NULL
+);
+
+-- Resultado derivado de H1 por variante del criterio (v1, h1c...):
+-- recalculable, se reemplaza. No es una señal de la chain, así que
+-- sobrescribir no viola el principio de 5.2. Sustituye a `h1_signals`
+-- (sin variante), que se borra al abrir: era derivada.
+DROP TABLE IF EXISTS h1_signals;
+CREATE TABLE IF NOT EXISTS h1_results (
+    mint              TEXT NOT NULL,
+    variant           TEXT NOT NULL,
+    params            TEXT NOT NULL,
+    trades            INTEGER NOT NULL,
+    creator_trades    INTEGER NOT NULL,
+    bot_wallets       INTEGER NOT NULL,
+    bot_trades        INTEGER NOT NULL,
+    fast_pair_wallets INTEGER NOT NULL,
+    whale_trades      INTEGER NOT NULL,
+    wallets_remaining INTEGER NOT NULL,
+    organic_wallets   INTEGER NOT NULL,
+    signal            INTEGER NOT NULL,
+    computed_at       INTEGER NOT NULL,
+    PRIMARY KEY (mint, variant)
+);
+
 -- Firmas ya procesadas, para no repetir getTransaction (cada uno cuesta CU).
 CREATE TABLE IF NOT EXISTS seen_signatures (
     signature TEXT PRIMARY KEY,
@@ -85,6 +170,28 @@ pub struct Ingested {
     pub creator_changes: usize,
     pub completions: usize,
     pub migrations: usize,
+    pub early_trades: usize,
+}
+
+/// Ventana temprana de H1 en segundos (CLAUDE.md 8, valor [P]).
+pub const EARLY_WINDOW_SECS: i64 = crate::h1::PARAMS_V1.window_secs;
+
+pub struct H1bInput {
+    pub mint: String,
+    pub t0: i64,
+    pub h1: bool,
+    pub initial: crate::h1b::Point,
+    pub points: Vec<crate::h1b::Point>,
+    pub completed_at: Option<i64>,
+    pub migrated_at: Option<i64>,
+}
+
+/// Token cuya ventana temprana está cerrada y aún no se ha descargado.
+pub struct PendingWindow {
+    pub mint: String,
+    pub bonding_curve: String,
+    pub created_at: i64,
+    pub signature: String,
 }
 
 impl Store {
@@ -189,6 +296,39 @@ impl Store {
                             ],
                         )?;
                     }
+                    "TradeEvent" => {
+                        let mint = req(e, "mint")?;
+                        let t0: Option<i64> = tx
+                            .query_row("SELECT timestamp FROM creations WHERE mint = ?1", [&mint], |r| r.get(0))
+                            .optional()?;
+                        let ts = ts(e)?;
+                        if !t0.is_some_and(|t0| (t0..t0 + EARLY_WINDOW_SECS).contains(&ts)) {
+                            continue;
+                        }
+                        let u = |k: &str| e.u64(k).map(|v| v as i64);
+                        n.early_trades += tx.execute(
+                            "INSERT OR IGNORE INTO early_trades VALUES
+                             (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
+                            params![
+                                mint,
+                                req(e, "user")?,
+                                e.bool("is_buy").context("TradeEvent.is_buy ausente")?,
+                                u("sol_amount"),
+                                u("quote_amount"),
+                                u("token_amount"),
+                                s(e, "quote_mint"),
+                                s(e, "creator"),
+                                s(e, "ix_name"),
+                                u("virtual_sol_reserves"),
+                                u("virtual_token_reserves"),
+                                u("virtual_quote_reserves"),
+                                ts,
+                                t.slot as i64,
+                                t.signature,
+                                i as i64
+                            ],
+                        )?;
+                    }
                     _ => {}
                 }
             }
@@ -273,8 +413,274 @@ impl Store {
         Ok(OperatorReport { creator: creator.to_string(), created, changes, paid_for_others })
     }
 
+    /// Creaciones con la ventana temprana ya cerrada en `now` y sin descarga
+    /// completa de sus trades, más antiguas primero.
+    pub fn pending_windows(&self, now: i64, limit: usize) -> Result<Vec<PendingWindow>> {
+        let mut q = self.db.prepare(
+            "SELECT c.mint, c.bonding_curve, c.timestamp, c.signature FROM creations c
+             LEFT JOIN trade_windows w ON w.mint = c.mint
+             WHERE c.timestamp + ?1 <= ?2 AND COALESCE(w.complete, 0) = 0
+             ORDER BY c.timestamp LIMIT ?3",
+        )?;
+        let rows = q.query_map(params![EARLY_WINDOW_SECS, now, limit as i64], |r| {
+            Ok(PendingWindow {
+                mint: r.get(0)?,
+                bonding_curve: r.get(1)?,
+                created_at: r.get(2)?,
+                signature: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn record_window(
+        &self,
+        mint: &str,
+        sigs_in_window: usize,
+        fetch_errors: usize,
+        complete: bool,
+        note: Option<&str>,
+        now: i64,
+    ) -> Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO trade_windows VALUES (?1,?2,?3,?4,?5,?6,?7)",
+            params![mint, EARLY_WINDOW_SECS, sigs_in_window as i64, fetch_errors as i64, complete, note, now],
+        )?;
+        Ok(())
+    }
+
+    /// (creaciones, con ventana cerrada, descargadas completas, intentadas sin completar)
+    pub fn window_coverage(&self, now: i64) -> Result<(i64, i64, i64, i64)> {
+        Ok(self.db.query_row(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(c.timestamp + ?1 <= ?2), 0),
+                    COALESCE(SUM(w.complete = 1), 0),
+                    COALESCE(SUM(w.complete = 0), 0)
+             FROM creations c LEFT JOIN trade_windows w ON w.mint = c.mint",
+            params![EARLY_WINDOW_SECS, now],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )?)
+    }
+
+    pub fn creation_time(&self, mint: &str) -> Result<i64> {
+        Ok(self.db.query_row("SELECT timestamp FROM creations WHERE mint = ?1", [mint], |r| r.get(0))?)
+    }
+
+    /// Mints con la ventana temprana descargada completa (H1 evaluable).
+    pub fn evaluable_mints(&self) -> Result<Vec<(String, i64)>> {
+        let mut q = self.db.prepare(
+            "SELECT c.mint, c.timestamp FROM creations c
+             JOIN trade_windows w ON w.mint = c.mint
+             WHERE w.complete = 1 ORDER BY c.timestamp",
+        )?;
+        let rows = q.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Trades de la ventana `[t0, t0 + window)`. Tamaño en unidades del
+    /// `quote_mint`: `quote_amount` si viene y es > 0, si no `sol_amount`.
+    pub fn window_trades(&self, mint: &str, t0: i64, window: i64) -> Result<Vec<crate::h1::Trade>> {
+        let mut q = self.db.prepare(
+            "SELECT user, is_buy, COALESCE(NULLIF(quote_amount, 0), sol_amount, 0), timestamp
+             FROM early_trades WHERE mint = ?1 AND timestamp >= ?2 AND timestamp < ?3
+             ORDER BY slot, timestamp, signature, ev_index",
+        )?;
+        let rows = q.query_map(params![mint, t0, t0 + window], |r| {
+            Ok(crate::h1::Trade {
+                user: r.get(0)?,
+                is_buy: r.get(1)?,
+                size: r.get::<_, i64>(2)? as u64,
+                timestamp: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Unión de todas las identidades de creador conocidas del mint: creator
+    /// original, payer de la creación, cambios de creador y el creator
+    /// embebido en cada trade guardado (CLAUDE.md 8, H1 paso 2).
+    pub fn creator_identities(&self, mint: &str) -> Result<std::collections::HashSet<String>> {
+        let mut q = self.db.prepare(
+            "SELECT creator FROM creations WHERE mint = ?1
+             UNION SELECT user FROM creations WHERE mint = ?1
+             UNION SELECT new_creator FROM creator_changes WHERE mint = ?1
+             UNION SELECT old_creator FROM creator_changes WHERE mint = ?1 AND old_creator IS NOT NULL
+             UNION SELECT creator FROM early_trades WHERE mint = ?1 AND creator IS NOT NULL",
+        )?;
+        let rows = q.query_map([mint], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn save_h1(
+        &self,
+        mint: &str,
+        variant: &str,
+        params_json: &str,
+        r: &crate::h1::H1Result,
+        now: i64,
+    ) -> Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO h1_results VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
+            params![
+                mint,
+                variant,
+                params_json,
+                r.trades as i64,
+                r.creator_trades as i64,
+                r.bot_wallets as i64,
+                r.bot_trades as i64,
+                r.fast_pair_wallets as i64,
+                r.whale_trades as i64,
+                r.wallets_remaining as i64,
+                r.organic_wallets as i64,
+                r.signal,
+                now
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Guarda como puntos de precio el `CreateEvent` y los `TradeEvent` de
+    /// mints conocidos con timestamp en `[t0, t0 + horizon)`. Complementa a
+    /// `ingest`, que sigue guardando el resto de eventos de la tx.
+    pub fn ingest_prices(&mut self, t: &TxEvents, horizon: i64) -> Result<usize> {
+        let tx = self.db.transaction()?;
+        let mut n = 0;
+        for (i, e) in t.events.iter().enumerate() {
+            let kind = match e.name.as_str() {
+                "CreateEvent" => "create",
+                "TradeEvent" => "trade",
+                _ => continue,
+            };
+            let (Some(mint), Some(ts)) = (e.str("mint"), e.i64("timestamp")) else { continue };
+            let t0: Option<i64> = tx
+                .query_row("SELECT timestamp FROM creations WHERE mint = ?1", [mint], |r| r.get(0))
+                .optional()?;
+            if !t0.is_some_and(|t0| (t0..t0 + horizon).contains(&ts)) {
+                continue;
+            }
+            // Con quote SOL ambos campos coinciden; con otro quote solo viene
+            // virtual_quote_reserves (CLAUDE.md 5.5).
+            let q = e.u64("virtual_quote_reserves").filter(|&v| v > 0).or(e.u64("virtual_sol_reserves"));
+            let (Some(q), Some(tok)) = (q, e.u64("virtual_token_reserves")) else { continue };
+            n += tx.execute(
+                "INSERT OR IGNORE INTO price_points VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![mint, kind, q as i64, tok as i64, ts, t.slot as i64, t.signature, i as i64],
+            )?;
+        }
+        tx.commit()?;
+        Ok(n)
+    }
+
+    /// Copia a `price_points` los trades ya descargados de la ventana temprana,
+    /// para no volver a pedir esas transacciones.
+    pub fn backfill_prices_from_early_trades(&self) -> Result<usize> {
+        Ok(self.db.execute(
+            "INSERT OR IGNORE INTO price_points
+             SELECT mint, 'trade', COALESCE(NULLIF(virtual_quote_reserves, 0), virtual_sol_reserves),
+                    virtual_token_reserves, timestamp, slot, signature, ev_index
+             FROM early_trades
+             WHERE virtual_token_reserves IS NOT NULL
+               AND COALESCE(NULLIF(virtual_quote_reserves, 0), virtual_sol_reserves) IS NOT NULL",
+            [],
+        )?)
+    }
+
+    /// Tokens con H1 calculada, ventana de precio cerrada en `now` y sin
+    /// descarga completa.
+    pub fn pending_price_windows(&self, now: i64, horizon: i64, limit: usize) -> Result<Vec<PendingWindow>> {
+        let mut q = self.db.prepare(
+            "SELECT c.mint, c.bonding_curve, c.timestamp, c.signature FROM creations c
+             LEFT JOIN price_windows w ON w.mint = c.mint AND w.horizon_secs = ?1
+             WHERE c.timestamp + ?1 <= ?2 AND COALESCE(w.complete, 0) = 0
+               AND EXISTS (SELECT 1 FROM h1_results h WHERE h.mint = c.mint)
+             ORDER BY c.timestamp LIMIT ?3",
+        )?;
+        let rows = q.query_map(params![horizon, now, limit as i64], |r| {
+            Ok(PendingWindow {
+                mint: r.get(0)?,
+                bonding_curve: r.get(1)?,
+                created_at: r.get(2)?,
+                signature: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_price_window(
+        &self,
+        mint: &str,
+        horizon: i64,
+        sigs: usize,
+        errors: usize,
+        complete: bool,
+        note: Option<&str>,
+        now: i64,
+    ) -> Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO price_windows VALUES (?1,?2,?3,?4,?5,?6,?7)",
+            params![mint, horizon, sigs as i64, errors as i64, complete, note, now],
+        )?;
+        Ok(())
+    }
+
+    /// Todo lo que necesita `h1b::compute` para un mint con ventana de precio
+    /// completa, junto con su señal H1 en la variante dada. Los mints sin
+    /// punto `create` se omiten.
+    pub fn h1b_inputs(&self, horizon: i64, variant: &str) -> Result<Vec<H1bInput>> {
+        let mut q = self.db.prepare(
+            "SELECT c.mint, c.timestamp, h.signal, cp.timestamp, m.timestamp
+             FROM creations c
+             JOIN h1_results h ON h.mint = c.mint AND h.variant = ?2
+             JOIN price_windows w ON w.mint = c.mint AND w.horizon_secs = ?1 AND w.complete = 1
+             LEFT JOIN completions cp ON cp.mint = c.mint
+             LEFT JOIN migrations m ON m.mint = c.mint
+             ORDER BY c.timestamp",
+        )?;
+        let heads = q
+            .query_map(params![horizon, variant], |r| {
+                Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })?
+            .collect::<rusqlite::Result<Vec<(String, i64, bool, Option<i64>, Option<i64>)>>>()?;
+        let mut pts = self.db.prepare(
+            "SELECT kind, timestamp, quote_reserves, token_reserves FROM price_points
+             WHERE mint = ?1 ORDER BY timestamp, slot",
+        )?;
+        let mut out = Vec::new();
+        for (mint, t0, h1, completed_at, migrated_at) in heads {
+            let rows = pts
+                .query_map([&mint], |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        crate::h1b::Point {
+                            timestamp: r.get(1)?,
+                            quote_reserves: r.get::<_, i64>(2)? as u64,
+                            token_reserves: r.get::<_, i64>(3)? as u64,
+                        },
+                    ))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            let Some(initial) = rows.iter().find(|(k, _)| k == "create").map(|(_, p)| *p) else { continue };
+            let points = rows.into_iter().filter(|(k, _)| k == "trade").map(|(_, p)| p).collect();
+            out.push(H1bInput { mint, t0, h1, initial, points, completed_at, migrated_at });
+        }
+        Ok(out)
+    }
+
     pub fn counts(&self) -> Result<Vec<(&'static str, i64)>> {
-        ["creations", "creator_changes", "completions", "migrations", "seen_signatures"]
+        [
+            "creations",
+            "creator_changes",
+            "completions",
+            "migrations",
+            "early_trades",
+            "trade_windows",
+            "h1_results",
+            "price_points",
+            "price_windows",
+            "seen_signatures",
+        ]
             .into_iter()
             .map(|t| {
                 let n = self.db.query_row(&format!("SELECT COUNT(*) FROM {t}"), [], |r| r.get(0))?;
@@ -385,5 +791,37 @@ mod tests {
         assert_eq!(r.created[0].creator_changes, 1);
         assert_eq!(r.changes[0].kind, "migrate_to_sharing");
         assert!(st.seen("s1").unwrap());
+    }
+
+    #[test]
+    fn solo_se_guardan_trades_de_la_ventana_temprana() {
+        let mut st = Store::open(":memory:").unwrap();
+        let trade = |ts: i64, mint: &str| {
+            ev(
+                "TradeEvent",
+                json!({"mint":mint,"user":"U","is_buy":true,"sol_amount":5,"quote_amount":7,
+                       "creator":"C2","timestamp":ts}),
+            )
+        };
+        // Creación y compra del creador en la misma tx: la compra ya cuenta.
+        st.ingest(&tx(
+            "s1",
+            vec![
+                ev("CreateEvent", json!({"mint":"M","bonding_curve":"B","creator":"A","user":"P","timestamp":100})),
+                trade(100, "M"),
+            ],
+        ))
+        .unwrap();
+        let n = st
+            .ingest(&tx("s2", vec![trade(399, "M"), trade(400, "M"), trade(150, "OTRO")]))
+            .unwrap();
+        assert_eq!(n.early_trades, 1, "t=400 queda fuera y OTRO no tiene creación");
+        let ts = st.window_trades("M", 100, EARLY_WINDOW_SECS).unwrap();
+        assert_eq!(ts.len(), 2);
+        assert_eq!(ts[0].size, 7, "se usa quote_amount");
+        let ids = st.creator_identities("M").unwrap();
+        for id in ["A", "P", "C2"] {
+            assert!(ids.contains(id), "falta {id}");
+        }
     }
 }

@@ -107,13 +107,20 @@ pub fn fetch_events(rpc: &RpcClient, idl: &Idl, sig: &str) -> Result<TxEvents> {
     })
 }
 
+pub struct SigInfo {
+    pub signature: String,
+    pub failed: bool,
+    pub slot: u64,
+    pub block_time: Option<i64>,
+}
+
 /// Firmas recientes que tocan `address` (más recientes primero).
 pub fn recent_signatures(
     rpc: &RpcClient,
     address: &str,
     limit: usize,
     before: Option<&str>,
-) -> Result<Vec<(String, bool, u64)>> {
+) -> Result<Vec<SigInfo>> {
     let addr = solana_pubkey::Pubkey::from_str(address).context("dirección inválida")?;
     let sigs = rpc.get_signatures_for_address_with_config(
         &addr,
@@ -124,5 +131,13 @@ pub fn recent_signatures(
             commitment: Some(CommitmentConfig::confirmed()),
         },
     )?;
-    Ok(sigs.into_iter().map(|s| (s.signature, s.err.is_some(), s.slot)).collect())
+    Ok(sigs
+        .into_iter()
+        .map(|s| SigInfo {
+            failed: s.err.is_some(),
+            slot: s.slot,
+            block_time: s.block_time,
+            signature: s.signature,
+        })
+        .collect())
 }
