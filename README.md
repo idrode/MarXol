@@ -1,4 +1,4 @@
-   ![marXol](assets/banner.png)
+![marXol](assets/marXol.jpg)
 # marXol
 
 CLI en Rust para análisis on-chain de operadores en **pump.fun** (Solana). Proyecto hermano de [marXi](https://github.com/idrode/MarXi), misma filosofía, red distinta.
