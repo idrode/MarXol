@@ -1,0 +1,19 @@
+[package]
+name = "marxol"
+version = "0.1.0"
+edition = "2021"
+description = "Búsqueda y análisis on-chain de operadores de pump.fun en Solana"
+
+[dependencies]
+anyhow = "1"
+bs58 = "0.5"
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+solana-rpc-client = "4.3"
+solana-rpc-client-api = "4.3"
+solana-transaction-status-client-types = "4.3"
+solana-commitment-config = "*"
+solana-signature = "*"
+solana-pubkey = { version = "*", features = ["curve25519"] }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
