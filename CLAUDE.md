@@ -463,6 +463,68 @@ Si falla alguna es **NO CONFIRMADA**, y se indica si la dirección es la opuesta
 - T_entry2: mediana a 12 s, 15.5 trades antes de entrar, múltiplo de precio mediano 1.31×.
 - En 2 tokens mayhem el múltiplo es < 1: sus reservas virtuales de quote cambian fuera de los trades. No es un error.
 
+### Resultado de la validación congelada (2026-09-29, `marxol entry2`, ejecutado una sola vez)
+
+**Alcance, antes que nada**: los 337 tokens de validación salen de **una única ráfaga de 8 minutos de un solo día** (creaciones del 2026-09-28 entre las 14:03 y las 14:11 UTC). Validan **dentro de esa ráfaga**. No generalizan a otros momentos, días ni regímenes de mercado: para eso hacen falta muestras de otras fechas y horas. Una asociación aquí es correlación, no causalidad (principio 6).
+
+**Datos**:
+- 337 ventanas tempranas y 337 ventanas de precio de 65 min completas, con 0 incompletas en ambas.
+- Los 6 fallos puntuales de descarga (429) se reintentaron y completaron. La exclusión por incompleto quedó vacía.
+- 86 tokens sin T_entry2, excluidos. **251 en tablas, 63 pump-y-caída (25 %)**.
+- 0 tokens con T_entry2 sin ventana de precio. Orden de ejecución completo y comisión conocida en 251/251.
+- Token de mayor peso: `9trcArtUpUePNEH6CvnFNDQAd8U9KqcjvPpN4z7LZFDm`.
+- Los 40 de calibración no entran en nada de esto.
+
+**Veredicto primario** (criterio congelado: dif. ≥ 20 pts, Fisher p < 0.01, ≥ 3 por grupo, misma dirección sin el token de mayor peso):
+
+| Hipótesis | n señal / sin señal | p&c con señal | p&c sin señal | Dif. | Fisher p | OR (IC95) | Sin mayor peso | Veredicto |
+|---|---|---|---|---|---|---|---|---|
+| H4' dev vendió antes de T_entry2 | 73 / 178 | 28/73 (38 %) | 35/178 (20 %) | +19 | 0.0036 | 2.54 (1.40–4.63) | +18 | **NO CONFIRMADA** (dif. < 20 pts) |
+| H5 wallet ajena en el slot de creación | 125 / 126 | 50/125 (40 %) | 13/126 (10 %) | +30 | < 0.0001 | 5.79 (2.95–11.40) | +29 | **CONFIRMADA** |
+| H6' llenado ≥ 13.65 % | 65 / 186 | 38/65 (58 %) | 25/186 (13 %) | +45 | < 0.0001 | 9.06 (4.74–17.34) | +44 | **CONFIRMADA** |
+| H7' ≥ 1 wallet 1+1 antes de entrar | 122 / 129 | 51/122 (42 %) | 12/129 (9 %) | +33 | < 0.0001 | 7.00 (3.50–14.03) | +32 | **CONFIRMADA** |
+| H8 creador ≥ 15 % en el slot de creación | 18 / 233 | 14/18 (78 %) | 49/233 (21 %) | +57 | < 0.0001 | 13.14 (4.14–41.72) | +55 | **CONFIRMADA** |
+
+H4' queda NO CONFIRMADA por 1 punto por debajo del umbral de 20, aunque p = 0.0036. **No se reinterpreta**: el criterio exige las cuatro condiciones.
+
+**Resultado secundario** (retorno neto desde T_entry2, mediana con señal frente a sin señal; Mann-Whitney):
+
+| | +10 min | +30 min | +60 min |
+|---|---|---|---|
+| H4' | −12.2 % vs −9.0 % (p 0.10) | −13.9 % vs −10.0 % (p 0.08) | −15.6 % vs −10.2 % (p 0.06) |
+| H5 | −12.2 % vs −8.6 % (p 0.024) | −14.3 % vs −8.7 % (p 0.004) | −15.2 % vs −8.9 % (p 0.002) |
+| H6' | −36.1 % vs −6.4 % (p < 0.001) | −37.1 % vs −7.6 % (p < 0.001) | −37.5 % vs −7.7 % (p < 0.001) |
+| H7' | −13.9 % vs −8.6 % (p 0.015) | −16.8 % vs −8.6 % (p 0.001) | −16.8 % vs −8.6 % (p < 0.001) |
+| H8 | −25.5 % vs −9.1 % (p 0.017) | −29.1 % vs −10.2 % (p 0.001) | −29.2 % vs −10.3 % (p < 0.001) |
+
+**Lectura (obligatoria junto al veredicto)**:
+- **Parte de la asociación primaria es mecánica.** Pump-y-caída se mide desde el precio **inicial**, no desde el de entrada. H6' (llenado alto) y H8 (compra grande del creador) miden precisamente cuánto ha subido ya el precio antes de T_entry2, así que el token está más cerca del "pico ≥ 2× el inicial" de la definición. Una parte del pump-y-caída ya ha ocurrido cuando se entra. H5 y H7' son menos directamente mecánicas, pero también se asocian a actividad temprana que mueve el precio.
+- **La medida accionable es el retorno desde T_entry2.** Ahí la mediana es **negativa en todos los grupos**, con señal y sin ella, en los tres horizontes. Las señales confirmadas marcan tokens **peores para entrar** (retorno mediano más negativo), no mejores. Sirven como filtro de "evitar", no como señal de entrada. Ni siquiera el grupo sin señal tiene retorno mediano positivo (−6 % a −10 %).
+- **La mayoría de los tokens muere enseguida.** En 166 de los 250 tokens con retorno evaluable, el retorno a +10 min es idéntico al de +60 min: no hay trades después de los 10 min. Las medianas reflejan sobre todo tokens que dejan de operar.
+
+**POST HOC, NO PRE-REGISTRADO, SIN VEREDICTO** (añadido tras congelar; no decide nada):
+- **(a) Con y sin mayhem**: la dirección se mantiene en los 203 no-mayhem en las cinco hipótesis. H4' sin mayhem sale +22 pts, p = 0.0012 (por encima de 20, pero es post hoc y no cambia el veredicto). En los 48 mayhem los grupos son minúsculos o vacíos: H6' y H8 tienen 0 tokens con señal, porque el llenado y la compra del creador se comportan distinto con reservas virtuales dinámicas.
+- **(b) Retorno estratificado**:
+  - **Los 36 tokens con comisión 0 bps en T_entry2 son todos mayhem** (los otros 12 mayhem tienen 125 bps). El estrato "0 bps" no mide un efecto de comisión: es un subconjunto de mayhem.
+  - Retorno mediano: mayhem −16.8 % (0 bps: −56.7 %) frente a −9.9 % a −11.4 % en no-mayhem.
+  - En los mayhem, el precio `virtual_quote / virtual_token` cambia fuera de los trades (sección 5.5 / piloto), así que **sus retornos no son fiables** como medida de la curva. En H5 aparecen valores extremos (+1162 %, +2306 %) con n = 1–2.
+  - Dentro de no-mayhem y de 125 bps, el patrón de los cinco indicadores se repite (con señal, peor retorno).
+
+**Hipótesis nuevas surgidas de aquí** (sin evaluar; necesitan otra ráfaga u otro día):
+- **H9** (filtro de exclusión): los tokens sin ninguna de las señales H5/H6'/H7'/H8 tienen un retorno neto desde T_entry2 mejor que el resto. El pre-registro debe fijar si el objetivo es "mediana > 0" o solo "mejor que el resto".
+- **H10** (supervivencia): la fracción de tokens sin trades después de +10 min desde T_entry2 difiere según las señales. Medir la muerte temprana directamente, no a través de la mediana.
+- **Resultado desde el precio de entrada**: redefinir pump-y-caída con el pico y el cierre medidos respecto al precio en T_entry2, para quitar el componente mecánico. Es una definición nueva, que habría que pre-registrar antes de aplicarla a otra muestra.
+- Tratar los tokens mayhem como población aparte (precio no comparable) en cualquier análisis futuro de retornos.
+
+**Consumo real de RPC (Alchemy)**:
+- Total **906 320 CU**: `windows` 740 720 (18 151 `getTransaction` + 367 `getSignaturesForAddress`) y `prices` 165 600 (3 784 + 356), en 22 658 peticiones.
+- Es el **57 % de la estimación de 1.6M CU**, el 3 % del free tier mensual de 30M y el 36 % del tope de 2.5M fijado para la ronda.
+- Por qué menos de lo estimado: la ventana temprana costó 53.9 `getTransaction` por token frente a los 106.5 del piloto. Los 40 del piloto eran más activos, y las tx fallidas se descartan sin pedirlas. El precio de la hora costó 11.2 por token y los listados de firmas 2.1 por token.
+- Tiempo: ~40 min `windows` y ~25 min `prices`. Iba limitado por la latencia de cada petición (secuencial, ~5 req/s efectivas), no por las 25 req/s.
+- Incidencias:
+  - Alchemy devolvió **429** 8 veces, aun con ~5 req/s efectivas. Uno de ellos, en `getSignaturesForAddress`, cortó la ejecución. Se añadió un reintento con espera creciente para los 429 (`rpc::with_retry`), y un error al listar firmas deja ahora el token pendiente en vez de cortar la ejecución.
+  - `rpc_usage.tokens` registraba 0 en una ejecución terminada en error (la fila de 14 677 `getTransaction` procesó 269 tokens). Se corrigió el código y esa fila.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
@@ -505,11 +567,8 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
    - Masa crítica de 1 500 tokens: ≈ 7.2M CU (24 % del mes).
    - Helius (10 créditos por llamada de archivo): ≈ 1.2k créditos por token → 337 ≈ 400k (40 % del mes gratis); 1 500 ≈ 1.8M, **no cabe** en el free tier de 1M.
    - Salvedad: cuanto más tiempo pasa desde la creación, más firmas posteriores hay que paginar hacia atrás en la bonding curve hasta llegar a la creación. Descargar tarde encarece los tokens que siguieron activos.
-   **Validación congelada (2026-09-29 15:24 UTC)**: sección 8. Secuencia pendiente de ejecutar (no lanzada; necesita red y decidir proveedor):
-   1. `marxol windows --limit 337 --provider alchemy --max-requests K`
-   2. `marxol prices --limit 337 …`, que se puede repetir hasta completar.
-   3. `marxol entry2 --check` (no-degeneración en validación, sin resultado).
-   4. `marxol entry2`, **una sola vez**.
+   **Validación congelada (2026-09-29 15:24 UTC)**: ejecutada el mismo día con Alchemy (`windows` → `prices` → `entry2 --check` → `entry2` una vez). Resultado y consumo (906 320 CU) en la sección 8: H5, H6', H7' y H8 confirmadas; H4' no confirmada (+19 pts). Todas marcan tokens **peores** para entrar (retorno neto mediano negativo en todos los grupos). Solo vale para la ráfaga de 8 min del 2026-09-28.
+   **Siguiente**: repetir la validación en otra ráfaga u otro día antes de dar ningún indicador por general, y pre-registrar H9/H10 y el resultado medido desde el precio de entrada (sección 8).
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.
 
 ---
@@ -549,6 +608,8 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
 - **Descargas reanudables** (`windows`, `prices`):
   - Saltan tokens ya completos y, dentro de un token, las firmas ya ingeridas (tabla `fetched_sigs`, por propósito `window`/`prices`). No se usa `seen_signatures` porque una firma vista por `index` antes de conocer la creación no tiene sus trades guardados.
   - Al llegar a `--max-requests` paran limpiamente, y el token a medias sigue en la próxima pasada.
+  - Un 429 del proveedor se reintenta hasta 4 veces con espera de 1, 2, 4 y 8 s (cada intento cuenta en el presupuesto). Un error al listar las firmas de un token lo deja pendiente sin cortar la ejecución.
+  - `rpc_usage.tokens` cuenta los tokens procesados aunque la ejecución termine en error.
   - Cada ejecución deja su consumo en `rpc_usage` y lo imprime junto con el acumulado.
   - `early_trades` guarda ahora `fee_basis_points` y `creator_fee_basis_points` (se añaden a bases antiguas al abrirlas).
   - `windows` guarda también el precio inicial del `CreateEvent`.
@@ -561,6 +622,8 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
 - **Vía barata para listar creaciones**: la PDA `mint-authority` (`TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM`, seeds `["mint-authority"]`, la imprime `marxol verify`) solo la tocan `create`/`create_v2`. En 400 firmas suyas: 22 tx fallidas y 378 exitosas, de las que 377 traen `CreateEvent` (la restante no está examinada). `index --address TSLvdd1p…` indexa creaciones sin recorrer el tráfico de trades del programa (~1 creación por cada 100 tx).
 - **Ritmo de creación observado**: 377 creaciones en 492 s (2026-09-28, 14:03–14:11 UTC) ≈ 0.77/s. Es una muestra de 8 minutos, no una media diaria.
 - **Orden de ejecución dentro de un slot (2026-09-29)**: ni `getTransaction` ni el orden `(slot, timestamp, firma)` lo dan (la firma es un hash). Se reconstruye exacto encadenando reservas: `virtual_token_reserves` antes de un trade = después + `token_amount` (compra) o − `token_amount` (venta), y coincide con el después del trade anterior, empezando por el `CreateEvent`. Encadena 2 831 de 2 831 trades de la ventana temprana del piloto. Hace falta en todo lo que dependa del orden dentro del slot (primer trade que cruza un umbral, precio de cierre). H1 y H1c no dependen de él (ver sección 8). Ignorarlo produjo un falso positivo en H5 (p = 0.026 → 0.42 tras corregir).
+- **Tokens mayhem y comisiones (2026-09-29, validación)**: los 36 tokens con `fee_basis_points + creator_fee_basis_points = 0` en T_entry2 son todos mayhem (48 mayhem en total entre 251). En no-mayhem la comisión más común es 125 bps (169 tokens), con valores de 96 a 395 bps. Nunca suponer la comisión de `Global` (95 + 5): leerla del `TradeEvent`.
+- **Rate limit de Alchemy**: aparecen 429 esporádicos (8 en ~22 700 peticiones) incluso a ~5 req/s efectivas. Hay que reintentar siempre.
 - Algunos mints no acaban en `pump` (p. ej. `zVbJ3eRj…phi`). No usar el sufijo como filtro.
 - Observado un `CreateEvent` con `creator_fee_bps = 0` mientras `Global.creator_fee_basis_points = 5`. Sin interpretar todavía: no está verificado cómo se combinan ambos campos.
 

@@ -354,8 +354,9 @@ fn curve_signatures(
     let mut out = Vec::new();
     let (mut before, mut pages) = (None::<String>, 0);
     while pages < max_pages {
-        budget.acquire(rpc::Method::GetSignatures)?;
-        let page = tx::recent_signatures(rpc, bonding_curve, 1000, before.as_deref())?;
+        let page = rpc::with_retry(budget, rpc::Method::GetSignatures, || {
+            tx::recent_signatures(rpc, bonding_curve, 1000, before.as_deref())
+        })?;
         pages += 1;
         let mut reached = page.len() < 1000;
         before = page.last().map(|s| s.signature.clone());
@@ -404,8 +405,7 @@ fn fetch_token_sigs<'a>(
         if !budget.has_room(1) {
             return Ok(None);
         }
-        budget.acquire(rpc::Method::GetTransaction)?;
-        match tx::fetch_events(rpc, idl, sig) {
+        match rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig)) {
             Ok(t) => {
                 errors += t.decode_errors.len();
                 let n = st.ingest(&t)?;
@@ -436,33 +436,42 @@ fn with_budget(
     st: &mut store::Store,
     command: &str,
     budget: &rpc::Budget,
-    f: impl FnOnce(&mut store::Store) -> Result<usize>,
+    f: impl FnOnce(&mut store::Store, &mut usize) -> Result<()>,
 ) -> Result<()> {
-    let r = f(st);
-    let tokens = *r.as_ref().unwrap_or(&0);
+    // `tokens` se actualiza sobre la marcha: si la ejecución termina en error
+    // se registran igual los tokens que llegó a procesar.
+    let mut tokens = 0;
+    let r = f(st, &mut tokens);
     st.record_rpc_usage(command, budget, tokens, unix_now())?;
     eprintln!("consumo de esta ejecución: {}", budget.summary());
     for (prov, gt, gs, units) in st.rpc_usage_totals()? {
         eprintln!("acumulado {prov}: {gt} getTransaction, {gs} getSignaturesForAddress, {units} unidades");
     }
-    r.map(|_| ())
+    r
 }
 
 fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
-    with_budget(st, "windows", budget, |st| {
+    with_budget(st, "windows", budget, |st, done| {
         let now = unix_now();
         let pending = st.pending_windows(now, limit)?;
         eprintln!("{} tokens con ventana cerrada pendientes de descarga", pending.len());
-        let (mut complete, mut incomplete, mut trades, mut done) = (0, 0, 0, 0);
+        let (mut complete, mut incomplete, mut trades) = (0, 0, 0);
         for w in pending {
             if !budget.has_room(1) {
                 eprintln!("tope de peticiones alcanzado: se para aquí (reanudable)");
                 break;
             }
             let end = w.created_at + store::EARLY_WINDOW_SECS;
-            let Some(in_window) =
-                curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, w.created_at, end, max_pages)?
-            else {
+            let sigs = match curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, w.created_at, end, max_pages) {
+                Ok(s) => s,
+                Err(e) => {
+                    // El token queda pendiente; la próxima pasada lo reintenta.
+                    eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
+                    incomplete += 1;
+                    continue;
+                }
+            };
+            let Some(in_window) = sigs else {
                 incomplete += 1;
                 st.record_window(&w.mint, 0, 0, false, Some("max_pages sin llegar a la creación"), now)?;
                 eprintln!("{}: ventana incompleta (max_pages sin llegar a la creación)", w.mint);
@@ -474,14 +483,14 @@ fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_
                 break;
             };
             trades += n;
-            done += 1;
+            *done += 1;
             let ok = errors == 0;
             if ok { complete += 1 } else { incomplete += 1 }
             let note = (!ok).then_some("errores de getTransaction o decodificación");
             st.record_window(&w.mint, in_window.len(), errors, ok, note, now)?;
         }
         println!("ventanas completas: {complete}, incompletas: {incomplete}, trades nuevos: {trades}");
-        Ok(done)
+        Ok(())
     })
 }
 
@@ -490,13 +499,13 @@ fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_
 const PRICE_DOWNLOAD_SECS: i64 = h1b::PARAMS_1H.horizon_secs + store::EARLY_WINDOW_SECS;
 
 fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
-    with_budget(st, "prices", budget, |st| {
+    with_budget(st, "prices", budget, |st, done| {
         let horizon = PRICE_DOWNLOAD_SECS;
         let now = unix_now();
         let copied = st.backfill_prices_from_early_trades()?;
         let pending = st.pending_price_windows(now, horizon, limit)?;
         eprintln!("{copied} puntos copiados de la ventana temprana; {} tokens pendientes", pending.len());
-        let (mut complete, mut incomplete, mut points, mut done) = (0, 0, 0, 0);
+        let (mut complete, mut incomplete, mut points) = (0, 0, 0);
         for w in pending {
             if !budget.has_room(1) {
                 eprintln!("tope de peticiones alcanzado: se para aquí (reanudable)");
@@ -505,9 +514,16 @@ fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_p
             // Los 5 primeros minutos ya están en early_trades: solo se piden las
             // firmas posteriores, más la creación (precio inicial del CreateEvent).
             let from = w.created_at + store::EARLY_WINDOW_SECS;
-            let Some(sigs) =
-                curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, from, w.created_at + horizon, max_pages)?
-            else {
+            let listed =
+                match curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, from, w.created_at + horizon, max_pages) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
+                        incomplete += 1;
+                        continue;
+                    }
+                };
+            let Some(sigs) = listed else {
                 incomplete += 1;
                 st.record_price_window(&w.mint, horizon, 0, 0, false, Some("max_pages sin llegar al rango"), now)?;
                 eprintln!("{}: ventana de precio incompleta (max_pages)", w.mint);
@@ -520,14 +536,14 @@ fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_p
                 break;
             };
             points += n;
-            done += 1;
+            *done += 1;
             let ok = errors == 0;
             if ok { complete += 1 } else { incomplete += 1 }
             let note = (!ok).then_some("errores de getTransaction o decodificación");
             st.record_price_window(&w.mint, horizon, sigs.len(), errors, ok, note, now)?;
         }
         println!("ventanas de precio completas: {complete}, incompletas: {incomplete}, puntos nuevos: {points}");
-        Ok(done)
+        Ok(())
     })
 }
 
@@ -932,6 +948,7 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
         e: &'a entry2::Entry2,
         pump_dump: bool,
         rets: [Option<f64>; 3],
+        mayhem: bool,
     }
     let mut table_rows = Vec::new();
     let mut no_price = 0;
@@ -949,6 +966,7 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
             e,
             pump_dump: r.peak_multiple >= pb.min_peak_multiple && r.drawdown > pb.max_drawdown,
             rets: entry2::returns(e, &pts, Some(i.t0 + h - 1), i.completed_at, &p),
+            mayhem: st.is_mayhem(&i.mint)?,
         });
     }
     let heaviest = table_rows.iter().max_by_key(|r| r.e.window_trades).map(|r| r.mint.to_string());
@@ -991,6 +1009,7 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
         let fp = t.fisher_p();
         let (or, olo, ohi) = t.odds_ratio();
         println!("\n{name}");
+        println!("  n señal = {}  n sin señal = {}  n/e = {}", t.a + t.b, t.c + t.d, table_rows.len() as u64 - (t.a + t.b + t.c + t.d));
         println!(
             "  señal: {}/{} p&c ({:.0}%)  sin señal: {}/{} ({:.0}%)  dif {:+.0} pts  Fisher p = {fp:.4}  OR {or:.2} ({olo:.2}–{ohi:.2})",
             t.a,
@@ -1025,6 +1044,79 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
                 100.0 * median(&mut x),
                 100.0 * median(&mut y)
             );
+        }
+    }
+
+    // A partir de aquí nada decide: descriptivo añadido tras congelar.
+    println!("\n==== POST HOC, NO PRE-REGISTRADA, SIN VEREDICTO ====");
+    type Filter<'b> = (&'b str, &'b dyn Fn(&Row) -> bool);
+    println!("\n(a) cada hipótesis con y sin tokens mayhem (pump-y-caída por grupo)");
+    let strata_a: [Filter; 3] =
+        [("todos", &|_| true), ("sin mayhem", &|r| !r.mayhem), ("solo mayhem", &|r| r.mayhem)];
+    for (name, sig) in ENTRY2_SIGNALS {
+        println!("{name}");
+        for (label, keep) in strata_a {
+            let mut t = h1b::Table::default();
+            for r in table_rows.iter().filter(|r| keep(r)) {
+                match (sig(r.e), r.pump_dump) {
+                    (Some(true), true) => t.a += 1,
+                    (Some(true), false) => t.b += 1,
+                    (Some(false), true) => t.c += 1,
+                    (Some(false), false) => t.d += 1,
+                    (None, _) => {}
+                }
+            }
+            println!(
+                "  {label:12} señal {}/{} ({:.0}%)  sin señal {}/{} ({:.0}%)  dif {:+.0} pts  Fisher p = {:.4}",
+                t.a,
+                t.a + t.b,
+                100.0 * rate(t.a, t.b),
+                t.c,
+                t.c + t.d,
+                100.0 * rate(t.c, t.d),
+                100.0 * (rate(t.a, t.b) - rate(t.c, t.d)),
+                t.fisher_p()
+            );
+        }
+    }
+    println!("\n(b) retorno neto estratificado por mayhem y por comisión en T_entry2");
+    let strata_b: [Filter; 5] = [
+        ("mayhem no", &|r| !r.mayhem),
+        ("mayhem sí", &|r| r.mayhem),
+        ("fee 125 bps", &|r| r.e.fee_bps == Some(125)),
+        ("fee 0 bps", &|r| r.e.fee_bps == Some(0)),
+        ("fee otra", &|r| !matches!(r.e.fee_bps, Some(125) | Some(0))),
+    ];
+    for (label, keep) in strata_b {
+        let sub: Vec<&Row> = table_rows.iter().filter(|r| keep(r)).collect();
+        println!("[{label}] tokens = {}", sub.len());
+        for (k, h) in p.return_horizons.iter().enumerate() {
+            let mut all: Vec<f64> = sub.iter().filter_map(|r| r.rets[k]).collect();
+            let n = all.len();
+            println!("  +{} min, todos: mediana {:+.1}% (n={n})", h / 60, 100.0 * median(&mut all));
+        }
+        for (name, sig) in ENTRY2_SIGNALS {
+            let short = name.split(' ').next().unwrap_or(name);
+            let cells: Vec<String> = p
+                .return_horizons
+                .iter()
+                .enumerate()
+                .map(|(k, h)| {
+                    let grp = |g: bool| -> Vec<f64> {
+                        sub.iter().filter(|r| sig(r.e) == Some(g)).filter_map(|r| r.rets[k]).collect()
+                    };
+                    let (mut x, mut y) = (grp(true), grp(false));
+                    let mw = entry2::mann_whitney(&x, &y).map_or(f64::NAN, |m| m.1);
+                    let (nx, ny) = (x.len(), y.len());
+                    format!(
+                        "+{}m {:+.0}% (n={nx}) vs {:+.0}% (n={ny}) MW p={mw:.3}",
+                        h / 60,
+                        100.0 * median(&mut x),
+                        100.0 * median(&mut y)
+                    )
+                })
+                .collect();
+            println!("  {short:4} {}", cells.join(" | "));
         }
     }
     Ok(())

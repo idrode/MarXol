@@ -116,6 +116,29 @@ impl Budget {
     }
 }
 
+/// Hace la petición con `acquire` y, si el proveedor responde 429, la
+/// reintenta hasta 4 veces con espera creciente (1, 2, 4, 8 s). Cada intento
+/// cuenta en el presupuesto: consume cuota igual.
+pub fn with_retry<T>(b: &Budget, m: Method, mut f: impl FnMut() -> Result<T>) -> Result<T> {
+    let mut wait = Duration::from_secs(1);
+    for attempt in 0.. {
+        b.acquire(m)?;
+        match f() {
+            Err(e) if attempt < 4 && is_rate_limited(&e) => {
+                std::thread::sleep(wait);
+                wait *= 2;
+            }
+            r => return r,
+        }
+    }
+    unreachable!()
+}
+
+fn is_rate_limited(e: &anyhow::Error) -> bool {
+    let s = format!("{e:#}");
+    s.contains("429") || s.contains("Too Many Requests")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +164,21 @@ mod tests {
         }
         assert!(t.elapsed() >= Duration::from_millis(38), "{:?}", t.elapsed());
         assert_eq!(b.units(), 0);
+    }
+
+    #[test]
+    fn reintenta_solo_los_429_y_cuenta_cada_intento() {
+        let b = Budget::new(ALCHEMY, Some(1000.0), None);
+        let mut n = 0;
+        let r = with_retry(&b, Method::GetTransaction, || {
+            n += 1;
+            if n < 2 { anyhow::bail!("HTTP status client error (429 Too Many Requests)") } else { Ok(n) }
+        });
+        assert_eq!(r.unwrap(), 2);
+        assert_eq!(b.get_transaction.get(), 2);
+        let r: Result<()> = with_retry(&b, Method::GetTransaction, || anyhow::bail!("otro error"));
+        assert!(r.is_err());
+        assert_eq!(b.get_transaction.get(), 3, "un error que no es 429 no se reintenta");
     }
 
     #[test]
