@@ -158,7 +158,34 @@ CREATE TABLE IF NOT EXISTS seen_signatures (
     signature TEXT PRIMARY KEY,
     slot      INTEGER NOT NULL
 );
+
+-- Firmas ya descargadas e ingeridas por `windows` ('window') o `prices`
+-- ('prices'), para reanudar sin repetir getTransaction. Es aparte de
+-- `seen_signatures` porque una firma vista por `index` antes de conocer la
+-- creación del mint no tiene sus trades ni sus precios guardados.
+CREATE TABLE IF NOT EXISTS fetched_sigs (
+    purpose    TEXT NOT NULL,
+    signature  TEXT NOT NULL,
+    PRIMARY KEY (purpose, signature)
+);
+
+-- Peticiones RPC reales hechas por cada ejecución de `windows`/`prices`.
+CREATE TABLE IF NOT EXISTS rpc_usage (
+    run_at            INTEGER NOT NULL,
+    command           TEXT NOT NULL,
+    provider          TEXT NOT NULL,
+    get_transaction   INTEGER NOT NULL,
+    get_signatures    INTEGER NOT NULL,
+    units             INTEGER NOT NULL,  -- CU (Alchemy) o créditos (Helius); 0 en RPC público
+    tokens            INTEGER NOT NULL
+);
 "#;
+
+/// Columnas añadidas después de crear la tabla (bases antiguas).
+const MIGRATIONS: &[(&str, &str, &str)] = &[
+    ("early_trades", "fee_basis_points", "INTEGER"),
+    ("early_trades", "creator_fee_basis_points", "INTEGER"),
+];
 
 pub struct Store {
     db: Connection,
@@ -175,6 +202,22 @@ pub struct Ingested {
 
 /// Ventana temprana de H1 en segundos (CLAUDE.md 8, valor [P]).
 pub const EARLY_WINDOW_SECS: i64 = crate::h1::PARAMS_V1.window_secs;
+
+/// Todo lo que necesitan `entry2::compute` y el resultado primario de un
+/// token con ventana temprana completa.
+pub struct Entry2Input {
+    pub mint: String,
+    pub t0: i64,
+    pub create_slot: u64,
+    pub initial: Option<crate::h1b::Point>,
+    pub trades: Vec<crate::entry::Trade>,
+    pub creator_ids: std::collections::HashSet<String>,
+    /// Horizonte de la ventana de precio si está completa.
+    pub price_horizon: Option<i64>,
+    pub points: Vec<crate::h1b::Point>,
+    pub completed_at: Option<i64>,
+    pub migrated_at: Option<i64>,
+}
 
 pub struct H1bInput {
     pub mint: String,
@@ -198,6 +241,16 @@ impl Store {
     pub fn open(path: &str) -> Result<Self> {
         let db = Connection::open(path).with_context(|| format!("abriendo {path}"))?;
         db.execute_batch(SCHEMA)?;
+        for (table, col, ty) in MIGRATIONS {
+            let exists: bool = db.query_row(
+                &format!("SELECT COUNT(*) > 0 FROM pragma_table_info('{table}') WHERE name = ?1"),
+                [col],
+                |r| r.get(0),
+            )?;
+            if !exists {
+                db.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {col} {ty}"))?;
+            }
+        }
         Ok(Store { db })
     }
 
@@ -307,8 +360,12 @@ impl Store {
                         }
                         let u = |k: &str| e.u64(k).map(|v| v as i64);
                         n.early_trades += tx.execute(
-                            "INSERT OR IGNORE INTO early_trades VALUES
-                             (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
+                            "INSERT OR IGNORE INTO early_trades
+                             (mint, user, is_buy, sol_amount, quote_amount, token_amount, quote_mint,
+                              creator, ix_name, virtual_sol_reserves, virtual_token_reserves,
+                              virtual_quote_reserves, timestamp, slot, signature, ev_index,
+                              fee_basis_points, creator_fee_basis_points)
+                             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
                             params![
                                 mint,
                                 req(e, "user")?,
@@ -325,7 +382,9 @@ impl Store {
                                 ts,
                                 t.slot as i64,
                                 t.signature,
-                                i as i64
+                                i as i64,
+                                u("fee_basis_points"),
+                                u("creator_fee_basis_points")
                             ],
                         )?;
                     }
@@ -496,6 +555,42 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    pub fn is_mayhem(&self, mint: &str) -> Result<bool> {
+        Ok(self
+            .db
+            .query_row("SELECT COALESCE(is_mayhem_mode, 0) FROM creations WHERE mint = ?1", [mint], |r| r.get(0))?)
+    }
+
+    pub fn creation_slot(&self, mint: &str) -> Result<u64> {
+        Ok(self.db.query_row("SELECT slot FROM creations WHERE mint = ?1", [mint], |r| r.get::<_, i64>(0))? as u64)
+    }
+
+    /// Trades de la ventana temprana con slot y reservas virtuales tras cada
+    /// uno, para T_entry y H4–H7. Reservas de quote como en `price_points`.
+    pub fn entry_trades(&self, mint: &str, t0: i64, window: i64) -> Result<Vec<crate::entry::Trade>> {
+        let mut q = self.db.prepare(
+            "SELECT user, is_buy, COALESCE(token_amount, 0), slot, timestamp,
+                    COALESCE(NULLIF(virtual_quote_reserves, 0), virtual_sol_reserves, 0),
+                    COALESCE(virtual_token_reserves, 0),
+                    fee_basis_points + creator_fee_basis_points
+             FROM early_trades WHERE mint = ?1 AND timestamp >= ?2 AND timestamp < ?3
+             ORDER BY slot, timestamp, signature, ev_index",
+        )?;
+        let rows = q.query_map(params![mint, t0, t0 + window], |r| {
+            Ok(crate::entry::Trade {
+                user: r.get(0)?,
+                is_buy: r.get(1)?,
+                token_amount: r.get::<_, i64>(2)? as u64,
+                slot: r.get::<_, i64>(3)? as u64,
+                timestamp: r.get(4)?,
+                quote_reserves: r.get::<_, i64>(5)? as u64,
+                token_reserves: r.get::<_, i64>(6)? as u64,
+                fee_bps: r.get::<_, Option<i64>>(7)?.map(|v| v as u64),
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// Unión de todas las identidades de creador conocidas del mint: creator
     /// original, payer de la creación, cambios de creador y el creator
     /// embebido en cada trade guardado (CLAUDE.md 8, H1 paso 2).
@@ -586,14 +681,14 @@ impl Store {
         )?)
     }
 
-    /// Tokens con H1 calculada, ventana de precio cerrada en `now` y sin
-    /// descarga completa.
+    /// Tokens con ventana temprana completa, ventana de precio cerrada en
+    /// `now` y sin descarga completa de precio (con cualquier horizonte).
     pub fn pending_price_windows(&self, now: i64, horizon: i64, limit: usize) -> Result<Vec<PendingWindow>> {
         let mut q = self.db.prepare(
             "SELECT c.mint, c.bonding_curve, c.timestamp, c.signature FROM creations c
-             LEFT JOIN price_windows w ON w.mint = c.mint AND w.horizon_secs = ?1
+             LEFT JOIN price_windows w ON w.mint = c.mint
              WHERE c.timestamp + ?1 <= ?2 AND COALESCE(w.complete, 0) = 0
-               AND EXISTS (SELECT 1 FROM h1_results h WHERE h.mint = c.mint)
+               AND EXISTS (SELECT 1 FROM trade_windows t WHERE t.mint = c.mint AND t.complete = 1)
              ORDER BY c.timestamp LIMIT ?3",
         )?;
         let rows = q.query_map(params![horizon, now, limit as i64], |r| {
@@ -633,7 +728,7 @@ impl Store {
             "SELECT c.mint, c.timestamp, h.signal, cp.timestamp, m.timestamp
              FROM creations c
              JOIN h1_results h ON h.mint = c.mint AND h.variant = ?2
-             JOIN price_windows w ON w.mint = c.mint AND w.horizon_secs = ?1 AND w.complete = 1
+             JOIN price_windows w ON w.mint = c.mint AND w.horizon_secs >= ?1 AND w.complete = 1
              LEFT JOIN completions cp ON cp.mint = c.mint
              LEFT JOIN migrations m ON m.mint = c.mint
              ORDER BY c.timestamp",
@@ -668,6 +763,105 @@ impl Store {
         Ok(out)
     }
 
+    pub fn fetched(&self, purpose: &str, sig: &str) -> Result<bool> {
+        Ok(self
+            .db
+            .query_row("SELECT 1 FROM fetched_sigs WHERE purpose = ?1 AND signature = ?2", [purpose, sig], |_| Ok(()))
+            .optional()?
+            .is_some())
+    }
+
+    pub fn mark_fetched(&self, purpose: &str, sig: &str) -> Result<()> {
+        self.db.execute("INSERT OR IGNORE INTO fetched_sigs VALUES (?1, ?2)", [purpose, sig])?;
+        Ok(())
+    }
+
+    pub fn record_rpc_usage(&self, command: &str, b: &crate::rpc::Budget, tokens: usize, now: i64) -> Result<()> {
+        self.db.execute(
+            "INSERT INTO rpc_usage VALUES (?1,?2,?3,?4,?5,?6,?7)",
+            params![
+                now,
+                command,
+                b.provider.name,
+                b.get_transaction.get() as i64,
+                b.get_signatures.get() as i64,
+                b.units() as i64,
+                tokens as i64
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Consumo acumulado por proveedor: (proveedor, getTransaction, getSignatures, unidades).
+    pub fn rpc_usage_totals(&self) -> Result<Vec<(String, i64, i64, i64)>> {
+        let mut q = self.db.prepare(
+            "SELECT provider, SUM(get_transaction), SUM(get_signatures), SUM(units)
+             FROM rpc_usage GROUP BY provider ORDER BY provider",
+        )?;
+        let rows = q.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Tokens con ventana temprana completa y slot de creación en
+    /// `[min_slot, max_slot]`.
+    pub fn entry2_inputs(&self, min_slot: u64, max_slot: u64) -> Result<Vec<Entry2Input>> {
+        let mut q = self.db.prepare(
+            "SELECT c.mint, c.timestamp, c.slot,
+                    (SELECT MAX(pw.horizon_secs) FROM price_windows pw WHERE pw.mint = c.mint AND pw.complete = 1),
+                    cp.timestamp, m.timestamp
+             FROM creations c
+             JOIN trade_windows w ON w.mint = c.mint AND w.complete = 1
+             LEFT JOIN completions cp ON cp.mint = c.mint
+             LEFT JOIN migrations m ON m.mint = c.mint
+             WHERE c.slot BETWEEN ?1 AND ?2
+             ORDER BY c.slot, c.timestamp",
+        )?;
+        let heads = q
+            .query_map(params![min_slot as i64, max_slot.min(i64::MAX as u64) as i64], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, i64>(1)?,
+                    r.get::<_, i64>(2)? as u64,
+                    r.get::<_, Option<i64>>(3)?,
+                    r.get::<_, Option<i64>>(4)?,
+                    r.get::<_, Option<i64>>(5)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut pts = self.db.prepare(
+            "SELECT kind, timestamp, quote_reserves, token_reserves FROM price_points
+             WHERE mint = ?1 ORDER BY timestamp, slot",
+        )?;
+        let mut out = Vec::new();
+        for (mint, t0, create_slot, price_horizon, completed_at, migrated_at) in heads {
+            let rows = pts
+                .query_map([&mint], |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        crate::h1b::Point {
+                            timestamp: r.get(1)?,
+                            quote_reserves: r.get::<_, i64>(2)? as u64,
+                            token_reserves: r.get::<_, i64>(3)? as u64,
+                        },
+                    ))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            out.push(Entry2Input {
+                trades: self.entry_trades(&mint, t0, EARLY_WINDOW_SECS)?,
+                creator_ids: self.creator_identities(&mint)?,
+                initial: rows.iter().find(|(k, _)| k == "create").map(|(_, p)| *p),
+                points: rows.into_iter().filter(|(k, _)| k == "trade").map(|(_, p)| p).collect(),
+                mint,
+                t0,
+                create_slot,
+                price_horizon,
+                completed_at,
+                migrated_at,
+            });
+        }
+        Ok(out)
+    }
+
     pub fn counts(&self) -> Result<Vec<(&'static str, i64)>> {
         [
             "creations",
@@ -679,6 +873,8 @@ impl Store {
             "h1_results",
             "price_points",
             "price_windows",
+            "fetched_sigs",
+            "rpc_usage",
             "seen_signatures",
         ]
             .into_iter()
@@ -823,5 +1019,29 @@ mod tests {
         for id in ["A", "P", "C2"] {
             assert!(ids.contains(id), "falta {id}");
         }
+    }
+
+    #[test]
+    fn comisiones_del_trade_y_firmas_descargadas_para_reanudar() {
+        let mut st = Store::open(":memory:").unwrap();
+        st.ingest(&tx(
+            "s1",
+            vec![
+                ev("CreateEvent", json!({"mint":"M","bonding_curve":"B","creator":"A","user":"A","timestamp":100})),
+                ev(
+                    "TradeEvent",
+                    json!({"mint":"M","user":"U","is_buy":true,"quote_amount":7,"token_amount":3,
+                           "virtual_quote_reserves":10,"virtual_token_reserves":20,
+                           "fee_basis_points":95,"creator_fee_basis_points":5,"timestamp":101}),
+                ),
+            ],
+        ))
+        .unwrap();
+        let ts = st.entry_trades("M", 100, EARLY_WINDOW_SECS).unwrap();
+        assert_eq!(ts[0].fee_bps, Some(100));
+        assert!(!st.fetched("window", "s1").unwrap());
+        st.mark_fetched("window", "s1").unwrap();
+        assert!(st.fetched("window", "s1").unwrap());
+        assert!(!st.fetched("prices", "s1").unwrap(), "cada propósito lleva su propio registro");
     }
 }

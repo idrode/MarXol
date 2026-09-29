@@ -1,9 +1,12 @@
 //! marXol — CLI de búsqueda y análisis on-chain de operadores de pump.fun.
 
+mod entry;
+mod entry2;
 mod h1;
 mod h1b;
 mod idl;
 mod pump;
+mod rpc;
 mod store;
 mod tx;
 
@@ -31,6 +34,28 @@ struct Cli {
     json: bool,
     #[command(subcommand)]
     cmd: Cmd,
+}
+
+/// Ritmo y tope de peticiones de las descargas (`windows`, `prices`).
+/// Ambas son reanudables: saltan tokens completos y firmas ya ingeridas.
+#[derive(clap::Args)]
+struct RateArgs {
+    /// Proveedor RPC, para el ritmo por defecto y el coste por método:
+    /// auto (según la URL), public, alchemy, helius.
+    #[arg(long, env = "MARXOL_PROVIDER", default_value = "auto")]
+    provider: String,
+    /// Peticiones por segundo (por defecto, el del proveedor).
+    #[arg(long)]
+    max_rps: Option<f64>,
+    /// Tope de peticiones de esta ejecución; al alcanzarlo se para limpiamente.
+    #[arg(long)]
+    max_requests: Option<u64>,
+}
+
+impl RateArgs {
+    fn budget(&self, rpc_url: &str) -> Result<rpc::Budget> {
+        Ok(rpc::Budget::new(rpc::Provider::parse(&self.provider, rpc_url)?, self.max_rps, self.max_requests))
+    }
 }
 
 #[derive(Subcommand)]
@@ -83,8 +108,8 @@ enum Cmd {
         /// llegar a la creación, la ventana queda incompleta.
         #[arg(long, default_value_t = 20)]
         max_pages: usize,
-        #[arg(long, default_value_t = 150)]
-        delay_ms: u64,
+        #[command(flatten)]
+        rate: RateArgs,
     },
     /// Calcula la señal H1 sobre los tokens con ventana temprana completa.
     H1 {
@@ -99,14 +124,30 @@ enum Cmd {
         limit: usize,
         #[arg(long, default_value_t = 20)]
         max_pages: usize,
-        #[arg(long, default_value_t = 150)]
-        delay_ms: u64,
+        #[command(flatten)]
+        rate: RateArgs,
     },
     /// Calcula H1b (1 h) y la cruza con H1: tablas 2×2 y test exacto de Fisher.
     H1b {
         /// Variante de H1 con la que se cruza (debe estar calculada con `h1`).
         #[arg(long, default_value = "v1")]
         variant: String,
+    },
+    /// Punto de entrada hipotético T_entry e indicadores previos H4–H7,
+    /// cruzados con pump-y-caída en 1 h (CLAUDE.md 8). Sin RPC.
+    Entry,
+    /// Validación congelada (CLAUDE.md 8): T_entry2 e indicadores H4', H5,
+    /// H6', H7', H8 contra pump-y-caída en 1 h, y retorno neto desde T_entry2.
+    /// Sin RPC.
+    Entry2 {
+        /// Solo chequeo de no-degeneración: cuenta grupos y distribuciones sin
+        /// calcular ni mirar el resultado.
+        #[arg(long)]
+        check: bool,
+        /// Tramo: validacion (slot > último del piloto) o piloto. El piloto
+        /// solo admite --check.
+        #[arg(long, default_value = "validacion")]
+        tramo: String,
     },
     /// Informe de un operador (identidad = campo `creator`, no el payer).
     Operator { creator: String },
@@ -150,21 +191,29 @@ fn main() -> Result<()> {
             let mut st = store::Store::open(&cli.db)?;
             index(&rpc, &idl, &mut st, &address, limit, delay_ms)
         }
-        Cmd::Windows { limit, max_pages, delay_ms } => {
+        Cmd::Windows { limit, max_pages, rate } => {
             let mut st = store::Store::open(&cli.db)?;
-            windows(&rpc, &idl, &mut st, limit, max_pages, delay_ms)
+            windows(&rpc, &idl, &mut st, limit, max_pages, &rate.budget(&cli.rpc)?)
         }
         Cmd::H1 { variant } => {
             let st = store::Store::open(&cli.db)?;
             h1_report(&st, cli.json, &variant)
         }
-        Cmd::Prices { limit, max_pages, delay_ms } => {
+        Cmd::Prices { limit, max_pages, rate } => {
             let mut st = store::Store::open(&cli.db)?;
-            prices(&rpc, &idl, &mut st, limit, max_pages, delay_ms)
+            prices(&rpc, &idl, &mut st, limit, max_pages, &rate.budget(&cli.rpc)?)
         }
         Cmd::H1b { variant } => {
             let st = store::Store::open(&cli.db)?;
             h1b_report(&st, cli.json, &variant)
+        }
+        Cmd::Entry => {
+            let st = store::Store::open(&cli.db)?;
+            entry_report(&st, cli.json)
+        }
+        Cmd::Entry2 { check, tramo } => {
+            let st = store::Store::open(&cli.db)?;
+            entry2_report(&st, cli.json, check, &tramo)
         }
         Cmd::Operator { creator } => {
             let st = store::Store::open(&cli.db)?;
@@ -295,16 +344,17 @@ const BLOCK_TIME_SLACK: i64 = 10;
 /// `from` es la creación. `None` si `max_pages` no basta para llegar.
 fn curve_signatures(
     rpc: &RpcClient,
+    budget: &rpc::Budget,
     bonding_curve: &str,
     creation_sig: &str,
     from: i64,
     to: i64,
     max_pages: usize,
-    delay_ms: u64,
 ) -> Result<Option<Vec<tx::SigInfo>>> {
     let mut out = Vec::new();
     let (mut before, mut pages) = (None::<String>, 0);
     while pages < max_pages {
+        budget.acquire(rpc::Method::GetSignatures)?;
         let page = tx::recent_signatures(rpc, bonding_curve, 1000, before.as_deref())?;
         pages += 1;
         let mut reached = page.len() < 1000;
@@ -329,99 +379,156 @@ fn curve_signatures(
         if reached {
             return Ok(Some(out));
         }
-        std::thread::sleep(Duration::from_millis(delay_ms));
     }
     Ok(None)
 }
 
-fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, delay_ms: u64) -> Result<()> {
-    let now = unix_now();
-    let pending = st.pending_windows(now, limit)?;
-    eprintln!("{} tokens con ventana cerrada pendientes de descarga", pending.len());
-    let (mut complete, mut incomplete, mut trades) = (0, 0, 0);
-    for w in pending {
-        let end = w.created_at + store::EARLY_WINDOW_SECS;
-        let Some(in_window) =
-            curve_signatures(rpc, &w.bonding_curve, &w.signature, w.created_at, end, max_pages, delay_ms)?
-        else {
-            incomplete += 1;
-            st.record_window(&w.mint, 0, 0, false, Some("max_pages sin llegar a la creación"), now)?;
-            eprintln!("{}: ventana incompleta (max_pages sin llegar a la creación)", w.mint);
+/// Descarga e ingiere las firmas de un token que aún no constan en
+/// `fetched_sigs` para `purpose`. Devuelve (errores, filas nuevas) o `None`
+/// si se agotó el tope de peticiones antes de terminar (el token queda
+/// pendiente y la próxima pasada sigue donde se quedó).
+fn fetch_token_sigs<'a>(
+    rpc: &RpcClient,
+    idl: &Idl,
+    st: &mut store::Store,
+    budget: &rpc::Budget,
+    purpose: &str,
+    sigs: impl Iterator<Item = &'a str>,
+    prices_horizon: Option<i64>,
+) -> Result<Option<(usize, usize)>> {
+    let (mut errors, mut rows) = (0, 0);
+    for sig in sigs {
+        if st.fetched(purpose, sig)? {
             continue;
-        };
-        let mut errors = 0;
-        for s in in_window.iter().filter(|s| !s.failed) {
-            std::thread::sleep(Duration::from_millis(delay_ms));
-            match tx::fetch_events(rpc, idl, &s.signature) {
-                Ok(t) => {
-                    errors += t.decode_errors.len();
-                    trades += st.ingest(&t)?.early_trades;
-                }
-                Err(e) => {
-                    errors += 1;
-                    eprintln!("{}: {e:#}", s.signature);
+        }
+        if !budget.has_room(1) {
+            return Ok(None);
+        }
+        budget.acquire(rpc::Method::GetTransaction)?;
+        match tx::fetch_events(rpc, idl, sig) {
+            Ok(t) => {
+                errors += t.decode_errors.len();
+                let n = st.ingest(&t)?;
+                rows += match prices_horizon {
+                    Some(h) => st.ingest_prices(&t, h)?,
+                    None => {
+                        // Guarda también el precio inicial del CreateEvent (T_entry2).
+                        st.ingest_prices(&t, store::EARLY_WINDOW_SECS)?;
+                        n.early_trades
+                    }
+                };
+                if t.decode_errors.is_empty() {
+                    st.mark_fetched(purpose, sig)?;
                 }
             }
+            Err(e) => {
+                errors += 1;
+                eprintln!("{sig}: {e:#}");
+            }
         }
-        let ok = errors == 0;
-        if ok { complete += 1 } else { incomplete += 1 }
-        let note = (!ok).then_some("errores de getTransaction o decodificación");
-        st.record_window(&w.mint, in_window.len(), errors, ok, note, now)?;
     }
-    println!("ventanas completas: {complete}, incompletas: {incomplete}, trades nuevos: {trades}");
-    Ok(())
+    Ok(Some((errors, rows)))
 }
 
-fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, delay_ms: u64) -> Result<()> {
-    let horizon = h1b::PARAMS_1H.horizon_secs;
-    let now = unix_now();
-    let copied = st.backfill_prices_from_early_trades()?;
-    let pending = st.pending_price_windows(now, horizon, limit)?;
-    eprintln!("{copied} puntos copiados de la ventana temprana; {} tokens pendientes", pending.len());
-    let (mut complete, mut incomplete, mut points) = (0, 0, 0);
-    for w in pending {
-        // Los 5 primeros minutos ya están en early_trades: solo se piden las
-        // firmas posteriores, más la creación (precio inicial del CreateEvent).
-        let from = w.created_at + store::EARLY_WINDOW_SECS;
-        let Some(sigs) = curve_signatures(
-            rpc,
-            &w.bonding_curve,
-            &w.signature,
-            from,
-            w.created_at + horizon,
-            max_pages,
-            delay_ms,
-        )?
-        else {
-            incomplete += 1;
-            st.record_price_window(&w.mint, horizon, 0, 0, false, Some("max_pages sin llegar al rango"), now)?;
-            eprintln!("{}: ventana de precio incompleta (max_pages)", w.mint);
-            continue;
-        };
-        let mut errors = 0;
-        let fetch = std::iter::once(w.signature.as_str())
-            .chain(sigs.iter().filter(|s| !s.failed).map(|s| s.signature.as_str()));
-        for sig in fetch {
-            std::thread::sleep(Duration::from_millis(delay_ms));
-            match tx::fetch_events(rpc, idl, sig) {
-                Ok(t) => {
-                    errors += t.decode_errors.len();
-                    st.ingest(&t)?;
-                    points += st.ingest_prices(&t, horizon)?;
-                }
-                Err(e) => {
-                    errors += 1;
-                    eprintln!("{sig}: {e:#}");
-                }
-            }
-        }
-        let ok = errors == 0;
-        if ok { complete += 1 } else { incomplete += 1 }
-        let note = (!ok).then_some("errores de getTransaction o decodificación");
-        st.record_price_window(&w.mint, horizon, sigs.len(), errors, ok, note, now)?;
+/// Ejecuta una descarga con presupuesto y deja constancia del consumo real
+/// en `rpc_usage`, también si la descarga termina con error.
+fn with_budget(
+    st: &mut store::Store,
+    command: &str,
+    budget: &rpc::Budget,
+    f: impl FnOnce(&mut store::Store) -> Result<usize>,
+) -> Result<()> {
+    let r = f(st);
+    let tokens = *r.as_ref().unwrap_or(&0);
+    st.record_rpc_usage(command, budget, tokens, unix_now())?;
+    eprintln!("consumo de esta ejecución: {}", budget.summary());
+    for (prov, gt, gs, units) in st.rpc_usage_totals()? {
+        eprintln!("acumulado {prov}: {gt} getTransaction, {gs} getSignaturesForAddress, {units} unidades");
     }
-    println!("ventanas de precio completas: {complete}, incompletas: {incomplete}, puntos nuevos: {points}");
-    Ok(())
+    r.map(|_| ())
+}
+
+fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
+    with_budget(st, "windows", budget, |st| {
+        let now = unix_now();
+        let pending = st.pending_windows(now, limit)?;
+        eprintln!("{} tokens con ventana cerrada pendientes de descarga", pending.len());
+        let (mut complete, mut incomplete, mut trades, mut done) = (0, 0, 0, 0);
+        for w in pending {
+            if !budget.has_room(1) {
+                eprintln!("tope de peticiones alcanzado: se para aquí (reanudable)");
+                break;
+            }
+            let end = w.created_at + store::EARLY_WINDOW_SECS;
+            let Some(in_window) =
+                curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, w.created_at, end, max_pages)?
+            else {
+                incomplete += 1;
+                st.record_window(&w.mint, 0, 0, false, Some("max_pages sin llegar a la creación"), now)?;
+                eprintln!("{}: ventana incompleta (max_pages sin llegar a la creación)", w.mint);
+                continue;
+            };
+            let sigs = in_window.iter().filter(|s| !s.failed).map(|s| s.signature.as_str());
+            let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "window", sigs, None)? else {
+                eprintln!("{}: tope de peticiones a mitad de token: queda pendiente (reanudable)", w.mint);
+                break;
+            };
+            trades += n;
+            done += 1;
+            let ok = errors == 0;
+            if ok { complete += 1 } else { incomplete += 1 }
+            let note = (!ok).then_some("errores de getTransaction o decodificación");
+            st.record_window(&w.mint, in_window.len(), errors, ok, note, now)?;
+        }
+        println!("ventanas completas: {complete}, incompletas: {incomplete}, trades nuevos: {trades}");
+        Ok(done)
+    })
+}
+
+/// Horizonte de descarga de precio: 1 h de H1b más la ventana temprana, para
+/// que el retorno a +60 min desde T_entry2 (≤ 5 min) quede cubierto.
+const PRICE_DOWNLOAD_SECS: i64 = h1b::PARAMS_1H.horizon_secs + store::EARLY_WINDOW_SECS;
+
+fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
+    with_budget(st, "prices", budget, |st| {
+        let horizon = PRICE_DOWNLOAD_SECS;
+        let now = unix_now();
+        let copied = st.backfill_prices_from_early_trades()?;
+        let pending = st.pending_price_windows(now, horizon, limit)?;
+        eprintln!("{copied} puntos copiados de la ventana temprana; {} tokens pendientes", pending.len());
+        let (mut complete, mut incomplete, mut points, mut done) = (0, 0, 0, 0);
+        for w in pending {
+            if !budget.has_room(1) {
+                eprintln!("tope de peticiones alcanzado: se para aquí (reanudable)");
+                break;
+            }
+            // Los 5 primeros minutos ya están en early_trades: solo se piden las
+            // firmas posteriores, más la creación (precio inicial del CreateEvent).
+            let from = w.created_at + store::EARLY_WINDOW_SECS;
+            let Some(sigs) =
+                curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, from, w.created_at + horizon, max_pages)?
+            else {
+                incomplete += 1;
+                st.record_price_window(&w.mint, horizon, 0, 0, false, Some("max_pages sin llegar al rango"), now)?;
+                eprintln!("{}: ventana de precio incompleta (max_pages)", w.mint);
+                continue;
+            };
+            let fetch = std::iter::once(w.signature.as_str())
+                .chain(sigs.iter().filter(|s| !s.failed).map(|s| s.signature.as_str()));
+            let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "prices", fetch, Some(horizon))? else {
+                eprintln!("{}: tope de peticiones a mitad de token: queda pendiente (reanudable)", w.mint);
+                break;
+            };
+            points += n;
+            done += 1;
+            let ok = errors == 0;
+            if ok { complete += 1 } else { incomplete += 1 }
+            let note = (!ok).then_some("errores de getTransaction o decodificación");
+            st.record_price_window(&w.mint, horizon, sigs.len(), errors, ok, note, now)?;
+        }
+        println!("ventanas de precio completas: {complete}, incompletas: {incomplete}, puntos nuevos: {points}");
+        Ok(done)
+    })
 }
 
 fn h1b_report(st: &store::Store, json: bool, variant: &str) -> Result<()> {
@@ -525,6 +632,400 @@ fn h1b_report(st: &store::Store, json: bool, variant: &str) -> Result<()> {
             if pairs == 0 { f64::NAN } else { 100.0 * fastn as f64 / pairs as f64 },
             med(&fr) / 10.0
         );
+    }
+    Ok(())
+}
+
+/// Token de `CLAUDE.md` 8 que concentra la mitad de los pares 1+1 del piloto:
+/// todo lo de H4–H7 se reporta con y sin él.
+const CRH: &str = "CRHnzej9uJgwyiybSDqcndovAXGantb4v7e2hUihpump";
+
+struct EntryRow {
+    mint: String,
+    mayhem: bool,
+    h1b: h1b::H1bResult,
+    pump_dump: bool,
+    ind: Option<entry::Indicators>,
+}
+
+fn entry_report(st: &store::Store, json: bool) -> Result<()> {
+    let (p, pb) = (entry::PARAMS, h1b::PARAMS_1H);
+    let mut rows = Vec::new();
+    for i in st.h1b_inputs(pb.horizon_secs, "v1")? {
+        let r = h1b::compute(i.t0, i.initial, &i.points, i.completed_at, i.migrated_at, &pb);
+        let trades = st.entry_trades(&i.mint, i.t0, p.window_secs)?;
+        let ind = entry::compute(
+            i.t0,
+            st.creation_slot(&i.mint)?,
+            (i.initial.quote_reserves, i.initial.token_reserves),
+            &trades,
+            &st.creator_identities(&i.mint)?,
+            &p,
+        );
+        rows.push(EntryRow {
+            mayhem: st.is_mayhem(&i.mint)?,
+            pump_dump: r.peak_multiple >= pb.min_peak_multiple && r.drawdown > pb.max_drawdown,
+            mint: i.mint,
+            h1b: r,
+            ind,
+        });
+    }
+    if json {
+        let v: Vec<_> = rows
+            .iter()
+            .map(|r| {
+                serde_json::json!({"mint": r.mint, "mayhem": r.mayhem, "pump_dump": r.pump_dump,
+                                   "h1b": r.h1b, "entry": r.ind})
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&v)?);
+        return Ok(());
+    }
+
+    println!("T_entry y H4–H7, parámetros [P]: {}", serde_json::to_string(&p)?);
+    let entered: Vec<&EntryRow> = rows.iter().filter(|r| r.ind.is_some()).collect();
+    let no_entry: Vec<&EntryRow> = rows.iter().filter(|r| r.ind.is_none()).collect();
+    println!(
+        "tokens: {}  con entrada: {} ({} pump-y-caída)  sin entrada: {} ({} pump-y-caída, {} con pico ≥ 2×)",
+        rows.len(),
+        entered.len(),
+        entered.iter().filter(|r| r.pump_dump).count(),
+        no_entry.len(),
+        no_entry.iter().filter(|r| r.pump_dump).count(),
+        no_entry.iter().filter(|r| r.h1b.peak_multiple >= pb.min_peak_multiple).count(),
+    );
+
+    println!(
+        "\n{:12} {:>3} {:>4} {:>6} {:>5} {:>6} {:>8} {:>4} {:>5} {:>7} {:>5}",
+        "mint", "p&c", "grad", "pico×", "t_ent", "trades", "dev_vta", "dev%", "slotC", "slot_w", "1+1"
+    );
+    for r in &entered {
+        let i = r.ind.as_ref().unwrap();
+        println!(
+            "{:12} {:>3} {:>4} {:>6.2} {:>5} {:>6} {:>8} {:>4.1} {:>5} {:>3} {:>3.1} {:>5}{}",
+            &r.mint[..12],
+            if r.pump_dump { "sí" } else { "no" },
+            if r.h1b.graduated { "sí" } else { "no" },
+            r.h1b.peak_multiple,
+            i.entry_secs,
+            i.trades_seen,
+            i.dev_first_sell_secs.map_or("-".into(), |s| format!("{s} s")),
+            i.dev_sold_pct,
+            if i.creator_same_slot_buy { "sí" } else { "no" },
+            i.same_slot_wallets,
+            i.same_slot_pct,
+            i.pairs,
+            if r.mayhem { "  (mayhem)" } else { "" },
+        );
+    }
+
+    type Sig = fn(&entry::Indicators) -> bool;
+    let sigs: [(&str, Sig); 5] = [
+        ("H4 dev vendió antes de entrar", |i| i.h4()),
+        ("H5 ≥1 wallet ajena compra en el slot de creación", |i| i.h5()),
+        ("H5a (descriptivo) el creador compra en el slot de creación", |i| i.creator_same_slot_buy),
+        ("H6 entrada en ≤ 10 s", |i| i.h6(&entry::PARAMS)),
+        ("H7 ≥ 3 wallets 1+1 antes de entrar", |i| i.h7(&entry::PARAMS)),
+    ];
+    let table = |sub: &[&&EntryRow], sig: Sig, ok: &dyn Fn(&EntryRow) -> Option<bool>| {
+        let mut t = h1b::Table::default();
+        for r in sub {
+            match (sig(r.ind.as_ref().unwrap()), ok(r)) {
+                (true, Some(true)) => t.a += 1,
+                (true, Some(false)) => t.b += 1,
+                (false, Some(true)) => t.c += 1,
+                (false, Some(false)) => t.d += 1,
+                (_, None) => {}
+            }
+        }
+        t
+    };
+    let rate = |x: u64, y: u64| if x + y == 0 { f64::NAN } else { x as f64 / (x + y) as f64 };
+    let all: Vec<&&EntryRow> = entered.iter().collect();
+    let sin_crh: Vec<&&EntryRow> = entered.iter().filter(|r| r.mint != CRH).collect();
+    for (name, sig) in sigs {
+        println!("\n{name}");
+        let mut diffs = vec![];
+        for (label, sub) in [("todos", &all), ("sin CRHnzej9", &sin_crh)] {
+            let t = table(sub, sig, &|r| Some(r.pump_dump));
+            let (p1, p0) = (rate(t.a, t.b), rate(t.c, t.d));
+            let (or, lo, hi) = t.odds_ratio();
+            println!(
+                "  {label:13} señal: {}/{} p&c ({:.0}%)  sin señal: {}/{} ({:.0}%)  dif {:+.0} pts  Fisher p = {:.3}  OR {or:.2} ({lo:.2}–{hi:.2})",
+                t.a,
+                t.a + t.b,
+                100.0 * p1,
+                t.c,
+                t.c + t.d,
+                100.0 * p0,
+                100.0 * (p1 - p0),
+                t.fisher_p()
+            );
+            diffs.push((t.a + t.b, t.c + t.d, p1 - p0));
+        }
+        // Tolerancia de coma flotante: 0.7 − 0.5 = 0.1999… debe contar como 20 pts.
+        const EPS: f64 = 1e-9;
+        let [(n1, n0, d), (_, _, d_sin)] = [diffs[0], diffs[1]];
+        let verdict = if n1 < 3 || n0 < 3 {
+            "no concluyente (algún grupo < 3 tokens)"
+        } else if d >= 0.20 - EPS && d_sin > EPS {
+            "candidata a validar con tokens nuevos"
+        } else if d <= EPS {
+            "descartada en calibración"
+        } else {
+            "no concluyente"
+        };
+        println!("  criterio pre-registrado: {verdict}");
+        for (label, ok) in [
+            ("graduó 1 h", &(|r: &EntryRow| Some(r.h1b.graduated)) as &dyn Fn(&EntryRow) -> Option<bool>),
+            ("sostenido 1 h", &|r: &EntryRow| r.h1b.sustained),
+        ] {
+            let t = table(&all, sig, ok);
+            println!(
+                "  secundario × {label}: señal {}/{}, sin señal {}/{}, Fisher p = {:.3}",
+                t.a,
+                t.a + t.b,
+                t.c,
+                t.c + t.d,
+                t.fisher_p()
+            );
+        }
+    }
+
+    // Distribuciones completas por grupo de resultado (con y sin CRHnzej9 solo
+    // cambia un valor: se marca con *).
+    type Metric = fn(&entry::Indicators) -> Option<f64>;
+    let metrics: [(&str, Metric); 6] = [
+        ("H4 % supply vendido por el dev", |i| Some(i.dev_sold_pct)),
+        ("H4 s hasta la primera venta del dev", |i| i.dev_first_sell_secs.map(|s| s as f64)),
+        ("H5 wallets ajenas en el slot de creación", |i| Some(i.same_slot_wallets as f64)),
+        ("H5 % supply comprado por ellas", |i| Some(i.same_slot_pct)),
+        ("H6 s hasta T_entry", |i| Some(i.entry_secs as f64)),
+        ("H7 wallets 1+1 antes de entrar", |i| Some(i.pairs as f64)),
+    ];
+    println!("\ndistribuciones (tokens con entrada; * = CRHnzej9):");
+    for (name, m) in metrics {
+        println!("  {name}");
+        for (label, pd) in [("p&c  ", true), ("resto", false)] {
+            let mut v: Vec<(f64, bool)> = entered
+                .iter()
+                .filter(|r| r.pump_dump == pd)
+                .filter_map(|r| m(r.ind.as_ref().unwrap()).map(|x| (x, r.mint == CRH)))
+                .collect();
+            v.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let s: Vec<String> =
+                v.iter().map(|(x, c)| format!("{}{}", if x.fract() == 0.0 { format!("{x:.0}") } else { format!("{x:.2}") }, if *c { "*" } else { "" })).collect();
+            let med = if v.is_empty() { f64::NAN } else { v[(v.len() - 1) / 2].0 };
+            println!("    {label} n={:2} mediana {med:.2}: [{}]", v.len(), s.join(", "));
+        }
+    }
+    Ok(())
+}
+
+type Signal = fn(&entry2::Entry2) -> Option<bool>;
+
+/// Las cinco hipótesis congeladas, con la dirección esperada: señal = true
+/// ⇒ más pump-y-caída en todas.
+const ENTRY2_SIGNALS: [(&str, Signal); 5] = [
+    ("H4' dev vendió antes de T_entry2", |e| e.h4()),
+    ("H5 ≥1 wallet ajena compra en el slot de creación", |e| e.h5()),
+    ("H6' llenado en T_entry2 ≥ umbral", |e| e.h6(&entry2::PARAMS)),
+    ("H7' wallets 1+1 antes de T_entry2 ≥ umbral", |e| e.h7(&entry2::PARAMS)),
+    ("H8 el creador compra ≥ 15 % del supply en el slot de creación", |e| e.h8(&entry2::PARAMS)),
+];
+
+/// Mediana convencional (media de los dos centrales si n es par).
+fn median(v: &mut [f64]) -> f64 {
+    if v.is_empty() {
+        return f64::NAN;
+    }
+    v.sort_by(f64::total_cmp);
+    let n = v.len();
+    if n % 2 == 1 { v[n / 2] } else { (v[n / 2 - 1] + v[n / 2]) / 2.0 }
+}
+
+fn fmt_list(v: &[f64]) -> String {
+    let mut v = v.to_vec();
+    v.sort_by(f64::total_cmp);
+    v.iter()
+        .map(|x| if x.fract() == 0.0 { format!("{x:.0}") } else { format!("{x:.2}") })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Result<()> {
+    let p = entry2::PARAMS;
+    let (lo, hi) = match tramo {
+        "piloto" => (0, entry2::PILOT_LAST_SLOT),
+        "validacion" => (entry2::PILOT_LAST_SLOT + 1, u64::MAX),
+        _ => anyhow::bail!("tramo desconocido: {tramo} (validacion, piloto)"),
+    };
+    if tramo == "piloto" && !check {
+        anyhow::bail!("el piloto es tramo de calibración: en la validación congelada solo admite --check");
+    }
+    let inputs = st.entry2_inputs(lo, hi)?;
+    let no_initial = inputs.iter().filter(|i| i.initial.is_none()).count();
+    let rows: Vec<(&store::Entry2Input, Option<entry2::Entry2>)> = inputs
+        .iter()
+        .filter_map(|i| {
+            let init = i.initial?;
+            let e = entry2::compute(
+                i.t0,
+                i.create_slot,
+                (init.quote_reserves, init.token_reserves),
+                &i.trades,
+                &i.creator_ids,
+                &p,
+            );
+            Some((i, e))
+        })
+        .collect();
+    let entered: Vec<(&store::Entry2Input, &entry2::Entry2)> =
+        rows.iter().filter_map(|(i, e)| e.as_ref().map(|e| (*i, e))).collect();
+
+    if check {
+        if json {
+            let v: Vec<_> = rows.iter().map(|(i, e)| serde_json::json!({"mint": i.mint, "entry2": e})).collect();
+            println!("{}", serde_json::to_string_pretty(&v)?);
+            return Ok(());
+        }
+        println!("CHEQUEO DE NO-DEGENERACIÓN, tramo {tramo} (sin resultado). Parámetros: {}", serde_json::to_string(&p)?);
+        println!(
+            "tokens con ventana completa: {}  sin precio inicial: {no_initial}  con T_entry2: {}  sin T_entry2: {}",
+            inputs.len(),
+            entered.len(),
+            rows.len() - entered.len()
+        );
+        println!(
+            "  orden de ejecución completo: {}/{}   comisión conocida en T_entry2: {}/{}",
+            entered.iter().filter(|(_, e)| e.order_complete).count(),
+            entered.len(),
+            entered.iter().filter(|(_, e)| e.fee_bps.is_some()).count(),
+            entered.len()
+        );
+        for (name, sig) in ENTRY2_SIGNALS {
+            let c = |x: Option<bool>| entered.iter().filter(|(_, e)| sig(e) == x).count();
+            println!("  {name}: true {}  false {}  n/e {}", c(Some(true)), c(Some(false)), c(None));
+        }
+        let col = |f: &dyn Fn(&entry2::Entry2) -> Option<f64>| -> Vec<f64> {
+            entered.iter().filter_map(|(_, e)| f(e)).collect()
+        };
+        for (name, v) in [
+            ("s hasta T_entry2", col(&|e| Some(e.entry_secs as f64))),
+            ("trades antes de T_entry2", col(&|e| Some(e.trades_before as f64))),
+            ("múltiplo de precio en T_entry2", col(&|e| Some(e.entry_multiple))),
+            ("H6' llenado % en T_entry2", col(&|e| e.fill_pct)),
+            ("H7' wallets 1+1 antes de T_entry2", col(&|e| Some(e.pairs as f64))),
+            ("H4' % supply vendido por el dev", col(&|e| Some(e.dev_sold_pct))),
+            ("H8 % supply comprado por el creador en el slot", col(&|e| Some(e.creator_slot_buy_pct))),
+        ] {
+            let mut m = v.clone();
+            println!("  {name} (n={}, mediana {:.3}): [{}]", v.len(), median(&mut m), fmt_list(&v));
+        }
+        return Ok(());
+    }
+
+    // Validación: resultado primario pump-y-caída en 1 h (definición vigente).
+    let pb = h1b::PARAMS_1H;
+    struct Row<'a> {
+        mint: &'a str,
+        e: &'a entry2::Entry2,
+        pump_dump: bool,
+        rets: [Option<f64>; 3],
+    }
+    let mut table_rows = Vec::new();
+    let mut no_price = 0;
+    for (i, e) in &entered {
+        let Some(h) = i.price_horizon.filter(|&h| h >= pb.horizon_secs) else {
+            no_price += 1;
+            continue;
+        };
+        let init = i.initial.unwrap();
+        let r = h1b::compute(i.t0, init, &i.points, i.completed_at, i.migrated_at, &pb);
+        let pts: Vec<(i64, f64)> =
+            i.points.iter().map(|x| (x.timestamp, x.quote_reserves as f64 / x.token_reserves as f64)).collect();
+        table_rows.push(Row {
+            mint: &i.mint,
+            e,
+            pump_dump: r.peak_multiple >= pb.min_peak_multiple && r.drawdown > pb.max_drawdown,
+            rets: entry2::returns(e, &pts, Some(i.t0 + h - 1), i.completed_at, &p),
+        });
+    }
+    let heaviest = table_rows.iter().max_by_key(|r| r.e.window_trades).map(|r| r.mint.to_string());
+    if json {
+        let v: Vec<_> = table_rows
+            .iter()
+            .map(|r| serde_json::json!({"mint": r.mint, "entry2": r.e, "pump_dump": r.pump_dump, "returns": r.rets}))
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&v)?);
+        return Ok(());
+    }
+    println!("VALIDACIÓN CONGELADA, tramo {tramo}. Parámetros: {}", serde_json::to_string(&p)?);
+    println!(
+        "tokens con ventana completa: {}  sin precio inicial: {no_initial}  sin T_entry2: {}  con T_entry2 sin ventana de precio: {no_price}  en tablas: {} ({} pump-y-caída)",
+        inputs.len(),
+        rows.len() - entered.len(),
+        table_rows.len(),
+        table_rows.iter().filter(|r| r.pump_dump).count()
+    );
+    println!("token de mayor peso (más trades en la ventana): {}", heaviest.as_deref().unwrap_or("-"));
+    let rate = |x: u64, y: u64| if x + y == 0 { f64::NAN } else { x as f64 / (x + y) as f64 };
+    const EPS: f64 = 1e-9;
+    for (name, sig) in ENTRY2_SIGNALS {
+        let table = |skip: Option<&str>| {
+            let mut t = h1b::Table::default();
+            for r in table_rows.iter().filter(|r| Some(r.mint) != skip) {
+                match (sig(r.e), r.pump_dump) {
+                    (Some(true), true) => t.a += 1,
+                    (Some(true), false) => t.b += 1,
+                    (Some(false), true) => t.c += 1,
+                    (Some(false), false) => t.d += 1,
+                    (None, _) => {}
+                }
+            }
+            t
+        };
+        let (t, ts) = (table(None), table(heaviest.as_deref()));
+        let d = rate(t.a, t.b) - rate(t.c, t.d);
+        let ds = rate(ts.a, ts.b) - rate(ts.c, ts.d);
+        let fp = t.fisher_p();
+        let (or, olo, ohi) = t.odds_ratio();
+        println!("\n{name}");
+        println!(
+            "  señal: {}/{} p&c ({:.0}%)  sin señal: {}/{} ({:.0}%)  dif {:+.0} pts  Fisher p = {fp:.4}  OR {or:.2} ({olo:.2}–{ohi:.2})",
+            t.a,
+            t.a + t.b,
+            100.0 * rate(t.a, t.b),
+            t.c,
+            t.c + t.d,
+            100.0 * rate(t.c, t.d),
+            100.0 * d
+        );
+        println!("  sin el token de mayor peso: dif {:+.0} pts", 100.0 * ds);
+        let verdict = if t.a + t.b < 3 || t.c + t.d < 3 {
+            "NO EVALUABLE (algún grupo < 3 tokens)"
+        } else if d >= 0.20 - EPS && fp < 0.01 && ds > EPS {
+            "CONFIRMADA"
+        } else if d < -EPS {
+            "NO CONFIRMADA (dirección opuesta)"
+        } else {
+            "NO CONFIRMADA"
+        };
+        println!("  criterio congelado: {verdict}");
+        for (k, h) in p.return_horizons.iter().enumerate() {
+            let grp = |g: bool| -> Vec<f64> {
+                table_rows.iter().filter(|r| sig(r.e) == Some(g)).filter_map(|r| r.rets[k]).collect()
+            };
+            let (mut x, mut y) = (grp(true), grp(false));
+            let mw = entry2::mann_whitney(&x, &y).map_or(f64::NAN, |m| m.1);
+            let (nx, ny) = (x.len(), y.len());
+            println!(
+                "  retorno neto +{} min: mediana señal {:+.1}% (n={nx}) vs sin señal {:+.1}% (n={ny}), Mann-Whitney p = {mw:.3}",
+                h / 60,
+                100.0 * median(&mut x),
+                100.0 * median(&mut y)
+            );
+        }
     }
     Ok(())
 }
