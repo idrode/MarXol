@@ -703,6 +703,66 @@ H4' queda NO CONFIRMADA por 1 punto por debajo del umbral de 20, aunque p = 0.00
 - En al menos el 25 % de los tokens el máximo posterior queda **por debajo** del precio de entrada: el precio no vuelve a subir nunca.
 - **Los tokens con señal tienen más recorrido al alza** (p90 del múltiplo bruto de 1.87–1.97× con señal, frente a 1.16–1.25× en H5, H6' y H7' sin señal), además de peor mediana final. Es coherente con más volatilidad, no con mejor entrada. Es descriptivo: la cota se calcula a posteriori y no dice cómo capturarla.
 
+### Validación 2 (réplica) — CONGELADO antes de descargar (2026-09-30 15:17 UTC)
+
+Fijado **antes de indexar ni descargar ningún token del tramo**. Se evalúa **una sola vez**. Cualquier cambio posterior es una hipótesis nueva que exige tokens nuevos. Los puntos marcados "(confirmado por Roi)" se resolvieron al pre-registrar, porque el texto original era ambiguo.
+
+**Muestra**:
+- **S2** = el primer slot con `blockTime ≥ 1790730000` (2026-09-30 01:00:00 UTC), según `getSignaturesForAddress` de la PDA `mint-authority` (`TSLvdd1p…`). Se resuelve al descargar y se anota aquí con su número (confirmado por Roi).
+- **Tramo "validación 2"**: las primeras **400 creaciones** exitosas (con `CreateEvent`) con slot ≥ S2, ordenadas por `(slot, mint lexicográfico)` (confirmado por Roi). Es otro día y otra franja horaria que la validación 1 (2026-09-28, 14:03–14:11 UTC).
+- Quedan fuera el piloto (40) y la validación 1 (337).
+- Si la indexación hacia atrás no llega a S2, o no hay 400 creaciones con slot ≥ S2: **parar y preguntar**.
+- **Coste**: estimación ~1.1M CU; **tope de la ejecución 2M CU**. Al alcanzarlo, la ejecución se detiene.
+  - Nota de ejecución, no forma parte del criterio: el `index` actual pide `getTransaction` de cada firma que recorre. Llegar a S2 desde la hora actual costaría del orden de 1.6M CU (unos 39 000 tokens creados desde las 01:00). Hay que recorrer solo las listas de firmas hasta S2 y pedir la transacción únicamente de las 400.
+  - Descargar tarde encarece las ventanas de los tokens que siguieron activos (sección 10), así que la estimación de 1.1M es optimista.
+
+**Definiciones sin cambios**:
+- T_entry2 y H4', H5, H6', H7', H8 con sus umbrales, incluido 13.65 % en H6' ("Validación de H4', H5, H6', H7', H8 — CONGELADO").
+- Pump-y-caída en 1 h (definición vigente).
+- Supervivencia: ≥ 1 trade a más de 10 min de T_entry2; n/e si la curva se completa antes de T_entry2 + 10 min (sección 10).
+- Los tokens mayhem forman población aparte en todo lo que sea retorno.
+
+**Poblaciones**:
+- **Primaria** (decide los veredictos): tokens con T_entry2, **un token por creator** (`CreateEvent.creator`), mayhem incluidos. Se queda el token de menor slot. Si hay empate, el de menor orden de ejecución; si no está disponible, el mint en orden lexicográfico.
+- **Secundaria 1**: todos los tokens con T_entry2.
+- **Secundaria 2**: todos los tokens con T_entry2 sin mayhem.
+
+**Criterio de CONFIRMACIÓN EN RÉPLICA**, por separado para H4', H5, H6', H7' y H8, con pump-y-caída en 1 h como resultado. **CONFIRMADA EN RÉPLICA** si se cumplen todas:
+1. En la población primaria:
+   - ≥ 3 tokens en cada grupo;
+   - p₁ − p₀ ≥ 20 puntos;
+   - Fisher bilateral p < 0.01;
+   - p₁ − p₀ > 0 también sin el **token de más trades**: el que tiene más trades en su ventana de 5 min entre los de la población primaria (definición ciega al resultado).
+2. p₁ − p₀ > 0 en la secundaria 1 y en la secundaria 2.
+
+Si no, **NO CONFIRMADA EN RÉPLICA**, indicando si la dirección es la opuesta. La odds ratio y su IC se reportan, pero no deciden.
+
+**H10** (secundaria): los tokens con señal tienen **más** supervivencia que los que no la tienen, para cada una de H5, H6', H7' y H8. Se aplica **el mismo criterio de réplica completo**, con la supervivencia como resultado y los n/e excluidos: ≥ 20 puntos, Fisher p < 0.01, ≥ 3 por grupo y misma dirección sin el token de más trades, todo en la primaria, más la misma dirección en las dos secundarias (confirmado por Roi). Como referencia post hoc de la validación 1 (sección 8, robustez): las diferencias fueron +19, +15, +19 y +30 puntos.
+
+**No entran en esta ronda**: H11 y H12. H9 no se pre-registra como "mediana > 0": queda descriptiva.
+
+**Condiciones de parada** (informar y detenerse, sin cambiar definiciones ni umbrales):
+- **Algún grupo con < 3 tokens** en alguna hipótesis (H4'–H8 o H10), en cualquiera de las tres poblaciones (confirmado por Roi).
+
+**Baja potencia**: si hay menos de **250 tokens con T_entry2** (secundaria 1), la evaluación **no se detiene**: se hace igual, y todo veredicto NO CONFIRMADA EN RÉPLICA se etiqueta **"baja potencia"**. Con esa etiqueta, el resultado no se interpreta como descarte.
+
+**Revisión 2026-09-30 15:48 UTC, hecha antes de indexar ningún token del tramo** (0 creaciones con `timestamp ≥ 1790730000` en `marxol.db`): la condición "menos de 250 tokens con T_entry2" pasó de condición de parada a la etiqueta de baja potencia de arriba. Motivo (Roi): parar después de descargar desperdicia la cuota y no protege de nada. No se cambió nada más.
+
+**Resultados descriptivos (sin veredicto)**, solo sin mayhem:
+- **Horizontes**: +5 s, +30 s, +5 min, +30 min y +60 min desde T_entry2.
+- **Retorno neto en dos versiones**:
+  - **(a)** La definición congelada de la validación 1 (`entry2::returns`): último punto con `timestamp ≤ t_T_entry2 + h`, ordenado por `(timestamp, slot)`.
+  - **(b)** Igual que (a), pero el precio de salida es el del **último trade en orden de ejecución** (reconstruido encadenando reservas) con `timestamp ≤ t_T_entry2 + h`.
+    - Mismo precio de entrada, misma comisión y mismas reglas de n/e que (a).
+    - Si el slot del punto de salida no se puede reconstruir, ese token queda n/e en ese horizonte para (b) (confirmado por Roi).
+    - Se reporta cuántos slots y cuántos tokens por horizonte no se pudieron reconstruir.
+- **Por horizonte y por grupo señal / sin señal** de H4', H5, H6', H7' y H8, y para todos: mediana del retorno neto (a) y (b), y fracción con retorno neto > 0.
+- **Métricas de filtro A, B y C** (definiciones de la sección 10) en **las tres poblaciones** (confirmado por Roi):
+  - Precisión, cobertura, sacrificio y número de tokens no evitados, con "malo" principal = pump-y-caída.
+  - "Malo" secundario = retorno neto a +30 min < 0, solo sin mayhem.
+  - Retorno del resto = mediana del retorno neto a +30 min de los no evitados, sin mayhem, en las versiones (a) y (b).
+  - Intervalo bootstrap: 2 000 réplicas, semilla 20260930, percentiles 2.5–97.5. Remuestreo simple en la primaria y por clúster de creator en las secundarias.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
