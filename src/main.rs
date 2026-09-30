@@ -98,6 +98,20 @@ enum Cmd {
         #[arg(long, default_value_t = 150)]
         delay_ms: u64,
     },
+    /// Indexa un tramo por tiempo (CLAUDE.md 8, validación 2): recorre solo las
+    /// listas de firmas de la PDA mint-authority hasta `--from` (blockTime) y
+    /// pide la transacción solo de las firmas exitosas más antiguas con
+    /// blockTime ≥ `--from`, slot a slot (cada slot entero), hasta reunir
+    /// `--count` creaciones. Reanudable: salta firmas ya vistas.
+    IndexTramo {
+        /// Unix time de inicio del tramo; S2 = primer slot con blockTime ≥ esto.
+        #[arg(long)]
+        from: i64,
+        #[arg(long, default_value_t = 400)]
+        count: usize,
+        #[command(flatten)]
+        rate: RateArgs,
+    },
     /// Descarga los trades de la ventana temprana (H1) de los tokens indexados
     /// cuya ventana ya se cerró, recorriendo las firmas de su bonding curve.
     Windows {
@@ -144,7 +158,9 @@ enum Cmd {
         /// calcular ni mirar el resultado.
         #[arg(long)]
         check: bool,
-        /// Tramo: validacion (slot > último del piloto) o piloto. El piloto
+        /// Tramo: validacion (validación 1: slot en (último del piloto, último
+        /// de la validación 1]), validacion2 (slots [S2, creación n.º 400]; solo
+        /// --check hasta implementar el veredicto de réplica) o piloto. El piloto
         /// solo admite --check.
         #[arg(long, default_value = "validacion")]
         tramo: String,
@@ -190,6 +206,10 @@ fn main() -> Result<()> {
         Cmd::Index { address, limit, delay_ms } => {
             let mut st = store::Store::open(&cli.db)?;
             index(&rpc, &idl, &mut st, &address, limit, delay_ms)
+        }
+        Cmd::IndexTramo { from, count, rate } => {
+            let mut st = store::Store::open(&cli.db)?;
+            index_tramo(&rpc, &idl, &mut st, from, count, &rate.budget(&cli.rpc)?)
         }
         Cmd::Windows { limit, max_pages, rate } => {
             let mut st = store::Store::open(&cli.db)?;
@@ -328,6 +348,86 @@ fn index(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, address: &str, limit
         total.creations, total.creator_changes, total.completions, total.migrations, total.early_trades
     );
     Ok(())
+}
+
+/// Ver `Cmd::IndexTramo`. Fase 1: listas de firmas hasta `from` (40 CU por
+/// página de 1000 en Alchemy). Fase 2: `getTransaction` de las firmas
+/// exitosas con blockTime ≥ `from`, de la más antigua a la más nueva y por
+/// slots enteros, hasta que haya ≥ `count` creaciones con slot ≥ S2; así el
+/// slot frontera queda completo para ordenar por (slot, mint).
+fn index_tramo(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, from: i64, count: usize, budget: &rpc::Budget) -> Result<()> {
+    let address = pump::mint_authority_pda().to_string();
+    with_budget(st, "index-tramo", budget, |st, done| {
+        let (mut sigs, mut before, mut pages) = (Vec::new(), None::<String>, 0);
+        let mut oldest_before_from: Option<(u64, i64)> = None;
+        while oldest_before_from.is_none() {
+            let page = rpc::with_retry(budget, rpc::Method::GetSignatures, || {
+                tx::recent_signatures(rpc, &address, 1000, before.as_deref())
+            })?;
+            pages += 1;
+            let full = page.len() == 1000;
+            before = page.last().map(|s| s.signature.clone());
+            for s in page {
+                let bt = s.block_time.with_context(|| format!("firma sin blockTime: {}", s.signature))?;
+                if bt >= from {
+                    sigs.push(s);
+                } else if oldest_before_from.is_none() {
+                    oldest_before_from = Some((s.slot, bt));
+                }
+            }
+            if pages % 10 == 0 {
+                eprintln!("… {pages} páginas, {} firmas con blockTime ≥ from", sigs.len());
+            }
+            if oldest_before_from.is_none() && !full {
+                anyhow::bail!("el historial de firmas se acaba antes de llegar a from = {from}");
+            }
+        }
+        let s2 = sigs.iter().map(|s| s.slot).min().context("ninguna firma con blockTime ≥ from")?;
+        let s2_time = sigs.iter().filter(|s| s.slot == s2).filter_map(|s| s.block_time).min().unwrap();
+        let (last_slot, last_time) = oldest_before_from.unwrap();
+        let failed = sigs.iter().filter(|s| s.failed).count();
+        println!("listas: {pages} páginas, {} firmas con blockTime ≥ {from} ({failed} fallidas, descartadas)", sigs.len());
+        println!("S2 = slot {s2} (blockTime {s2_time}); última firma anterior: slot {last_slot} (blockTime {last_time})");
+
+        let mut ok: Vec<&tx::SigInfo> = sigs.iter().filter(|s| !s.failed).collect();
+        ok.sort_by(|a, b| (a.slot, &a.signature).cmp(&(b.slot, &b.signature)));
+        let (mut fetched, mut no_create, mut i) = (0, 0, 0);
+        while i < ok.len() && st.creations_in_slots(s2, ok[i].slot.saturating_sub(1))?.len() < count {
+            let slot = ok[i].slot;
+            while i < ok.len() && ok[i].slot == slot {
+                let sig = &ok[i].signature;
+                i += 1;
+                if st.seen(sig)? {
+                    continue;
+                }
+                let t = rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig))
+                    .with_context(|| format!("getTransaction {sig} (el slot {slot} queda incompleto; reanudable)"))?;
+                fetched += 1;
+                for e in &t.decode_errors {
+                    eprintln!("{sig}: error decodificando evento: {e}");
+                }
+                if !t.events.iter().any(|e| e.name == "CreateEvent") {
+                    no_create += 1;
+                }
+                st.ingest(&t)?;
+                *done += 1;
+            }
+        }
+        let last_needed = ok.get(i.saturating_sub(1)).map(|s| s.slot).unwrap_or(s2);
+        let created = st.creations_in_slots(s2, last_needed)?;
+        println!("getTransaction: {fetched} (sin CreateEvent: {no_create}); creaciones con slot en [S2, {last_needed}]: {}", created.len());
+        if created.len() < count {
+            anyhow::bail!("solo hay {} creaciones con slot ≥ S2 (se piden {count})", created.len());
+        }
+        let (fs, fm, ft) = &created[count - 1];
+        let in_frontier = created.iter().filter(|c| c.0 == *fs).count();
+        println!(
+            "creación n.º {count} en orden (slot, mint): slot {fs}, mint {fm}, timestamp {ft}; \
+             creaciones en el slot frontera: {in_frontier}; indexadas fuera del tramo (tras la n.º {count}): {}",
+            created.len() - count
+        );
+        Ok(())
+    })
 }
 
 fn unix_now() -> i64 {
@@ -873,11 +973,18 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
     let p = entry2::PARAMS;
     let (lo, hi) = match tramo {
         "piloto" => (0, entry2::PILOT_LAST_SLOT),
-        "validacion" => (entry2::PILOT_LAST_SLOT + 1, u64::MAX),
-        _ => anyhow::bail!("tramo desconocido: {tramo} (validacion, piloto)"),
+        "validacion" => (entry2::PILOT_LAST_SLOT + 1, entry2::VALIDATION1_LAST_SLOT),
+        "validacion2" => (entry2::VALIDATION2_FIRST_SLOT, entry2::VALIDATION2_LAST_SLOT),
+        _ => anyhow::bail!("tramo desconocido: {tramo} (validacion, validacion2, piloto)"),
     };
     if tramo == "piloto" && !check {
         anyhow::bail!("el piloto es tramo de calibración: en la validación congelada solo admite --check");
+    }
+    if tramo == "validacion2" && !check {
+        // El veredicto único usa el criterio de réplica (población primaria de un
+        // token por creator, etc.), distinto del de la validación 1: no se
+        // calcula con este informe.
+        anyhow::bail!("validacion2: el veredicto de réplica aún no está implementado; solo admite --check");
     }
     let inputs = st.entry2_inputs(lo, hi)?;
     let no_initial = inputs.iter().filter(|i| i.initial.is_none()).count();
@@ -922,6 +1029,42 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
         for (name, sig) in ENTRY2_SIGNALS {
             let c = |x: Option<bool>| entered.iter().filter(|(_, e)| sig(e) == x).count();
             println!("  {name}: true {}  false {}  n/e {}", c(Some(true)), c(Some(false)), c(None));
+        }
+        if tramo == "validacion2" {
+            // Poblaciones del pre-registro (sin resultado): primaria = un token
+            // por creator (menor slot, luego mint); secundaria 1 = todos con
+            // T_entry2; secundaria 2 = sin mayhem.
+            let mut tagged = Vec::new();
+            for (i, e) in &entered {
+                tagged.push((st.creation_creator(&i.mint)?, i.create_slot, i.mint.as_str(), st.is_mayhem(&i.mint)?, *e));
+            }
+            tagged.sort_by(|a, b| (a.1, a.2).cmp(&(b.1, b.2)));
+            let mut seen = std::collections::HashSet::new();
+            let primary: Vec<_> = tagged.iter().filter(|t| seen.insert(t.0.clone())).collect();
+            let all: Vec<_> = tagged.iter().collect();
+            let no_mayhem: Vec<_> = tagged.iter().filter(|t| !t.3).collect();
+            let n = entered.len();
+            println!(
+                "  con T_entry2: {n} (umbral de baja potencia {}): {}",
+                entry2::VALIDATION2_MIN_ENTERED,
+                if n < entry2::VALIDATION2_MIN_ENTERED { "BAJA POTENCIA" } else { "no aplica" }
+            );
+            let mut small = Vec::new();
+            for (label, pop) in [("primaria (1 por creator)", &primary), ("secundaria 1 (todos)", &all), ("secundaria 2 (sin mayhem)", &no_mayhem)] {
+                println!("  población {label}: {} tokens, {} creators", pop.len(), pop.iter().map(|t| &t.0).collect::<std::collections::HashSet<_>>().len());
+                for (name, sig) in ENTRY2_SIGNALS {
+                    let c = |x: Option<bool>| pop.iter().filter(|t| sig(t.4) == x).count();
+                    let (t, f) = (c(Some(true)), c(Some(false)));
+                    if t < 3 || f < 3 {
+                        small.push(format!("{label} / {name}"));
+                    }
+                    println!("    {name}: true {t}  false {f}  n/e {}", c(None));
+                }
+            }
+            println!(
+                "  grupos < 3 (parada; H10 usa los mismos grupos menos los n/e de supervivencia, que se ven al calcular): {}",
+                if small.is_empty() { "ninguno".to_string() } else { small.join("; ") }
+            );
         }
         let col = |f: &dyn Fn(&entry2::Entry2) -> Option<f64>| -> Vec<f64> {
             entered.iter().filter_map(|(_, e)| f(e)).collect()

@@ -9,6 +9,16 @@ use std::collections::{BTreeMap, HashSet};
 /// Último slot de creación del tramo de calibración (los 40 del piloto).
 /// Validación = creaciones con slot mayor.
 pub const PILOT_LAST_SLOT: u64 = 451_340_397;
+/// Último slot de creación de la validación 1 (sus 337 creaciones, indexadas
+/// el 2026-09-28). Acota el tramo para que las creaciones posteriores (p. ej.
+/// la validación 2) no entren en él; el conjunto sigue siendo el mismo.
+pub const VALIDATION1_LAST_SLOT: u64 = 451_342_089;
+/// Validación 2 (réplica, CLAUDE.md 8): S2 y slot de la creación n.º 400,
+/// fijados por `index-tramo` el 2026-09-30 (400 creaciones exactas).
+pub const VALIDATION2_FIRST_SLOT: u64 = 451_810_013;
+pub const VALIDATION2_LAST_SLOT: u64 = 451_811_800;
+/// Por debajo de esto, los NO CONFIRMADA de la validación 2 son "baja potencia".
+pub const VALIDATION2_MIN_ENTERED: usize = 250;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Params {

@@ -30,6 +30,10 @@ Definiciones (fijadas 2026-09-30 antes de calcular; copia de CLAUDE.md sección 
 import argparse, json, sqlite3, subprocess, collections, math, random
 
 SEED, B = 20260930, 2000
+# Fábricas: se cuentan sobre las 377 creaciones del piloto y la validación 1
+# (slot <= último de la validación 1, entry2::VALIDATION1_LAST_SLOT), no sobre
+# creaciones indexadas después.
+VALIDATION1_LAST_SLOT = 451_342_089
 
 
 def load_entry2(marxol, db):
@@ -53,7 +57,7 @@ def load_tokens(marxol, db_path):
     q = lambda s, *a: db.execute(s, a).fetchall()
     cr = {m: (c, s, bool(mh), t0) for m, c, s, mh, t0 in q("select mint,creator,slot,is_mayhem_mode,timestamp from creations")}
     comp = dict(q("select mint,timestamp from completions"))
-    allc = collections.Counter(v[0] for v in cr.values())
+    allc = collections.Counter(v[0] for v in cr.values() if v[1] <= VALIDATION1_LAST_SLOT)
     fab = {c for c, k in allc.items() if k >= 5}
     toks = []
     for r in load_entry2(marxol, db_path):

@@ -746,6 +746,37 @@ Si no, **NO CONFIRMADA EN RÉPLICA**, indicando si la dirección es la opuesta. 
 
 **Baja potencia**: si hay menos de **250 tokens con T_entry2** (secundaria 1), la evaluación **no se detiene**: se hace igual, y todo veredicto NO CONFIRMADA EN RÉPLICA se etiqueta **"baja potencia"**. Con esa etiqueta, el resultado no se interpreta como descarte.
 
+**Ejecución, fase 1: indexado del tramo (2026-09-30, `marxol index-tramo --from 1790730000 --count 400 --provider alchemy --max-rps 10 --max-requests 3000`)**:
+- Solo se recorrieron las listas de firmas de `mint-authority` hasta S2: 29 páginas, 28 545 firmas con `blockTime ≥ 1790730000`. Las 1 629 fallidas se descartaron por `err`.
+- Se pidió `getTransaction` solo de las 401 firmas exitosas necesarias; 1 no trae `CreateEvent`.
+- **S2 = slot 451 810 013** (blockTime 1790730000 = 01:00:00 UTC exacto). La última firma anterior está en el slot 451 810 008 (blockTime 1790729999).
+- **Creación n.º 400** en orden `(slot, mint)`: **slot 451 811 800**, mint `H6V4cjHgJ1j8rUbBzfVceevkx7aggaJTyBwyM5LZpump`, timestamp 1790730478. El slot frontera tiene 1 sola creación, así que no hizo falta desempatar, y no se indexó ninguna creación fuera del tramo.
+- **Tramo validación 2 = creaciones con slot en [451 810 013, 451 811 800]**: exactamente 400, entre las 01:00:00 y las 01:07:58 UTC.
+- **Consumo: 17 440 CU** (401 `getTransaction` + 35 `getSignaturesForAddress`, 6 de ellas reintentos). Es el 0.9 % del tope de 2M CU.
+- Aún no se ha descargado ninguna ventana ni precio del tramo, y no se ha mirado ningún resultado.
+
+**Ejecución, fase 2: descargas y chequeo (2026-09-30, sin mirar el resultado)**:
+- `windows --limit 400 --provider alchemy --max-rps 10 --max-requests 40000`: **400 ventanas completas, 0 incompletas**, 0 errores ni 429. Consumo: 27 315 `getTransaction` + 518 `getSignaturesForAddress` = **1 113 320 CU**, en ~60 min.
+- `prices --limit 400 … --max-requests 21731`: **400 ventanas de precio completas (65 min), 0 incompletas**, 0 errores. Consumo: 5 174 + 422 = **223 840 CU**, en ~25 min.
+- Los 18 667 trades de la ventana temprana tienen su punto de precio, y las 400 creaciones tienen precio inicial.
+- **Total de la validación 2: 1 354 600 CU** (68 % del tope de 2M). La estimación era de ~1.1M: salió un 23 % por encima, por descargar tarde.
+- `entry2 --tramo validacion2` (slots [451 810 013, 451 811 800]) solo admite `--check` hasta que se implemente el veredicto de réplica. Tras la ingesta, la validación 1 sigue idéntica byte a byte (las mismas cinco salidas de la sección 11).
+- **`entry2 --check --tramo validacion2`** (sin resultado):
+  - 283 tokens con T_entry2 y 117 sin él. Como 283 ≥ 250, **no aplica la etiqueta de baja potencia**.
+  - Comisión conocida en 283/283. Orden de ejecución completo en 282/283: la excepción es `DWJzFDAx…` (543 trades en la ventana, T_entry2 a 10 s con 16 trades antes). Se anota; no cambia ninguna definición.
+  - Grupos señal / sin señal:
+
+| Población | n (creators) | H4' | H5 | H6' | H7' | H8 |
+|---|---|---|---|---|---|---|
+| Primaria (1 por creator) | 197 (197) | 59 / 138 | 119 / 78 | 56 / 141 | 102 / 95 | 15 / 182 |
+| Secundaria 1 (todos) | 283 (197) | 87 / 196 | 143 / 140 | 69 / 214 | 129 / 154 | 25 / 258 |
+| Secundaria 2 (sin mayhem) | 220 (174) | 70 / 150 | 143 / 77 | 67 / 153 | 117 / 103 | 23 / 197 |
+
+  - **Ningún grupo < 3**, así que no hay condición de parada en H4'–H8.
+  - En H10 los grupos son los mismos menos los n/e de supervivencia. Esos n/e solo se ven al calcular, y la condición de parada se vuelve a comprobar entonces.
+  - H6' es evaluable en los 283 tokens.
+  - Medianas en T_entry2: 13 s, 6 trades antes y múltiplo de precio 1.067×.
+
 **Revisión 2026-09-30 15:48 UTC, hecha antes de indexar ningún token del tramo** (0 creaciones con `timestamp ≥ 1790730000` en `marxol.db`): la condición "menos de 250 tokens con T_entry2" pasó de condición de parada a la etiqueta de baja potencia de arriba. Motivo (Roi): parar después de descargar desperdicia la cuota y no protege de nada. No se cambió nada más.
 
 **Resultados descriptivos (sin veredicto)**, solo sin mayhem:
@@ -865,7 +896,12 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
 - `src/h1.rs`: cálculo puro de H1 (sin RPC), con los umbrales [P] en `PARAMS_V1` (criterio vigente) y `PARAMS_H1C` (variante H1c, descartada en calibración).
 - `src/h1b.rs`: cálculo puro de H1b (sin RPC), con los umbrales [P] en `PARAMS_1H`, y el test exacto de Fisher bilateral. Tablas de soporte en `store.rs`: `price_points` (`kind ∈ {create, trade}`) y `price_windows`.
 - `src/entry.rs`: cálculo puro de T_entry y H4–H7 (sin RPC), con los umbrales [P] en `PARAMS`, y `execution_order`, que reconstruye el orden de ejecución de los trades encadenando reservas.
-- `src/entry2.rs`: cálculo puro de T_entry2, los indicadores congelados (`PARAMS`, `PILOT_LAST_SLOT`), el retorno neto y el test de Mann-Whitney.
+- `src/entry2.rs`: cálculo puro de T_entry2, los indicadores congelados (`PARAMS`, `PILOT_LAST_SLOT`, `VALIDATION1_LAST_SLOT`), el retorno neto y el test de Mann-Whitney.
+  - **Aclaración de implementación (2026-09-30), no es un cambio de criterio**: el tramo de la validación 1 estaba en el código como "slot > 451 340 397", sin límite superior, así que las creaciones posteriores habrían entrado en él. Ahora está acotado a slot ≤ **451 342 089** (`VALIDATION1_LAST_SLOT`, el slot máximo de sus 337 creaciones). El conjunto sigue siendo exactamente los mismos 337 mints.
+  - El script de robustez cuenta ahora las fábricas solo sobre las 377 creaciones del piloto y la validación 1.
+  - Se verificó antes y después de ingerir la validación 2 que la salida es **idéntica byte a byte**: `entry2 --json` (misma lista de 251 mints y mismos números), `entry2`, `entry2 --check`, `scripts/robustez_posthoc.py` y `scripts/curva_retorno_posthoc.py`.
+  - `h1`, `h1b` y `entry` no seleccionan por tramo: trabajan sobre todos los tokens con ventana completa. Cuando se descarguen las ventanas de la validación 2 los incluirán si se vuelven a ejecutar. No se han tocado.
+- `marxol index-tramo --from <unix> --count N`: indexa un tramo por tiempo recorriendo solo las listas de firmas de `mint-authority` y pidiendo `getTransaction` solo de las firmas exitosas necesarias, por slots enteros. Se puede reanudar.
 - `src/rpc.rs`: presupuesto de RPC por proveedor (`Budget`): ritmo máximo, tope de peticiones por ejecución y contador de peticiones y unidades reales (40 CU por método histórico en Alchemy, 10 créditos en Helius, 0 en el RPC público).
 - **Descargas reanudables** (`windows`, `prices`):
   - Saltan tokens ya completos y, dentro de un token, las firmas ya ingeridas (tabla `fetched_sigs`, por propósito `window`/`prices`). No se usa `seen_signatures` porque una firma vista por `index` antes de conocer la creación no tiene sus trades guardados.

@@ -254,6 +254,18 @@ impl Store {
         Ok(Store { db })
     }
 
+    /// Creaciones con slot en `[lo, hi]`, ordenadas por (slot, mint):
+    /// (slot, mint, timestamp).
+    pub fn creations_in_slots(&self, lo: u64, hi: u64) -> Result<Vec<(u64, String, i64)>> {
+        let mut q = self.db.prepare(
+            "SELECT slot, mint, timestamp FROM creations WHERE slot BETWEEN ?1 AND ?2 ORDER BY slot, mint",
+        )?;
+        let rows = q
+            .query_map(params![lo as i64, hi as i64], |r| Ok((r.get::<_, i64>(0)? as u64, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     pub fn seen(&self, sig: &str) -> Result<bool> {
         Ok(self
             .db
@@ -559,6 +571,11 @@ impl Store {
         Ok(self
             .db
             .query_row("SELECT COALESCE(is_mayhem_mode, 0) FROM creations WHERE mint = ?1", [mint], |r| r.get(0))?)
+    }
+
+    /// `creator` original del `CreateEvent` (identidad de operador).
+    pub fn creation_creator(&self, mint: &str) -> Result<String> {
+        Ok(self.db.query_row("SELECT creator FROM creations WHERE mint = ?1", [mint], |r| r.get(0))?)
     }
 
     pub fn creation_slot(&self, mint: &str) -> Result<u64> {
