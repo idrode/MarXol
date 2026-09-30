@@ -593,6 +593,116 @@ H4' queda NO CONFIRMADA por 1 punto por debajo del umbral de 20, aunque p = 0.00
 - **H12** "persistencia de dev-sell": si en el token anterior del mismo creator el dev vendió antes de T_entry2, en el siguiente también. Es la única bandera que en la exploración queda por encima del azar en unanimidad (17/19 frente a 13.8 esperado), con n muy pequeño.
 - **H13** (control de seudorreplicación, no es hipótesis de señal): repetir la prueba de H5, H6', H7' y H8 en la segunda ráfaga también con **un token por creator** (el primero). Solo se da por buena una señal si mantiene la dirección y el criterio en ese análisis.
 
+### ROBUSTEZ POST HOC de la validación congelada (2026-09-30) — SIN VEREDICTO
+
+**Post hoc, no pre-registrada.** Se hace después de ver los resultados de la validación. No confirma ni descarta nada y no toca los veredictos congelados. Las definiciones se fijaron antes de calcular y están en la sección 10. Solo `marxol.db`, sin red.
+- **Cómo se reproduce**, desde la raíz del repo: `cargo build --release && python3 -B scripts/robustez_posthoc.py`. El script llama a `target/release/marxol entry2 --json` y cruza con `creations`, `completions` y `price_points`. Opciones `--marxol` y `--db`. La semilla (20260930) y las definiciones van en la cabecera. Se ejecutó dos veces con la salida idéntica byte a byte (2026-09-30).
+- **Comprobaciones**: la población (b) reproduce exactamente las tablas congeladas. H6' es evaluable en los 251. La supervivencia es n/e en 1 token (`HpXRRsBW…`, completa la curva a los 252 s de T_entry2).
+
+**n efectivo**:
+
+| Subconjunto | Tokens | Creators | Bootstrap |
+|---|---|---|---|
+| (a) un token por creator | 210 | 210 | simple |
+| (b) los 251 | 251 | 210 | clúster |
+| (c) sin fábricas | 220 | 202 | clúster |
+| (d) sin mayhem | 203 | 193 | clúster |
+
+**1. Diferencia en pump-y-caída (puntos, señal − sin señal)**, con el IC bootstrap al 95 % entre corchetes. En ninguna réplica quedó un grupo vacío.
+
+| | (a) 1 por creator | (b) 251 clúster | (c) sin fábricas | (d) sin mayhem |
+|---|---|---|---|---|
+| H4' | +21.4 [8.5, 35.1], p 0.0014 | +18.7 [5.5, 31.6], p 0.0036 | +20.0 [6.7, 33.7], p 0.0026 | +21.9 [8.9, 35.8], p 0.0012 |
+| H5 | +35.0 [24.7, 45.1] | +29.7 [18.0, 40.7] | +33.4 [23.4, 43.8] | +34.8 [24.4, 44.8] |
+| H6' | +46.7 [33.2, 59.7] | +45.0 [31.9, 58.5] | +46.2 [32.2, 59.6] | +47.6 [34.2, 60.7] |
+| H7' | +34.7 [24.2, 45.6] | +32.5 [22.6, 42.7] | +35.0 [24.6, 45.3] | +35.2 [24.3, 46.3] |
+| H8 | +56.4 [35.2, 75.0] | +56.7 [34.2, 76.2] | +56.5 [34.0, 74.3] | +56.7 [33.6, 77.0] |
+
+- H5, H6', H7' y H8 tienen Fisher p < 0.0001 en los cuatro subconjuntos.
+- n señal / sin señal: en (a) H4' 69/141, H5 118/92, H6' 65/145, H7' 106/104, H8 18/192. En (d) H4' 69/134, H5 123/80, H6' 65/138, H7' 104/99, H8 18/185.
+- La OR sube al quitar la seudorreplicación o los mayhem. En (b) H5 es 5.79 (2.95–11.4). En (a) es 10.18 (4.12–25.2) y en (d) 12.58 (4.32–36.6).
+- **Lectura**: la asociación de las cuatro confirmadas no depende de la seudorreplicación por creator, de las fábricas ni de los mayhem. Los IC por clúster excluyen 0 con holgura.
+- H4' queda en torno al umbral de 20 puntos: +18.7 a +21.9 según el subconjunto, con el IC excluyendo 0 en todos. **No cambia su veredicto congelado (NO CONFIRMADA).**
+
+**2. Supervivencia y retorno por grupo**:
+- **Supervivencia** (≥ 1 trade a más de 10 min de T_entry2), en (b): 38–61 % con señal frente a 24–34 % sin señal. **Las señales se asocian a MÁS supervivencia**, no a menos, en los cuatro subconjuntos. Ejemplos: H5 43 % frente a 24 %; H8 61 % frente a 32 %. Los tokens sin señal suelen morir sin actividad; los que tienen señal siguen operando, pero caen.
+- **Retorno neto sin mayhem** (mediana a +30 min en (b), con IC por clúster):
+
+| Señal | Con señal | Sin señal |
+|---|---|---|
+| H4' | −13.9 % [−23.7, −10.5] | −9.5 % [−11.4, −8.2] |
+| H5 | −14.6 % [−24.9, −11.4] | −8.3 % [−9.9, −6.2] |
+| H6' | −37.1 % [−41.6, −33.0] | −7.3 % [−8.6, −6.3] |
+| H7' | −16.8 % [−25.0, −12.0] | −8.6 % [−10.1, −6.5] |
+| H8 | −29.1 % [−48.1, −18.3] | −10.0 % [−11.5, −8.5] |
+
+  - +10 y +60 min van casi iguales a +30.
+  - En (a), (c) y (d) las cifras son prácticamente las mismas.
+  - **Todos los IC están por debajo de 0**, también en el grupo sin señal.
+
+**3. Métricas de filtro "evitar"** (sobre los 251; "malo" = pump-y-caída). Precisión, cobertura y sacrificio se dan con todos / sin mayhem. El retorno del resto es la mediana a +30 de los no evitados, sin mayhem, con IC por clúster.
+
+| Filtro | Evitados / no evitados | Precisión | Cobertura | Sacrificio | Retorno del resto (n) |
+|---|---|---|---|---|---|
+| A (cualquiera de H5/H6'/H7'/H8) | 154 / 97 | 38 / 38 % | 92 / 98 % | 51 / 56 % | −6.9 % [−8.6, −4.8] (67) |
+| B (≥ 2 de las cuatro) | 112 / 139 | 45 / 45 % | 79 / 93 % | 33 / 41 % | −7.8 % [−9.0, −6.3] (93) |
+| C (H5 o H7') | 150 / 101 | 39 / 39 % | 92 / 98 % | 49 / 53 % | −7.6 % [−8.9, −5.6] (71) |
+| H5 | 125 / 126 | 40 / 40 % | 79 / 93 % | 40 / 49 % | −8.3 % [−9.9, −6.2] (80) |
+| H6' | 65 / 186 | 58 / 58 % | 60 / 72 % | 14 / 18 % | −7.3 % [−8.6, −6.3] (137) |
+| H7' | 122 / 129 | 42 / 43 % | 81 / 85 % | 38 / 39 % | −8.6 % [−10.1, −6.5] (99) |
+| H8 | 18 / 233 | 78 / 78 % | 22 / 26 % | 2 / 3 % | −10.0 % [−11.5, −8.5] (184) |
+| H4' | 73 / 178 | 38 / 41 % | 44 / 53 % | 24 / 27 % | −9.5 % [−11.4, −8.2] (133) |
+| Sin filtrar | — | — | — | — | −10.7 % (202) |
+
+- **"Malo" secundario (retorno a +30 < 0, sin mayhem) casi degenera**: 196 de los 202 evaluables son "malos" y solo **6 son "buenos"** (+0.1 %, +2.6 %, +7.8 %, +23 %, +77 %, +81 %). La precisión sale 95–100 % para cualquier filtro, y el sacrificio (5 de 6 buenos en A, B, C, H5 y H7'; 0 en H6' y H8) no se puede interpretar con n = 6.
+
+**Lectura (post hoc, sin veredicto)**:
+- Las cuatro señales confirmadas **sobreviven** a un token por creator, a quitar fábricas y a quitar mayhem, con IC por clúster lejos de 0. La seudorreplicación que avisó la exploración de operadores no explica el resultado.
+- **Como filtro de entrada no bastan.** Ningún filtro deja un resto con retorno mediano positivo. El mejor (A) sube la mediana de −10.7 % a −6.9 %, con el IC entero por debajo de 0, a costa de descartar el 56 % de los tokens "buenos" (pump-y-caída = no, sin mayhem). La mediana de los no evitados sigue siendo negativa, porque la comisión y la inactividad ya la hunden. Las señales mejoran el "evitar", no generan un "entrar".
+- **H6' y H8 son las más selectivas** (sacrificio 14–18 % y 2–3 %), pero siguen siendo en parte mecánicas (sección 8, lectura de la validación).
+- La supervivencia va **al revés de lo que suponía H10**: los tokens con señal siguen operando más, pero pierden más. Si se pre-registra H10, hay que fijar la dirección con esto en cuenta. Esa dirección es post hoc, así que solo se puede comprobar con otra ráfaga.
+
+### EXPLORACIÓN POST HOC (2026-09-30): curva de retorno desde T_entry2 y máxima subida — SIN VEREDICTO
+
+**Post hoc, solo descripción.** No propone horizontes ni umbrales. Aplica las reglas de la robustez post hoc: los 251 tokens de validación, métricas de retorno **solo sin mayhem** (203 tokens) y retorno neto calculado como en la validación congelada.
+- **Reproducir**: `cargo build --release && python3 -B scripts/curva_retorno_posthoc.py` (sin red).
+- **Control**: los retornos a +10, +30 y +60 min coinciden exactamente con los de `marxol entry2 --json` en los 203 tokens (0 discrepancias).
+- **Limitación**: el precio de salida es el último punto con `timestamp ≤ salida`, ordenado por `(timestamp, slot)` como en `entry2::returns`. Si en ese segundo y slot hay varios trades, el orden interno no está determinado. Pasa en 52 tokens a +5 s, 44 a +15 s, 42 a +30 s, 30 a +1 min, 22 a +2 min, 32 a +5 min, 23 a +10 min, 16 a +30 min y 15 a +60 min. **Los horizontes cortos son los más afectados.**
+
+**1. Retorno neto mediano y fracción con retorno > 0 según el horizonte** (sin mayhem):
+
+| Horizonte | Todos (n = 203) | H5 sí / no | H6' sí / no | H7' sí / no | H8 sí / no |
+|---|---|---|---|---|---|
+| +5 s | −3.0 % · 15 % | −2.7 · 21 % / −3.1 · 5 % | −3.8 · 26 % / −2.7 · 9 % | −2.6 · 23 % / −3.3 · 6 % | −2.8 · 28 % / −3.0 · 14 % |
+| +15 s | −4.3 % · 17 % | −4.3 · 23 % / −3.9 · 8 % | −13.7 · 25 % / −3.1 · 13 % | −3.9 · 26 % / −4.3 · 7 % | −4.7 · 28 % / −4.1 · 16 % |
+| +30 s | −5.3 % · 16 % | −5.7 · 22 % / −4.4 · 6 % | −22.3 · 22 % / −3.6 · 13 % | −5.5 · 23 % / −4.6 · 8 % | −5.1 · 22 % / −5.3 · 15 % |
+| +1 min | −6.2 % · 14 % | −7.2 · 20 % / −4.5 · 5 % | −26.5 · 17 % / −4.4 · 13 % | −7.3 · 21 % / −5.3 · 7 % | −6.5 · 17 % / −6.2 · 14 % |
+| +2 min | −7.6 % · 11 % | −9.5 · 15 % / −5.7 · 5 % | −30.0 · 12 % / −5.7 · 10 % | −9.2 · 16 % / −6.3 · 5 % | −9.1 · 17 % / −7.6 · 10 % |
+| +5 min | −8.9 % · 7 % | −11.4 · 10 % / −7.3 · 4 % | −33.3 · 2 % / −5.8 · 10 % | −11.6 · 13 % / −7.8 · 2 % | −13.1 · 0 % / −8.6 · 8 % |
+| +10 min | −9.9 % · 4 % | −12.2 · 7 % / −8.0 · 1 % | −36.1 · 0 % / −6.2 · 7 % | −13.3 · 8 % / −8.5 · 1 % | −25.5 · 0 % / −9.0 · 5 % |
+| +30 min | −10.7 % · 3 % | −14.6 · 4 % / −8.3 · 1 % | −37.1 · 0 % / −7.3 · 4 % | −16.8 · 5 % / −8.6 · 1 % | −29.1 · 0 % / −10.0 · 3 % |
+| +60 min | −11.4 % · 2 % | −16.4 · 3 % / −8.6 · 0 % | −37.5 · 0 % / −7.6 · 3 % | −18.3 · 4 % / −8.6 · 0 % | −29.2 · 0 % / −10.2 · 2 % |
+
+- Cada celda da la mediana y la fracción de tokens con retorno > 0.
+- n por grupo (sí / no): H5 123/80, H6' 65/138, H7' 104/99, H8 18/185. A +30 y +60 min se pierde 1 token (curva completada).
+- La mediana es negativa en todos los horizontes y grupos, y se hace más negativa con el tiempo. A +5 s ya es −3 %, del orden de la comisión de ida y vuelta (125 bps × 2 ≈ 2.5 %).
+- **En horizontes cortos la fracción con retorno > 0 es MAYOR con señal que sin ella** en H5, H6', H7' y H8, al revés que la mediana. Ejemplo: H5 a +5 s, 21 % frente a 5 %. Los tokens con señal tienen más dispersión, con subidas y caídas, mientras que los que no tienen señal se quedan quietos y pierden la comisión. Con señal, esa fracción cae a ≤ 5 % en +30 min.
+
+**2. Máxima subida alcanzable tras T_entry2** (hasta +60 min, sin mayhem; 202 evaluables, n/e `5wXHg8Ed…` por completar la curva). Es el precio máximo de la curva en el slot de T_entry2 o después, frente al precio de entrada. Es una **cota a posteriori**: supone vender justo en el máximo, sin impacto de precio.
+
+| | n | Múltiplo bruto p25 / p50 / p75 / p90 (máx) | Neto en el máximo p50 / p75 / p90 | Neto > 0 | s hasta el máximo p50 / p75 / p90 | Máx. en el slot de T_entry2 |
+|---|---|---|---|---|---|---|
+| Todos | 202 | 0.974 / 1.001 / 1.118 / 1.629 (3.63) | −2.4 / +8.7 / +58.8 % | 69 (34 %) | 1 / 31 / 159 | 94 (47 %) |
+| H5 sí / no | 122 / 80 | 1.013 / 0.997 (p50) | −1.2 / −3.0 % (p50) | 47 % / 15 % | 3 / 0 (p50) | 48 / 46 |
+| H6' sí / no | 65 / 137 | 1.054 / 1.000 | +2.7 / −2.5 % | 57 % / 23 % | 5 / 0 | 19 / 75 |
+| H7' sí / no | 103 / 99 | 1.027 / 0.999 | +0.2 / −2.8 % | 50 % / 17 % | 5 / 0 | 36 / 58 |
+| H8 sí / no | 18 / 184 | 1.001 / 1.000 | −2.4 / −2.5 % | 50 % / 33 % | 2 / 1 | 8 / 86 |
+
+- **Cuándo ocurre el máximo** (todos): 0 s 99, 1–5 s 17, 6–15 s 20, 16–30 s 12, 31–60 s 12, 1–2 min 14, 2–5 min 13, 5–10 min 7, 10–30 min 8, 30–60 min 0.
+- **La mitad de los máximos está en el mismo segundo que T_entry2** (94 en su propio slot). Muchas veces es el precio justo después del propio trade de entrada. Un observador que reacciona a ese trade difícilmente lo captura, así que la cota es optimista.
+- En al menos el 25 % de los tokens el máximo posterior queda **por debajo** del precio de entrada: el precio no vuelve a subir nunca.
+- **Los tokens con señal tienen más recorrido al alza** (p90 del múltiplo bruto de 1.87–1.97× con señal, frente a 1.16–1.25× en H5, H6' y H7' sin señal), además de peor mediana final. Es coherente con más volatilidad, no con mejor entrada. Es descriptivo: la cota se calcula a posteriori y no dice cómo capturarla.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
@@ -637,6 +747,30 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
    - Salvedad: cuanto más tiempo pasa desde la creación, más firmas posteriores hay que paginar hacia atrás en la bonding curve hasta llegar a la creación. Descargar tarde encarece los tokens que siguieron activos.
    **Validación congelada (2026-09-29 15:24 UTC)**: ejecutada el mismo día con Alchemy (`windows` → `prices` → `entry2 --check` → `entry2` una vez). Resultado y consumo (906 320 CU) en la sección 8: H5, H6', H7' y H8 confirmadas; H4' no confirmada (+19 pts). Todas marcan tokens **peores** para entrar (retorno neto mediano negativo en todos los grupos). Solo vale para la ráfaga de 8 min del 2026-09-28.
    **Siguiente**: repetir la validación en otra ráfaga u otro día antes de dar ningún indicador por general, y pre-registrar H9/H10 y el resultado medido desde el precio de entrada (sección 8). Pre-registrar también H11 (lanzamiento previo del creator, con N horas y estratificado por mayhem y mismo símbolo), H12 (persistencia de dev-sell entre tokens del mismo creator) y H13 (repetir H5/H6'/H7'/H8 con un token por creator como control de seudorreplicación), surgidas de la exploración de operadores (sección 8).
+   **Comprobación de robustez de la validación congelada — POST HOC, SIN VEREDICTO, EJECUTADA 2026-09-30** (definiciones fijadas antes de calcular; resultado en la sección 8, "ROBUSTEZ POST HOC"). Solo `marxol.db`, sin red. No cambia ningún veredicto congelado ni ninguna definición previa.
+   - **Población base**: los 251 tokens de validación con T_entry2 (los de las tablas congeladas). Quedan fuera los 40 del piloto y los 86 sin T_entry2.
+   - **Un token por creator**: el de menor slot de creación del creator dentro de los 251. Empate: menor orden de ejecución dentro del slot; si no está disponible, mint en orden lexicográfico. En la práctica no hay empates entre los 210 creators.
+   - **Fábrica**: creator con ≥ 5 tokens entre las 377 creaciones indexadas (9 creators, 31 tokens de los 251).
+   - **Supervivencia** (definición de H10): ≥ 1 trade a más de 10 min de T_entry2. **Decisión confirmada por Roi**: si la curva se completa antes de T_entry2 + 10 min, n/e (1 token), la misma regla que para el retorno.
+   - **Retorno neto**: la definición de la validación congelada. Medianas a +10, +30 y +60 min; solo +30 lleva intervalo.
+   - **Mayhem**: las métricas de retorno se reportan solo sin mayhem. Las de pump-y-caída y supervivencia, con todos y sin mayhem.
+   - **"Malo" principal** = pump-y-caída (definición congelada). **"Malo" secundario** = retorno neto a +30 min < 0. "Bueno" = el complementario en cada caso.
+   - **Filtros "evitar"**:
+     - A: señal en cualquiera de H5, H6', H7', H8.
+     - B: señal en ≥ 2 de las cuatro.
+     - C: señal en H5 o H7' (las dos no mecánicas).
+     - Además, cada señal por separado, con H4' aparte.
+   - **Métricas del filtro**:
+     - Precisión: fracción de "malos" entre los evitados.
+     - Cobertura: fracción de los "malos" que se evita.
+     - Sacrificio: fracción de los "buenos" que se evita.
+     - Retorno del resto: mediana del retorno a +30 entre los no evitados, sin mayhem, con IC bootstrap por clúster.
+     - Número de tokens no evitados.
+   - **Subconjuntos de las tablas 2×2** (sin combinarlos): (a) un token por creator; (b) los 251; (c) los 251 sin fábricas; (d) los 251 sin mayhem.
+   - **Bootstrap**: 2 000 réplicas, semilla 20260930, percentiles 2.5–97.5.
+     - En (a), remuestreo simple de tokens.
+     - En (b), (c) y (d), remuestreo de creators con reemplazo, con todos sus tokens (clúster). **Decisión confirmada por Roi**: (c) y (d) también llevan intervalo.
+     - Una réplica con algún grupo vacío se descarta para esa estadística, y se reporta cuántas.
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.
 
 ---
@@ -682,6 +816,10 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
   - `early_trades` guarda ahora `fee_basis_points` y `creator_fee_basis_points` (se añaden a bases antiguas al abrirlas).
   - `windows` guarda también el precio inicial del `CreateEvent`.
 - `src/pump.rs`: constantes, PDAs y matemática de graduación.
+- `scripts/` (Python, solo biblioteca estándar; análisis **post hoc**, sin veredicto):
+  - `robustez_posthoc.py`: robustez de la validación congelada.
+  - `curva_retorno_posthoc.py`: curva de retorno y máxima subida desde T_entry2.
+  - Los dos leen `target/release/marxol entry2 --json` y `marxol.db`. Se ejecutan desde la raíz del repo con `python3 -B`.
 
 **Hallazgos operativos (mainnet, 2026-09-28)**:
 - **Transacciones versión 1 en mainnet**: `getTransaction` con `maxSupportedTransactionVersion: 0` falla (error -32015) con parte del tráfico de pump. Hay que pedir `1`. `solana-transaction-status-client-types 4.3` las decodifica bien en encoding `json`.
