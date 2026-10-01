@@ -1,0 +1,207 @@
+VALIDACIÓN 2 — CRITERIO DE RÉPLICA, tramo validacion2. Parámetros: {"window_secs":300,"min_delay_secs":10,"fill_threshold_pct":13.65,"min_pairs":1,"creator_buy_pct":15.0,"supply":1000000000000000,"v0_std":1073000000000000,"r0_std":793100000000000,"return_horizons":[600,1800,3600]}
+con T_entry2: 283 (umbral de baja potencia 250: no aplica)  con T_entry2 sin ventana de precio: 0  empates de slot en la primaria (resueltos por mint): 1
+población primaria (1 por creator): 197 tokens, 197 creators
+población secundaria 1 (todos): 283 tokens, 197 creators
+población secundaria 2 (sin mayhem): 220 tokens, 174 creators
+condición de parada (grupo < 3 en H4'–H8 y H10, tres poblaciones): no se cumple
+supervivencia n/e: primaria 2, secundaria 1 2, secundaria 2 1
+token de más trades en la primaria: 2Avh9SfjB6Fpk8EsfcA8HWGVzY5Edt5J4gqE1CzBxsdA (1166 trades en 5 min; tokens con ese máximo: 1)
+
+==== Resultado: pump-y-caída en 1 h ====
+
+H4' dev vendió antes de T_entry2
+  primaria (1 por creator): n 59/138  señal 21/59 (+35.6%)  sin señal 18/138 (+13.0%)  dif +22.5 pts  boot simple [+9.6, +36.9; descartadas 0]  Fisher p = 0.0007  OR 3.68 (1.78–7.63)
+  secundaria 1 (todos): n 87/196  señal 31/87 (+35.6%)  sin señal 24/196 (+12.2%)  dif +23.4 pts  boot clúster [+11.3, +35.6; descartadas 0]  Fisher p = 0.0000  OR 3.97 (2.15–7.32)
+  secundaria 2 (sin mayhem): n 70/150  señal 26/70 (+37.1%)  sin señal 16/150 (+10.7%)  dif +26.5 pts  boot clúster [+11.5, +40.0; descartadas 0]  Fisher p = 0.0000  OR 4.95 (2.43–10.06)
+  primaria sin el token de más trades: dif +21.4 pts
+  VEREDICTO: CONFIRMADA EN RÉPLICA
+
+H5 ≥1 wallet ajena compra en el slot de creación
+  primaria (1 por creator): n 119/78  señal 31/119 (+26.1%)  sin señal 8/78 (+10.3%)  dif +15.8 pts  boot simple [+5.2, +25.6; descartadas 0]  Fisher p = 0.0063  OR 3.08 (1.33–7.13)
+  secundaria 1 (todos): n 143/140  señal 37/143 (+25.9%)  sin señal 18/140 (+12.9%)  dif +13.0 pts  boot clúster [+4.0, +22.8; descartadas 0]  Fisher p = 0.0067  OR 2.37 (1.27–4.40)
+  secundaria 2 (sin mayhem): n 143/77  señal 37/143 (+25.9%)  sin señal 5/77 (+6.5%)  dif +19.4 pts  boot clúster [+9.9, +29.9; descartadas 0]  Fisher p = 0.0003  OR 5.03 (1.89–13.40)
+  primaria sin el token de más trades: dif +15.2 pts
+  VEREDICTO: NO CONFIRMADA EN RÉPLICA
+
+H6' llenado en T_entry2 ≥ umbral
+  primaria (1 por creator): n 56/141  señal 29/56 (+51.8%)  sin señal 10/141 (+7.1%)  dif +44.7 pts  boot simple [+31.7, +58.0; descartadas 0]  Fisher p = 0.0000  OR 14.07 (6.14–32.25)
+  secundaria 1 (todos): n 69/214  señal 36/69 (+52.2%)  sin señal 19/214 (+8.9%)  dif +43.3 pts  boot clúster [+31.0, +55.9; descartadas 0]  Fisher p = 0.0000  OR 11.20 (5.75–21.82)
+  secundaria 2 (sin mayhem): n 67/153  señal 35/67 (+52.2%)  sin señal 7/153 (+4.6%)  dif +47.7 pts  boot clúster [+35.2, +59.7; descartadas 0]  Fisher p = 0.0000  OR 22.81 (9.30–55.95)
+  primaria sin el token de más trades: dif +43.8 pts
+  VEREDICTO: CONFIRMADA EN RÉPLICA
+
+H7' wallets 1+1 antes de T_entry2 ≥ umbral
+  primaria (1 por creator): n 102/95  señal 31/102 (+30.4%)  sin señal 8/95 (+8.4%)  dif +22.0 pts  boot simple [+12.1, +32.5; descartadas 0]  Fisher p = 0.0001  OR 4.75 (2.05–10.98)
+  secundaria 1 (todos): n 129/154  señal 39/129 (+30.2%)  sin señal 16/154 (+10.4%)  dif +19.8 pts  boot clúster [+9.1, +30.6; descartadas 0]  Fisher p = 0.0000  OR 3.74 (1.97–7.09)
+  secundaria 2 (sin mayhem): n 117/103  señal 37/117 (+31.6%)  sin señal 5/103 (+4.9%)  dif +26.8 pts  boot clúster [+16.8, +36.6; descartadas 0]  Fisher p = 0.0000  OR 9.06 (3.40–24.14)
+  primaria sin el token de más trades: dif +21.3 pts
+  VEREDICTO: CONFIRMADA EN RÉPLICA
+
+H8 el creador compra ≥ 15 % del supply en el slot de creación
+  primaria (1 por creator): n 15/182  señal 7/15 (+46.7%)  sin señal 32/182 (+17.6%)  dif +29.1 pts  boot simple [+3.0, +56.1; descartadas 0]  Fisher p = 0.0134  OR 4.10 (1.39–12.12)
+  secundaria 1 (todos): n 25/258  señal 11/25 (+44.0%)  sin señal 44/258 (+17.1%)  dif +26.9 pts  boot clúster [+1.5, +56.4; descartadas 0]  Fisher p = 0.0028  OR 3.82 (1.63–8.97)
+  secundaria 2 (sin mayhem): n 23/197  señal 10/23 (+43.5%)  sin señal 32/197 (+16.2%)  dif +27.2 pts  boot clúster [-1.1, +58.9; descartadas 0]  Fisher p = 0.0039  OR 3.97 (1.60–9.83)
+  primaria sin el token de más trades: dif +29.5 pts
+  VEREDICTO: NO CONFIRMADA EN RÉPLICA
+
+==== Resultado: H10 supervivencia (> 10 min de T_entry2) ====
+
+H10 × H5
+  primaria (1 por creator): n 118/77  señal 40/118 (+33.9%)  sin señal 15/77 (+19.5%)  dif +14.4 pts  boot simple [+1.6, +26.9; descartadas 0]  Fisher p = 0.0344  OR 2.12 (1.07–4.19)
+  secundaria 1 (todos): n 142/139  señal 42/142 (+29.6%)  sin señal 20/139 (+14.4%)  dif +15.2 pts  boot clúster [+4.4, +25.6; descartadas 0]  Fisher p = 0.0025  OR 2.50 (1.38–4.53)
+  secundaria 2 (sin mayhem): n 142/77  señal 42/142 (+29.6%)  sin señal 12/77 (+15.6%)  dif +14.0 pts  boot clúster [+3.0, +24.9; descartadas 0]  Fisher p = 0.0224  OR 2.27 (1.11–4.64)
+  primaria sin el token de más trades: dif +13.9 pts
+  VEREDICTO: NO CONFIRMADA EN RÉPLICA
+
+H10 × H6'
+  primaria (1 por creator): n 56/139  señal 21/56 (+37.5%)  sin señal 34/139 (+24.5%)  dif +13.0 pts  boot simple [-2.1, +28.1; descartadas 0]  Fisher p = 0.0794  OR 1.85 (0.95–3.60)
+  secundaria 1 (todos): n 69/212  señal 23/69 (+33.3%)  sin señal 39/212 (+18.4%)  dif +14.9 pts  boot clúster [+1.8, +28.5; descartadas 0]  Fisher p = 0.0122  OR 2.22 (1.21–4.08)
+  secundaria 2 (sin mayhem): n 67/152  señal 23/67 (+34.3%)  sin señal 31/152 (+20.4%)  dif +13.9 pts  boot clúster [-0.0, +28.5; descartadas 0]  Fisher p = 0.0404  OR 2.04 (1.08–3.87)
+  primaria sin el token de más trades: dif +11.9 pts
+  VEREDICTO: NO CONFIRMADA EN RÉPLICA
+
+H10 × H7'
+  primaria (1 por creator): n 100/95  señal 31/100 (+31.0%)  sin señal 24/95 (+25.3%)  dif +5.7 pts  boot simple [-6.7, +18.3; descartadas 0]  Fisher p = 0.4272  OR 1.33 (0.71–2.49)
+  secundaria 1 (todos): n 127/154  señal 33/127 (+26.0%)  sin señal 29/154 (+18.8%)  dif +7.2 pts  boot clúster [-3.5, +16.5; descartadas 0]  Fisher p = 0.1931  OR 1.51 (0.86–2.67)
+  secundaria 2 (sin mayhem): n 116/103  señal 33/116 (+28.4%)  sin señal 21/103 (+20.4%)  dif +8.1 pts  boot clúster [-4.9, +18.8; descartadas 0]  Fisher p = 0.2090  OR 1.55 (0.83–2.90)
+  primaria sin el token de más trades: dif +5.0 pts
+  VEREDICTO: NO CONFIRMADA EN RÉPLICA
+
+H10 × H8
+  primaria (1 por creator): n 15/180  señal 4/15 (+26.7%)  sin señal 51/180 (+28.3%)  dif -1.7 pts  boot simple [-23.5, +25.2; descartadas 0]  Fisher p = 1.0000  OR 0.92 (0.28–3.02)
+  secundaria 1 (todos): n 25/256  señal 5/25 (+20.0%)  sin señal 57/256 (+22.3%)  dif -2.3 pts  boot clúster [-17.9, +20.8; descartadas 0]  Fisher p = 1.0000  OR 0.87 (0.31–2.43)
+  secundaria 2 (sin mayhem): n 23/196  señal 5/23 (+21.7%)  sin señal 49/196 (+25.0%)  dif -3.3 pts  boot clúster [-20.9, +19.9; descartadas 0]  Fisher p = 1.0000  OR 0.83 (0.29–2.36)
+  primaria sin el token de más trades: dif -1.3 pts
+  VEREDICTO: NO CONFIRMADA EN RÉPLICA (dirección opuesta)
+
+==== DESCRIPTIVO, SIN VEREDICTO ====
+
+Retorno neto desde T_entry2, sin mayhem (n = 220). Celda: mediana · fracción > 0 (n)
+control: (a) = (b) en todo token-horizonte con slot de salida de un solo trade: 1278 de 1278 (discrepancias: 0)
+
++5 s: (b) slot de salida con un trade 184, varios trades reconstruidos 36, NO reconstruidos 0 tokens (0 slots), n/e como (a) 0
+  todos     (a) -4.4 · 10% (220)             (b) -4.5 · 10% (220)
+  H4' sí    (a) -7.0 · 13% (70)              (b) -8.6 · 13% (70)
+  H4' no    (a) -4.1 · 8% (150)              (b) -4.1 · 8% (150)
+  H5 sí     (a) -5.6 · 10% (143)             (b) -5.6 · 10% (143)
+  H5 no     (a) -3.0 · 9% (77)               (b) -3.0 · 9% (77)
+  H6' sí    (a) -11.7 · 13% (67)             (b) -12.3 · 13% (67)
+  H6' no    (a) -3.1 · 8% (153)              (b) -3.1 · 8% (153)
+  H7' sí    (a) -3.1 · 15% (117)             (b) -3.1 · 15% (117)
+  H7' no    (a) -5.6 · 4% (103)              (b) -5.6 · 4% (103)
+  H8 sí     (a) -16.1 · 17% (23)             (b) -11.9 · 22% (23)
+  H8 no     (a) -4.3 · 9% (197)              (b) -4.3 · 8% (197)
+
++30 s: (b) slot de salida con un trade 189, varios trades reconstruidos 31, NO reconstruidos 0 tokens (0 slots), n/e como (a) 0
+  todos     (a) -5.6 · 14% (220)             (b) -5.6 · 13% (220)
+  H4' sí    (a) -10.4 · 14% (70)             (b) -13.4 · 13% (70)
+  H4' no    (a) -5.5 · 13% (150)             (b) -5.5 · 13% (150)
+  H5 sí     (a) -6.8 · 17% (143)             (b) -6.6 · 17% (143)
+  H5 no     (a) -3.5 · 8% (77)               (b) -3.5 · 6% (77)
+  H6' sí    (a) -25.1 · 18% (67)             (b) -27.5 · 18% (67)
+  H6' no    (a) -4.4 · 12% (153)             (b) -4.4 · 11% (153)
+  H7' sí    (a) -5.9 · 21% (117)             (b) -5.6 · 21% (117)
+  H7' no    (a) -5.6 · 5% (103)              (b) -5.6 · 4% (103)
+  H8 sí     (a) -27.6 · 13% (23)             (b) -27.6 · 9% (23)
+  H8 no     (a) -5.6 · 14% (197)             (b) -5.6 · 14% (197)
+
++5 min: (b) slot de salida con un trade 205, varios trades reconstruidos 11, NO reconstruidos 3 tokens (3 slots), n/e como (a) 1
+  todos     (a) -7.4 · 5% (219)              (b) -7.5 · 4% (216)
+  H4' sí    (a) -17.9 · 4% (70)              (b) -18.8 · 4% (70)
+  H4' no    (a) -5.6 · 5% (149)              (b) -5.6 · 3% (146)
+  H5 sí     (a) -12.1 · 6% (142)             (b) -14.8 · 5% (139)
+  H5 no     (a) -5.1 · 1% (77)               (b) -5.1 · 1% (77)
+  H6' sí    (a) -33.2 · 7% (67)              (b) -35.2 · 6% (65)
+  H6' no    (a) -5.6 · 3% (152)              (b) -5.6 · 3% (151)
+  H7' sí    (a) -12.0 · 8% (116)             (b) -12.0 · 6% (113)
+  H7' no    (a) -5.6 · 1% (103)              (b) -5.6 · 1% (103)
+  H8 sí     (a) -32.0 · 4% (23)              (b) -32.0 · 4% (23)
+  H8 no     (a) -6.1 · 5% (196)              (b) -6.2 · 4% (193)
+
++30 min: (b) slot de salida con un trade 207, varios trades reconstruidos 10, NO reconstruidos 2 tokens (2 slots), n/e como (a) 1
+  todos     (a) -8.7 · 1% (219)              (b) -8.7 · 1% (217)
+  H4' sí    (a) -18.7 · 0% (70)              (b) -18.9 · 0% (69)
+  H4' no    (a) -6.0 · 2% (149)              (b) -6.0 · 2% (148)
+  H5 sí     (a) -16.3 · 2% (142)             (b) -16.3 · 2% (140)
+  H5 no     (a) -5.3 · 0% (77)               (b) -5.3 · 0% (77)
+  H6' sí    (a) -37.1 · 0% (67)              (b) -38.0 · 0% (66)
+  H6' no    (a) -5.6 · 2% (152)              (b) -5.6 · 2% (151)
+  H7' sí    (a) -16.3 · 2% (116)             (b) -16.0 · 2% (114)
+  H7' no    (a) -5.6 · 1% (103)              (b) -5.6 · 1% (103)
+  H8 sí     (a) -32.6 · 0% (23)              (b) -32.6 · 0% (23)
+  H8 no     (a) -7.7 · 2% (196)              (b) -7.7 · 2% (194)
+
++60 min: (b) slot de salida con un trade 206, varios trades reconstruidos 10, NO reconstruidos 3 tokens (3 slots), n/e como (a) 1
+  todos     (a) -8.7 · 1% (219)              (b) -8.7 · 1% (216)
+  H4' sí    (a) -20.7 · 0% (70)              (b) -20.7 · 0% (68)
+  H4' no    (a) -7.0 · 2% (149)              (b) -6.7 · 2% (148)
+  H5 sí     (a) -16.7 · 2% (142)             (b) -16.4 · 2% (139)
+  H5 no     (a) -5.3 · 0% (77)               (b) -5.3 · 0% (77)
+  H6' sí    (a) -37.1 · 0% (67)              (b) -38.9 · 0% (65)
+  H6' no    (a) -5.6 · 2% (152)              (b) -5.6 · 2% (151)
+  H7' sí    (a) -16.7 · 2% (116)             (b) -15.8 · 2% (113)
+  H7' no    (a) -5.6 · 1% (103)              (b) -5.6 · 1% (103)
+  H8 sí     (a) -32.6 · 0% (23)              (b) -32.6 · 0% (23)
+  H8 no     (a) -7.8 · 2% (196)              (b) -7.8 · 2% (193)
+
+Filtros "evitar" (A = cualquiera de H5/H6'/H7'/H8; B = ≥ 2; C = H5 o H7')
+
+[primaria (1 por creator)] bootstrap simple
+  filtro A
+    malo principal = pump-y-caída                  evaluables 197  evitados 138  no evitados 59  precisión +24.6%  cobertura +87.2%  sacrificio +65.8%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 173  evitados 135  no evitados 38  precisión +97.8%  cobertura +77.6%  sacrificio +100.0%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 172  evitados 134  no evitados 38  precisión +97.8%  cobertura +77.5%  sacrificio +100.0%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 38: -4.7% [-5.6, -3.0; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 38: -4.7% [-5.6, -3.0; descartadas 0]
+  filtro B
+    malo principal = pump-y-caída                  evaluables 197  evitados 99  no evitados 98  precisión +33.3%  cobertura +84.6%  sacrificio +41.8%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 173  evitados 98  no evitados 75  precisión +98.0%  cobertura +56.5%  sacrificio +66.7%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 172  evitados 97  no evitados 75  precisión +97.9%  cobertura +56.2%  sacrificio +66.7%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 75: -5.6% [-6.4, -5.1; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 75: -5.6% [-6.4, -5.1; descartadas 0]
+  filtro C
+    malo principal = pump-y-caída                  evaluables 197  evitados 137  no evitados 60  precisión +24.8%  cobertura +87.2%  sacrificio +65.2%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 173  evitados 134  no evitados 39  precisión +97.8%  cobertura +77.1%  sacrificio +100.0%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 172  evitados 133  no evitados 39  precisión +97.7%  cobertura +76.9%  sacrificio +100.0%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 39: -5.1% [-5.6, -3.0; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 39: -5.1% [-5.6, -3.0; descartadas 0]
+
+[secundaria 1 (todos)] bootstrap por clúster de creator
+  filtro A
+    malo principal = pump-y-caída                  evaluables 283  evitados 181  no evitados 102  precisión +24.3%  cobertura +80.0%  sacrificio +60.1%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 219  evitados 164  no evitados 55  precisión +98.2%  cobertura +74.5%  sacrificio +100.0%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 217  evitados 162  no evitados 55  precisión +98.1%  cobertura +74.3%  sacrificio +100.0%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 55: -5.4% [-5.6, -3.1; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 55: -5.4% [-5.6, -3.1; descartadas 0]
+  filtro B
+    malo principal = pump-y-caída                  evaluables 283  evitados 118  no evitados 165  precisión +33.9%  cobertura +72.7%  sacrificio +34.2%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 219  evitados 117  no evitados 102  precisión +98.3%  cobertura +53.2%  sacrificio +66.7%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 217  evitados 115  no evitados 102  precisión +98.3%  cobertura +52.8%  sacrificio +66.7%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 102: -5.6% [-5.7, -5.1; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 102: -5.6% [-5.7, -5.1; descartadas 0]
+  filtro C
+    malo principal = pump-y-caída                  evaluables 283  evitados 174  no evitados 109  precisión +24.1%  cobertura +76.4%  sacrificio +57.9%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 219  evitados 161  no evitados 58  precisión +98.1%  cobertura +73.1%  sacrificio +100.0%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 217  evitados 159  no evitados 58  precisión +98.1%  cobertura +72.9%  sacrificio +100.0%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 58: -5.6% [-5.6, -3.4; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 58: -5.6% [-5.6, -3.4; descartadas 0]
+
+[secundaria 2 (sin mayhem)] bootstrap por clúster de creator
+  filtro A
+    malo principal = pump-y-caída                  evaluables 220  evitados 165  no evitados 55  precisión +24.2%  cobertura +95.2%  sacrificio +70.2%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 219  evitados 164  no evitados 55  precisión +98.2%  cobertura +74.5%  sacrificio +100.0%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 217  evitados 162  no evitados 55  precisión +98.1%  cobertura +74.3%  sacrificio +100.0%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 55: -5.4% [-5.6, -3.1; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 55: -5.4% [-5.6, -3.1; descartadas 0]
+  filtro B
+    malo principal = pump-y-caída                  evaluables 220  evitados 118  no evitados 102  precisión +33.9%  cobertura +95.2%  sacrificio +43.8%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 219  evitados 117  no evitados 102  precisión +98.3%  cobertura +53.2%  sacrificio +66.7%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 217  evitados 115  no evitados 102  precisión +98.3%  cobertura +52.8%  sacrificio +66.7%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 102: -5.6% [-5.8, -5.0; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 102: -5.6% [-5.8, -5.0; descartadas 0]
+  filtro C
+    malo principal = pump-y-caída                  evaluables 220  evitados 162  no evitados 58  precisión +24.7%  cobertura +95.2%  sacrificio +68.5%
+    malo secundario (a) = ret +30 < 0, sin mayhem  evaluables 219  evitados 161  no evitados 58  precisión +98.1%  cobertura +73.1%  sacrificio +100.0%
+    malo secundario (b) = ret +30 < 0, sin mayhem  evaluables 217  evitados 159  no evitados 58  precisión +98.1%  cobertura +72.9%  sacrificio +100.0%
+    retorno +30 de los no evitados, sin mayhem, (a) n = 58: -5.6% [-5.6, -3.4; descartadas 0]
+    retorno +30 de los no evitados, sin mayhem, (b) n = 58: -5.6% [-5.6, -3.4; descartadas 0]

@@ -794,6 +794,104 @@ Si no, **NO CONFIRMADA EN RÉPLICA**, indicando si la dirección es la opuesta. 
   - Retorno del resto = mediana del retorno neto a +30 min de los no evitados, sin mayhem, en las versiones (a) y (b).
   - Intervalo bootstrap: 2 000 réplicas, semilla 20260930, percentiles 2.5–97.5. Remuestreo simple en la primaria y por clúster de creator en las secundarias.
 
+### Resultado de la validación 2 (réplica) (2026-10-01 15:21 UTC, `marxol entry2 --tramo validacion2`, ejecutada una sola vez)
+
+**Alcance, antes que nada**: una sola franja de **~8 minutos** de otro día (creaciones del 2026-09-30 entre las 01:00:00 y las 01:07:58 UTC). Replica dentro de esa franja frente a la validación 1 (otra franja de 8 minutos, dos días antes). No generaliza más allá: otras horas, días o regímenes de mercado siguen sin probar. Una asociación aquí es correlación, no causalidad (principio 6).
+
+**Ejecución**:
+- Una sola ejecución, sin repetir. Salida completa en `resultados/validacion2_replica.txt`.
+- Código del commit `039d4f0`. Antes de ejecutarlo se comprobó sobre la validación 1 (`scripts/verificar_replica.py`):
+  - La primaria da n = 210.
+  - Reproduce exactamente la robustez post hoc en poblaciones, diferencias, intervalos bootstrap y métricas de filtro. Fisher y OR coinciden hasta 1e-9.
+  - Las salidas previas de `entry2` y de los dos scripts post hoc siguen idénticas byte a byte.
+- **Datos**:
+  - 283 tokens con T_entry2: no aplica la etiqueta de baja potencia. 0 tokens sin ventana de precio.
+  - Condición de parada (grupo < 3 en H4'–H8 y H10, tres poblaciones): **no se cumple**.
+  - Supervivencia n/e: 2 tokens en la primaria, 2 en la secundaria 1 y 1 en la secundaria 2.
+- **Poblaciones**:
+  - Primaria: 197 tokens de 197 creators, 39 pump-y-caída (20 %).
+  - Secundaria 1: 283 tokens de 197 creators, 55 pump-y-caída.
+  - Secundaria 2: 220 tokens de 174 creators, 42 pump-y-caída.
+  - Un creator tenía dos tokens con T_entry2 en su slot mínimo. El orden de ejecución entre creaciones no se guarda, así que el empate se resolvió por mint lexicográfico, como estaba pre-registrado.
+- Token de más trades en la primaria: `2Avh9SfjB6Fpk8EsfcA8HWGVzY5Edt5J4gqE1CzBxsdA` (1 166 trades en 5 min, sin empate).
+
+**Veredicto primario: pump-y-caída en 1 h.** Columnas de la primaria; IC bootstrap simple de la diferencia entre corchetes.
+
+| Hipótesis | n señal / sin señal | p&c con señal | p&c sin señal | Dif. [IC boot] | Fisher p | OR (IC95) | Sin el de más trades | Sec. 1 dif. | Sec. 2 dif. | Veredicto |
+|---|---|---|---|---|---|---|---|---|---|---|
+| H4' | 59 / 138 | 21/59 (36 %) | 18/138 (13 %) | +22.5 [+9.6, +36.9] | 0.0007 | 3.68 (1.78–7.63) | +21.4 | +23.4 | +26.5 | **CONFIRMADA EN RÉPLICA** |
+| H5 | 119 / 78 | 31/119 (26 %) | 8/78 (10 %) | +15.8 [+5.2, +25.6] | 0.0063 | 3.08 (1.33–7.13) | +15.2 | +13.0 | +19.4 | **NO CONFIRMADA EN RÉPLICA** (dif. < 20) |
+| H6' | 56 / 141 | 29/56 (52 %) | 10/141 (7 %) | +44.7 [+31.7, +58.0] | < 0.0001 | 14.07 (6.14–32.25) | +43.8 | +43.3 | +47.7 | **CONFIRMADA EN RÉPLICA** |
+| H7' | 102 / 95 | 31/102 (30 %) | 8/95 (8 %) | +22.0 [+12.1, +32.5] | 0.0001 | 4.75 (2.05–10.98) | +21.3 | +19.8 | +26.8 | **CONFIRMADA EN RÉPLICA** |
+| H8 | 15 / 182 | 7/15 (47 %) | 32/182 (18 %) | +29.1 [+3.0, +56.1] | 0.0134 | 4.10 (1.39–12.12) | +29.5 | +26.9 | +27.2 | **NO CONFIRMADA EN RÉPLICA** (Fisher ≥ 0.01) |
+
+Secundarias, n señal / sin señal, Fisher p y OR (IC95):
+
+| Hipótesis | Secundaria 1 | Secundaria 2 |
+|---|---|---|
+| H4' | 87/196, p < 0.0001, OR 3.97 (2.15–7.32), boot clúster [+11.3, +35.6] | 70/150, p < 0.0001, OR 4.95 (2.43–10.06), boot clúster [+11.5, +40.0] |
+| H5 | 143/140, p 0.0067, OR 2.37 (1.27–4.40), boot clúster [+4.0, +22.8] | 143/77, p 0.0003, OR 5.03 (1.89–13.40), boot clúster [+9.9, +29.9] |
+| H6' | 69/214, p < 0.0001, OR 11.20 (5.75–21.82), boot clúster [+31.0, +55.9] | 67/153, p < 0.0001, OR 22.81 (9.30–55.95), boot clúster [+35.2, +59.7] |
+| H7' | 129/154, p < 0.0001, OR 3.74 (1.97–7.09), boot clúster [+9.1, +30.6] | 117/103, p < 0.0001, OR 9.06 (3.40–24.14), boot clúster [+16.8, +36.6] |
+| H8 | 25/258, p 0.0028, OR 3.82 (1.63–8.97), boot clúster [+1.5, +56.4] | 23/197, p 0.0039, OR 3.97 (1.60–9.83), boot clúster [−1.1, +58.9] |
+
+- **H5 y H8 no se confirman en réplica, y no se reinterpretan.**
+  - En H5 la dirección se mantiene en las tres poblaciones (+13 a +19 pts), pero la diferencia baja de +35 pts (validación 1, un token por creator) a +15.8 pts, por debajo de 20.
+  - En H8 la diferencia es grande (+29 pts) con solo 15 tokens con señal, y Fisher p = 0.0134 no pasa 0.01. El IC bootstrap en la secundaria 2 llega a −1.1.
+- H4', que en la validación 1 había quedado NO CONFIRMADA por 1 punto, aquí pasa todas las condiciones. Es otro criterio (primaria de un token por creator) y otra franja: **no reabre** el veredicto congelado de la validación 1.
+
+**H10 (supervivencia: ≥ 1 trade a más de 10 min de T_entry2), mismo criterio de réplica**:
+
+| Señal | n (prim.) | Superv. con señal | Superv. sin señal | Dif. [IC boot] | Fisher p | OR (IC95) | Sin el de más trades | Sec. 1 / Sec. 2 dif. | Veredicto |
+|---|---|---|---|---|---|---|---|---|---|
+| H5 | 118 / 77 | 40/118 (34 %) | 15/77 (19 %) | +14.4 [+1.6, +26.9] | 0.034 | 2.12 (1.07–4.19) | +13.9 | +15.2 / +14.0 | **NO CONFIRMADA** |
+| H6' | 56 / 139 | 21/56 (38 %) | 34/139 (24 %) | +13.0 [−2.1, +28.1] | 0.079 | 1.85 (0.95–3.60) | +11.9 | +14.9 / +13.9 | **NO CONFIRMADA** |
+| H7' | 100 / 95 | 31/100 (31 %) | 24/95 (25 %) | +5.7 [−6.7, +18.3] | 0.43 | 1.33 (0.71–2.49) | +5.0 | +7.2 / +8.1 | **NO CONFIRMADA** |
+| H8 | 15 / 180 | 4/15 (27 %) | 51/180 (28 %) | −1.7 [−23.5, +25.2] | 1.00 | 0.92 (0.28–3.02) | −1.3 | −2.3 / −3.3 | **NO CONFIRMADA** (dirección opuesta) |
+
+H10 queda **NO CONFIRMADA EN RÉPLICA** con las cuatro señales. Con H5, H6' y H7' la dirección es la de la validación 1 (más supervivencia con señal), pero más débil. Con H8 no hay diferencia.
+
+**Descriptivo (sin veredicto), solo sin mayhem** (secundaria 2, n = 220):
+- **Control**: (a) = (b) en los 1 278 token-horizontes cuyo slot de salida tiene un solo trade (0 discrepancias).
+- **Slots de salida con varios trades** en (b):
+  - Reconstruidos: 36 a +5 s, 31 a +30 s, 11 a +5 min, 10 a +30 min y 10 a +60 min.
+  - **No reconstruidos (n/e en (b))**: 0, 0, 3, 2 y 3 tokens (un slot cada uno). Son slots posteriores a la ventana temprana, donde `price_points` no guarda importes para encadenar reservas.
+- **Retorno neto mediano · fracción > 0**, (a) / (b):
+
+| Horizonte | Todos | H4' sí / no | H5 sí / no | H6' sí / no | H7' sí / no | H8 sí / no |
+|---|---|---|---|---|---|---|
+| +5 s | −4.4 · 10 % / −4.5 · 10 % | −7.0 / −4.1 (b: −8.6 / −4.1) | −5.6 / −3.0 | −11.7 / −3.1 (b: −12.3) | −3.1 · 15 % / −5.6 · 4 % | −16.1 / −4.3 (b: −11.9) |
+| +30 s | −5.6 · 14 % / −5.6 · 13 % | −10.4 / −5.5 (b: −13.4) | −6.8 / −3.5 | −25.1 / −4.4 (b: −27.5) | −5.9 · 21 % / −5.6 · 5 % | −27.6 / −5.6 |
+| +5 min | −7.4 · 5 % / −7.5 · 4 % | −17.9 / −5.6 | −12.1 / −5.1 (b: −14.8) | −33.2 / −5.6 (b: −35.2) | −12.0 / −5.6 | −32.0 / −6.1 |
+| +30 min | −8.7 · 1 % / −8.7 · 1 % | −18.7 / −6.0 | −16.3 / −5.3 | −37.1 / −5.6 (b: −38.0) | −16.3 / −5.6 | −32.6 / −7.7 |
+| +60 min | −8.7 · 1 % / −8.7 · 1 % | −20.7 / −7.0 | −16.7 / −5.3 | −37.1 / −5.6 (b: −38.9) | −16.7 / −5.6 | −32.6 / −7.8 |
+
+  - Cuando no se indica (b), coincide con (a) o difiere en menos de 1 punto. La tabla por grupo y horizonte completa, con n, está en la salida guardada.
+  - Igual que en la validación 1: la mediana es negativa en todos los grupos y horizontes, y los grupos con señal pierden más. En horizontes cortos, la fracción con retorno > 0 es mayor con H7' (15–21 % frente a 4–5 %).
+- **Filtros "evitar"**, malo principal = pump-y-caída. El retorno del resto es la mediana a +30 min de los no evitados sin mayhem, (a); (b) da lo mismo en todos los filtros.
+
+| Población | Filtro | Evitados / no evitados | Precisión | Cobertura | Sacrificio | Retorno del resto [IC boot] (n) |
+|---|---|---|---|---|---|---|
+| Primaria | A | 138 / 59 | 25 % | 87 % | 66 % | −4.7 % [−5.6, −3.0] (38) |
+| Primaria | B | 99 / 98 | 33 % | 85 % | 42 % | −5.6 % [−6.4, −5.1] (75) |
+| Primaria | C | 137 / 60 | 25 % | 87 % | 65 % | −5.1 % [−5.6, −3.0] (39) |
+| Secundaria 1 | A | 181 / 102 | 24 % | 80 % | 60 % | −5.4 % [−5.6, −3.1] (55) |
+| Secundaria 1 | B | 118 / 165 | 34 % | 73 % | 34 % | −5.6 % [−5.7, −5.1] (102) |
+| Secundaria 1 | C | 174 / 109 | 24 % | 76 % | 58 % | −5.6 % [−5.6, −3.4] (58) |
+| Secundaria 2 | A | 165 / 55 | 24 % | 95 % | 70 % | −5.4 % [−5.6, −3.1] (55) |
+| Secundaria 2 | B | 118 / 102 | 34 % | 95 % | 44 % | −5.6 % [−5.8, −5.0] (102) |
+| Secundaria 2 | C | 162 / 58 | 25 % | 95 % | 69 % | −5.6 % [−5.6, −3.4] (58) |
+
+  - Ningún filtro deja un resto con retorno mediano positivo: todos los IC quedan por debajo de 0, como en la validación 1.
+  - **El malo secundario (retorno a +30 < 0) degenera otra vez.** De 219 tokens sin mayhem evaluables (217 en (b)), solo **3 son "buenos"** en la secundaria 1. Por eso salen la precisión del 98 % y el sacrificio del 67–100 %, que con n = 3 no se pueden interpretar.
+
+**Lectura**:
+- De las cuatro señales confirmadas en la validación 1, **H6' y H7' se replican**, y H4' también pasa el criterio de réplica. **H5 y H8 no se replican**: mantienen la dirección, pero H5 con una diferencia más pequeña y H8 con muy pocos tokens con señal.
+- H6' sigue siendo en parte mecánica (sección 8, lectura de la validación 1).
+- H10 no se replica.
+- Como filtro de entrada nada cambia: las señales marcan tokens peores, no un punto de entrada con retorno esperado positivo.
+- Todo esto vale para dos franjas de 8 minutos de dos días distintos, no más.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
@@ -837,7 +935,8 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
    - Helius (10 créditos por llamada de archivo): ≈ 1.2k créditos por token → 337 ≈ 400k (40 % del mes gratis); 1 500 ≈ 1.8M, **no cabe** en el free tier de 1M.
    - Salvedad: cuanto más tiempo pasa desde la creación, más firmas posteriores hay que paginar hacia atrás en la bonding curve hasta llegar a la creación. Descargar tarde encarece los tokens que siguieron activos.
    **Validación congelada (2026-09-29 15:24 UTC)**: ejecutada el mismo día con Alchemy (`windows` → `prices` → `entry2 --check` → `entry2` una vez). Resultado y consumo (906 320 CU) en la sección 8: H5, H6', H7' y H8 confirmadas; H4' no confirmada (+19 pts). Todas marcan tokens **peores** para entrar (retorno neto mediano negativo en todos los grupos). Solo vale para la ráfaga de 8 min del 2026-09-28.
-   **Siguiente**: repetir la validación en otra ráfaga u otro día antes de dar ningún indicador por general, y pre-registrar H9/H10 y el resultado medido desde el precio de entrada (sección 8). Pre-registrar también H11 (lanzamiento previo del creator, con N horas y estratificado por mayhem y mismo símbolo), H12 (persistencia de dev-sell entre tokens del mismo creator) y H13 (repetir H5/H6'/H7'/H8 con un token por creator como control de seudorreplicación), surgidas de la exploración de operadores (sección 8).
+   **Validación 2 (réplica), ejecutada 2026-10-01**: H4', H6' y H7' se confirman en réplica; H5, H8 y H10 no (sección 8). Sigue siendo una sola franja de 8 minutos de otro día.
+   **Siguiente**: repetir la validación en más franjas y días antes de dar ningún indicador por general, y pre-registrar H9/H10 y el resultado medido desde el precio de entrada (sección 8). Pre-registrar también H11 (lanzamiento previo del creator, con N horas y estratificado por mayhem y mismo símbolo), H12 (persistencia de dev-sell entre tokens del mismo creator) y H13 (repetir H5/H6'/H7'/H8 con un token por creator como control de seudorreplicación), surgidas de la exploración de operadores (sección 8).
    **Comprobación de robustez de la validación congelada — POST HOC, SIN VEREDICTO, EJECUTADA 2026-09-30** (definiciones fijadas antes de calcular; resultado en la sección 8, "ROBUSTEZ POST HOC"). Solo `marxol.db`, sin red. No cambia ningún veredicto congelado ni ninguna definición previa.
    - **Población base**: los 251 tokens de validación con T_entry2 (los de las tablas congeladas). Quedan fuera los 40 del piloto y los 86 sin T_entry2.
    - **Un token por creator**: el de menor slot de creación del creator dentro de los 251. Empate: menor orden de ejecución dentro del slot; si no está disponible, mint en orden lexicográfico. En la práctica no hay empates entre los 210 creators.
@@ -883,7 +982,7 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
 | `marxol prices [--limit N] [mismas opciones de ritmo]` | Para tokens con ventana temprana completa y la ventana de precio ya cumplida, guarda los puntos de precio de la bonding curve en `[t0, t0+65 min)` (1 h de H1b + 5 min para el retorno a +60 min desde T_entry2) (reutiliza los trades de la ventana temprana; pide el resto y la tx de creación) |
 | `marxol h1b [--variant v1\|h1c]` | Calcula H1b en 1 h (graduación, pump sostenido) y la cruza con la variante de H1: tablas 2×2, test exacto de Fisher, odds ratio con IC 95 %, pump-y-caída por grupo y criterio (a) de H1c |
 | `marxol entry` | T_entry (primer trade con precio ≥ 1.5× el inicial en 5 min, en orden de ejecución) e indicadores previos H4–H7, cruzados con pump-y-caída en 1 h: tablas 2×2 con y sin `CRHnzej9…`, veredicto del criterio pre-registrado y distribuciones. Sin RPC |
-| `marxol entry2 [--check] [--tramo validacion\|piloto]` | Validación congelada (sección 8): T_entry2, H4', H5, H6', H7', H8 contra pump-y-caída en 1 h (Fisher, criterio congelado, sin el token de mayor peso) y retorno neto desde T_entry2 a +10/+30/+60 min (Mann-Whitney). `--check` solo cuenta grupos, sin resultado. Sin `--check`, se niega a usar el piloto. Sin RPC |
+| `marxol entry2 [--check] [--tramo validacion\|validacion2\|piloto] [--replica]` | Validación congelada (sección 8): T_entry2, H4', H5, H6', H7', H8 contra pump-y-caída en 1 h (Fisher, criterio congelado, sin el token de mayor peso) y retorno neto desde T_entry2 a +10/+30/+60 min (Mann-Whitney). `--check` solo cuenta grupos, sin resultado. Sin `--check`, se niega a usar el piloto. Con `--tramo validacion2` (o `--replica` sobre `validacion`, solo como comprobación), aplica el criterio de réplica de la validación 2: tres poblaciones, H4'–H8 y H10, retornos (a)/(b) y filtros A/B/C con bootstrap. Sin RPC |
 | `marxol operator <creator>` | Informe de un operador sobre lo indexado |
 | `marxol stats` | Recuento de filas |
 
@@ -912,9 +1011,11 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
   - `early_trades` guarda ahora `fee_basis_points` y `creator_fee_basis_points` (se añaden a bases antiguas al abrirlas).
   - `windows` guarda también el precio inicial del `CreateEvent`.
 - `src/pump.rs`: constantes, PDAs y matemática de graduación.
+- `src/replica.rs`: cálculo puro del criterio de réplica (tablas, veredicto, filtros) y el bootstrap. Usa un Mersenne Twister sembrado como `random.Random` de Python, para que los intervalos coincidan exactamente con los de `scripts/robustez_posthoc.py` con la misma semilla.
 - `scripts/` (Python, solo biblioteca estándar; análisis **post hoc**, sin veredicto):
   - `robustez_posthoc.py`: robustez de la validación congelada.
   - `curva_retorno_posthoc.py`: curva de retorno y máxima subida desde T_entry2.
+  - `verificar_replica.py`: comprueba que `entry2 --tramo validacion --replica` reproduce exactamente la robustez post hoc (primaria n = 210). Es un test, no un análisis.
   - Los dos leen `target/release/marxol entry2 --json` y `marxol.db`. Se ejecutan desde la raíz del repo con `python3 -B`.
 
 **Hallazgos operativos (mainnet, 2026-09-28)**:
