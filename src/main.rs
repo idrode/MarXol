@@ -6,6 +6,7 @@ mod h1;
 mod h1b;
 mod idl;
 mod pump;
+mod replica;
 mod rpc;
 mod store;
 mod tx;
@@ -159,11 +160,16 @@ enum Cmd {
         #[arg(long)]
         check: bool,
         /// Tramo: validacion (validación 1: slot en (último del piloto, último
-        /// de la validación 1]), validacion2 (slots [S2, creación n.º 400]; solo
-        /// --check hasta implementar el veredicto de réplica) o piloto. El piloto
-        /// solo admite --check.
+        /// de la validación 1]), validacion2 (slots [S2, creación n.º 400]; sin
+        /// --check calcula el veredicto de réplica) o piloto. El piloto solo
+        /// admite --check.
         #[arg(long, default_value = "validacion")]
         tramo: String,
+        /// Criterio de réplica de la validación 2 sobre otro tramo (solo
+        /// validacion: comprobación contra la robustez post hoc). En
+        /// validacion2 es siempre el criterio.
+        #[arg(long)]
+        replica: bool,
     },
     /// Informe de un operador (identidad = campo `creator`, no el payer).
     Operator { creator: String },
@@ -231,9 +237,9 @@ fn main() -> Result<()> {
             let st = store::Store::open(&cli.db)?;
             entry_report(&st, cli.json)
         }
-        Cmd::Entry2 { check, tramo } => {
+        Cmd::Entry2 { check, tramo, replica } => {
             let st = store::Store::open(&cli.db)?;
-            entry2_report(&st, cli.json, check, &tramo)
+            entry2_report(&st, cli.json, check, &tramo, replica)
         }
         Cmd::Operator { creator } => {
             let st = store::Store::open(&cli.db)?;
@@ -969,7 +975,7 @@ fn fmt_list(v: &[f64]) -> String {
         .join(", ")
 }
 
-fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Result<()> {
+fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str, replica: bool) -> Result<()> {
     let p = entry2::PARAMS;
     let (lo, hi) = match tramo {
         "piloto" => (0, entry2::PILOT_LAST_SLOT),
@@ -980,11 +986,8 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
     if tramo == "piloto" && !check {
         anyhow::bail!("el piloto es tramo de calibración: en la validación congelada solo admite --check");
     }
-    if tramo == "validacion2" && !check {
-        // El veredicto único usa el criterio de réplica (población primaria de un
-        // token por creator, etc.), distinto del de la validación 1: no se
-        // calcula con este informe.
-        anyhow::bail!("validacion2: el veredicto de réplica aún no está implementado; solo admite --check");
+    if replica && (check || tramo == "piloto") {
+        anyhow::bail!("--replica no admite --check ni el piloto");
     }
     let inputs = st.entry2_inputs(lo, hi)?;
     let no_initial = inputs.iter().filter(|i| i.initial.is_none()).count();
@@ -1082,6 +1085,9 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
             println!("  {name} (n={}, mediana {:.3}): [{}]", v.len(), median(&mut m), fmt_list(&v));
         }
         return Ok(());
+    }
+    if replica || tramo == "validacion2" {
+        return entry2_replica_report(st, json, tramo, &entered);
     }
 
     // Validación: resultado primario pump-y-caída en 1 h (definición vigente).
@@ -1261,6 +1267,324 @@ fn entry2_report(st: &store::Store, json: bool, check: bool, tramo: &str) -> Res
                 .collect();
             println!("  {short:4} {}", cells.join(" | "));
         }
+    }
+    Ok(())
+}
+
+/// Horizontes del descriptivo de la validación 2 (s desde T_entry2).
+const REPLICA_HORIZONS: [(i64, &str); 5] = [(5, "+5 s"), (30, "+30 s"), (300, "+5 min"), (1800, "+30 min"), (3600, "+60 min")];
+
+fn pct1(x: Option<f64>) -> String {
+    match x {
+        Some(v) if !v.is_nan() => format!("{:+.1}", 100.0 * v),
+        _ => "n/a".into(),
+    }
+}
+
+fn ci_str(c: (f64, f64, usize)) -> String {
+    format!("[{}, {}; descartadas {}]", pct1(Some(c.0)), pct1(Some(c.1)), c.2)
+}
+
+/// Validación 2 (réplica, CLAUDE.md 8): poblaciones primaria (un token por
+/// creator), secundaria 1 (todos) y secundaria 2 (sin mayhem); veredicto de
+/// réplica de H4'–H8 (pump-y-caída) y H10 (supervivencia) y descriptivo.
+fn entry2_replica_report(
+    st: &store::Store,
+    json: bool,
+    tramo: &str,
+    entered: &[(&store::Entry2Input, &entry2::Entry2)],
+) -> Result<()> {
+    use entry2::ExitB;
+    use replica::Tok;
+    use std::collections::{HashMap, HashSet};
+    let (p, pb) = (entry2::PARAMS, h1b::PARAMS_1H);
+    let low_power = entered.len() < entry2::VALIDATION2_MIN_ENTERED;
+
+    // Primaria: un token por creator, menor slot; el orden de ejecución entre
+    // creaciones no se guarda, así que el empate se resuelve por mint.
+    let mut by_slot: Vec<(u64, &str, String)> = Vec::new();
+    for (i, _) in entered {
+        by_slot.push((i.create_slot, i.mint.as_str(), st.creation_creator(&i.mint)?));
+    }
+    by_slot.sort();
+    let mut first: HashMap<&str, (u64, &str)> = HashMap::new();
+    let mut slot_ties = 0;
+    for (slot, mint, c) in &by_slot {
+        match first.get(c.as_str()) {
+            None => {
+                first.insert(c, (*slot, mint));
+            }
+            Some((s, _)) if s == slot => slot_ties += 1,
+            _ => {}
+        }
+    }
+    let primary_mints: HashSet<&str> = first.values().map(|x| x.1).collect();
+
+    struct Full {
+        tok: Tok,
+        ret_a: [Option<f64>; 5],
+        ret_b: [ExitB; 5],
+        exit_slot: [Option<u64>; 5],
+    }
+    let mut full = Vec::new();
+    let mut no_price = 0;
+    for (i, e) in entered {
+        let Some(h) = i.price_horizon.filter(|&h| h >= pb.horizon_secs) else {
+            no_price += 1;
+            continue;
+        };
+        let init = i.initial.unwrap();
+        let r = h1b::compute(i.t0, init, &i.points, i.completed_at, i.migrated_at, &pb);
+        let price = |x: &h1b::Point| x.quote_reserves as f64 / x.token_reserves as f64;
+        let flat: Vec<(i64, f64)> = i.points.iter().map(|x| (x.timestamp, price(x))).collect();
+        let pts3: Vec<(i64, u64, f64)> =
+            i.points.iter().zip(&i.point_slots).map(|(x, &s)| (x.timestamp, s, price(x))).collect();
+        let window: Vec<&entry::Trade> =
+            i.trades.iter().filter(|t| (i.t0..i.t0 + p.window_secs).contains(&t.timestamp)).collect();
+        let chain = entry2::chained(init.token_reserves, &window);
+        let covered = Some(i.t0 + h - 1);
+        let ret_a = REPLICA_HORIZONS.map(|(h, _)| entry2::return_at(e, &flat, covered, i.completed_at, h));
+        let ret_b = REPLICA_HORIZONS.map(|(h, _)| entry2::return_b(e, &pts3, &chain, covered, i.completed_at, h));
+        let exit_slot = REPLICA_HORIZONS
+            .map(|(h, _)| pts3.iter().filter(|x| x.0 <= e.entry_ts + h).max_by_key(|x| x.0).map(|x| x.1));
+        let ts: Vec<i64> = i.points.iter().map(|x| x.timestamp).collect();
+        full.push(Full {
+            tok: Tok {
+                mint: i.mint.clone(),
+                creator: st.creation_creator(&i.mint)?,
+                slot: i.create_slot,
+                mayhem: st.is_mayhem(&i.mint)?,
+                window_trades: e.window_trades,
+                sigs: ENTRY2_SIGNALS.map(|(_, s)| s(e)),
+                pump_dump: r.peak_multiple >= pb.min_peak_multiple && r.drawdown > pb.max_drawdown,
+                surv: entry2::survives(e, &ts, i.completed_at),
+                ret30: [ret_a[3], ret_b[3].value()],
+            },
+            ret_a,
+            ret_b,
+            exit_slot,
+        });
+    }
+    let mut primary: Vec<&Tok> = full.iter().map(|f| &f.tok).filter(|t| primary_mints.contains(t.mint.as_str())).collect();
+    primary.sort_by(|a, b| (a.slot, &a.mint).cmp(&(b.slot, &b.mint)));
+    let all: Vec<&Tok> = full.iter().map(|f| &f.tok).collect();
+    let no_mayhem: Vec<&Tok> = all.iter().copied().filter(|t| !t.mayhem).collect();
+    let pops: [(&str, &[&Tok], bool); 3] = [
+        ("primaria (1 por creator)", &primary, false),
+        ("secundaria 1 (todos)", &all, true),
+        ("secundaria 2 (sin mayhem)", &no_mayhem, true),
+    ];
+    let creators = |pop: &[&Tok]| pop.iter().map(|t| t.creator.as_str()).collect::<HashSet<_>>().len();
+    let names: Vec<&str> = ENTRY2_SIGNALS.iter().map(|(n, _)| n.split(' ').next().unwrap()).collect();
+
+    let mut out = String::new();
+    macro_rules! say { ($($a:tt)*) => { out.push_str(&format!($($a)*)); out.push('\n'); } }
+    say!("VALIDACIÓN 2 — CRITERIO DE RÉPLICA, tramo {tramo}. Parámetros: {}", serde_json::to_string(&p)?);
+    say!(
+        "con T_entry2: {} (umbral de baja potencia {}: {})  con T_entry2 sin ventana de precio: {no_price}  empates de slot en la primaria (resueltos por mint): {slot_ties}",
+        entered.len(),
+        entry2::VALIDATION2_MIN_ENTERED,
+        if low_power { "BAJA POTENCIA" } else { "no aplica" }
+    );
+    for (label, pop, _) in &pops {
+        say!("población {label}: {} tokens, {} creators", pop.len(), creators(pop));
+    }
+
+    // Condición de parada: algún grupo < 3 (H4'–H8; H10 sin los n/e de supervivencia).
+    let mut small = Vec::new();
+    for (label, pop, _) in &pops {
+        for (k, name) in names.iter().enumerate() {
+            let c = |g: bool, surv_only: bool| {
+                pop.iter().filter(|t| t.sigs[k] == Some(g) && (!surv_only || t.surv.is_some())).count() as u64
+            };
+            if c(true, false) < replica::MIN_GROUP || c(false, false) < replica::MIN_GROUP {
+                small.push(format!("{label} / {name}"));
+            }
+            if k >= 1 && (c(true, true) < replica::MIN_GROUP || c(false, true) < replica::MIN_GROUP) {
+                small.push(format!("{label} / H10 {name}"));
+            }
+        }
+    }
+    if !small.is_empty() {
+        say!("\nCONDICIÓN DE PARADA: grupos con < {} tokens: {}", replica::MIN_GROUP, small.join("; "));
+        say!("No se calcula ningún veredicto.");
+        print!("{out}");
+        return Ok(());
+    }
+    say!("condición de parada (grupo < 3 en H4'–H8 y H10, tres poblaciones): no se cumple");
+    say!(
+        "supervivencia n/e: primaria {}, secundaria 1 {}, secundaria 2 {}",
+        primary.iter().filter(|t| t.surv.is_none()).count(),
+        all.iter().filter(|t| t.surv.is_none()).count(),
+        no_mayhem.iter().filter(|t| t.surv.is_none()).count()
+    );
+
+    let heaviest = primary.iter().max_by_key(|t| t.window_trades).map(|t| (t.mint.clone(), t.window_trades));
+    let (hmint, htrades) = heaviest.clone().unwrap_or_default();
+    let heavy_ties = primary.iter().filter(|t| t.window_trades == htrades).count();
+    say!("token de más trades en la primaria: {hmint} ({htrades} trades en 5 min; tokens con ese máximo: {heavy_ties})");
+
+    let mut hyps_json = Vec::new();
+    let outcomes: [(&str, replica::Outcome, usize); 2] =
+        [("pump-y-caída en 1 h", replica::pump_dump, 0), ("H10 supervivencia (> 10 min de T_entry2)", replica::survival, 1)];
+    for (oname, outcome, first_sig) in outcomes {
+        say!("\n==== Resultado: {oname} ====");
+        for k in first_sig..5 {
+            let name = if first_sig == 0 { ENTRY2_SIGNALS[k].0.to_string() } else { format!("H10 × {}", names[k]) };
+            let res: Vec<replica::PopResult> =
+                pops.iter().map(|(_, pop, cl)| replica::pop_result(pop, k, outcome, *cl)).collect();
+            let wo: Vec<&Tok> = primary.iter().copied().filter(|t| t.mint != hmint).collect();
+            let primary_wo = replica::diff(&replica::table(&wo, k, outcome));
+            let v = replica::verdict(&res[0], primary_wo, [&res[1], &res[2]], low_power);
+            say!("\n{name}");
+            for ((label, _, cl), r) in pops.iter().zip(&res) {
+                let t = r.table;
+                say!(
+                    "  {label}: n {}/{}  señal {}/{} ({}%)  sin señal {}/{} ({}%)  dif {} pts  boot {} {}  Fisher p = {:.4}  OR {:.2} ({:.2}–{:.2})",
+                    r.n1,
+                    r.n0,
+                    t.a,
+                    r.n1,
+                    pct1(Some(t.a as f64 / r.n1 as f64)),
+                    t.c,
+                    r.n0,
+                    pct1(Some(t.c as f64 / r.n0 as f64)),
+                    pct1(r.diff),
+                    if *cl { "clúster" } else { "simple" },
+                    ci_str(r.boot),
+                    r.fisher_p,
+                    r.or.0,
+                    r.or.1,
+                    r.or.2
+                );
+            }
+            say!("  primaria sin el token de más trades: dif {} pts", pct1(primary_wo));
+            say!("  VEREDICTO: {v}");
+            hyps_json.push(serde_json::json!({
+                "name": name, "outcome": oname, "verdict": v, "primary_wo_heaviest": primary_wo,
+                "primaria": res[0], "secundaria1": res[1], "secundaria2": res[2],
+            }));
+        }
+    }
+
+    say!("\n==== DESCRIPTIVO, SIN VEREDICTO ====");
+    // Retorno (a) y (b), secundaria 2 (todos con T_entry2 sin mayhem).
+    let nm: Vec<&Full> = full.iter().filter(|f| !f.tok.mayhem).collect();
+    say!("\nRetorno neto desde T_entry2, sin mayhem (n = {}). Celda: mediana · fracción > 0 (n)", nm.len());
+    let mut single_mismatch = 0;
+    let mut single_total = 0;
+    for f in &full {
+        for k in 0..5 {
+            if let ExitB::Single(v) = f.ret_b[k] {
+                single_total += 1;
+                if f.ret_a[k] != Some(v) {
+                    single_mismatch += 1;
+                }
+            }
+        }
+    }
+    say!(
+        "control: (a) = (b) en todo token-horizonte con slot de salida de un solo trade: {} de {} (discrepancias: {single_mismatch})",
+        single_total - single_mismatch,
+        single_total
+    );
+    let mut rets_json = Vec::new();
+    for (k, (_, hl)) in REPLICA_HORIZONS.iter().enumerate() {
+        let (mut single, mut rebuilt, mut unresolved, mut ne) = (0, 0, 0, 0);
+        let mut slots = HashSet::new();
+        for f in &nm {
+            match f.ret_b[k] {
+                ExitB::Single(_) => single += 1,
+                ExitB::Rebuilt(_) => rebuilt += 1,
+                ExitB::Unresolved => {
+                    unresolved += 1;
+                    slots.insert(f.exit_slot[k]);
+                }
+                ExitB::NotEvaluable => ne += 1,
+            }
+        }
+        say!(
+            "\n{hl}: (b) slot de salida con un trade {single}, varios trades reconstruidos {rebuilt}, NO reconstruidos {unresolved} tokens ({} slots), n/e como (a) {ne}",
+            slots.len()
+        );
+        let cell = |v: &mut Vec<f64>| {
+            let n = v.len();
+            let pos = v.iter().filter(|&&x| x > 0.0).count();
+            let m = replica::median(v);
+            (format!("{} · {} ({n})", pct1(m), if n == 0 { "n/a".into() } else { format!("{:.0}%", 100.0 * pos as f64 / n as f64) }), m, pos, n)
+        };
+        let mut groups: Vec<(String, Vec<&Full>)> = vec![("todos".into(), nm.clone())];
+        for (s, name) in names.iter().enumerate() {
+            for g in [true, false] {
+                groups.push((
+                    format!("{name} {}", if g { "sí" } else { "no" }),
+                    nm.iter().copied().filter(|f| f.tok.sigs[s] == Some(g)).collect(),
+                ));
+            }
+        }
+        for (label, grp) in groups {
+            let mut a: Vec<f64> = grp.iter().filter_map(|f| f.ret_a[k]).collect();
+            let mut b: Vec<f64> = grp.iter().filter_map(|f| f.ret_b[k].value()).collect();
+            let (sa, ma, pa, na) = cell(&mut a);
+            let (sb, mb, pbp, nb) = cell(&mut b);
+            say!("  {label:9} (a) {sa:28} (b) {sb}");
+            rets_json.push(serde_json::json!({"horizon": hl, "group": label,
+                "a": {"median": ma, "pos": pa, "n": na}, "b": {"median": mb, "pos": pbp, "n": nb}}));
+        }
+    }
+
+    say!("\nFiltros \"evitar\" (A = cualquiera de H5/H6'/H7'/H8; B = ≥ 2; C = H5 o H7')");
+    let mut filt_json = Vec::new();
+    for (label, pop, cl) in &pops {
+        say!("\n[{label}] bootstrap {}", if *cl { "por clúster de creator" } else { "simple" });
+        for f in ['A', 'B', 'C'] {
+            say!("  filtro {f}");
+            let bads: [(&str, &dyn Fn(&Tok) -> Option<bool>); 3] = [
+                ("malo principal = pump-y-caída", &|t| Some(t.pump_dump)),
+                ("malo secundario (a) = ret +30 < 0, sin mayhem", &|t| if t.mayhem { None } else { t.ret30[0].map(|r| r < 0.0) }),
+                ("malo secundario (b) = ret +30 < 0, sin mayhem", &|t| if t.mayhem { None } else { t.ret30[1].map(|r| r < 0.0) }),
+            ];
+            let mut fj = serde_json::json!({"population": label, "filter": f.to_string()});
+            for (bl, bad) in bads {
+                let m = replica::filter_metrics(pop, f, bad);
+                say!(
+                    "    {bl:46} evaluables {}  evitados {}  no evitados {}  precisión {}%  cobertura {}%  sacrificio {}%",
+                    m.evaluable,
+                    m.avoided,
+                    m.kept,
+                    pct1(Some(m.precision)),
+                    pct1(Some(m.coverage)),
+                    pct1(Some(m.sacrifice))
+                );
+                fj[bl] = serde_json::to_value(&m)?;
+            }
+            for v in 0..2 {
+                let r = replica::rest_return(pop, f, v);
+                let c = replica::ci(pop, *cl, &|rs| replica::rest_return(rs, f, v));
+                let n = pop.iter().filter(|t| !t.mayhem && !replica::filter(t, f) && t.ret30[v].is_some()).count();
+                say!(
+                    "    retorno +30 de los no evitados, sin mayhem, ({}) n = {n}: {}% {}",
+                    ["a", "b"][v],
+                    pct1(r),
+                    ci_str(c)
+                );
+                fj[format!("rest_{}", ["a", "b"][v])] = serde_json::json!({"median": r, "ci": c, "n": n});
+            }
+            filt_json.push(fj);
+        }
+    }
+
+    if json {
+        let v = serde_json::json!({
+            "entered": entered.len(), "low_power": low_power, "no_price": no_price, "heaviest": heaviest,
+            "populations": pops.iter().map(|(l, pop, _)| serde_json::json!({"label": l, "tokens": pop.len(), "creators": creators(pop),
+                "mints": pop.iter().map(|t| &t.mint).collect::<Vec<_>>()})).collect::<Vec<_>>(),
+            "tokens": all,
+            "hypotheses": hyps_json, "returns": rets_json, "filters": filt_json,
+        });
+        println!("{}", serde_json::to_string_pretty(&v)?);
+    } else {
+        print!("{out}");
     }
     Ok(())
 }

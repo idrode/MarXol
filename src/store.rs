@@ -215,6 +215,8 @@ pub struct Entry2Input {
     /// Horizonte de la ventana de precio si está completa.
     pub price_horizon: Option<i64>,
     pub points: Vec<crate::h1b::Point>,
+    /// Slot de cada punto de `points` (mismo orden).
+    pub point_slots: Vec<u64>,
     pub completed_at: Option<i64>,
     pub migrated_at: Option<i64>,
 }
@@ -756,7 +758,7 @@ impl Store {
             })?
             .collect::<rusqlite::Result<Vec<(String, i64, bool, Option<i64>, Option<i64>)>>>()?;
         let mut pts = self.db.prepare(
-            "SELECT kind, timestamp, quote_reserves, token_reserves FROM price_points
+            "SELECT kind, timestamp, quote_reserves, token_reserves, slot FROM price_points
              WHERE mint = ?1 ORDER BY timestamp, slot",
         )?;
         let mut out = Vec::new();
@@ -846,7 +848,7 @@ impl Store {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         let mut pts = self.db.prepare(
-            "SELECT kind, timestamp, quote_reserves, token_reserves FROM price_points
+            "SELECT kind, timestamp, quote_reserves, token_reserves, slot FROM price_points
              WHERE mint = ?1 ORDER BY timestamp, slot",
         )?;
         let mut out = Vec::new();
@@ -860,14 +862,16 @@ impl Store {
                             quote_reserves: r.get::<_, i64>(2)? as u64,
                             token_reserves: r.get::<_, i64>(3)? as u64,
                         },
+                        r.get::<_, i64>(4)? as u64,
                     ))
                 })?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             out.push(Entry2Input {
                 trades: self.entry_trades(&mint, t0, EARLY_WINDOW_SECS)?,
                 creator_ids: self.creator_identities(&mint)?,
-                initial: rows.iter().find(|(k, _)| k == "create").map(|(_, p)| *p),
-                points: rows.into_iter().filter(|(k, _)| k == "trade").map(|(_, p)| p).collect(),
+                initial: rows.iter().find(|(k, ..)| k == "create").map(|(_, p, _)| *p),
+                point_slots: rows.iter().filter(|(k, ..)| k == "trade").map(|x| x.2).collect(),
+                points: rows.into_iter().filter(|(k, ..)| k == "trade").map(|(_, p, _)| p).collect(),
                 mint,
                 t0,
                 create_slot,

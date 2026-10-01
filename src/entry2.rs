@@ -170,15 +170,111 @@ pub fn returns(
     completed_at: Option<i64>,
     p: &Params,
 ) -> [Option<f64>; 3] {
-    p.return_horizons.map(|h| {
-        let exit_t = e.entry_ts + h;
-        let fee = e.fee_bps?;
-        if covered_until? < exit_t || completed_at.is_some_and(|c| c <= exit_t) {
-            return None;
+    p.return_horizons.map(|h| return_at(e, points, covered_until, completed_at, h))
+}
+
+/// Retorno neto a `h` s desde T_entry2 (versión (a), la congelada): último
+/// punto con `timestamp ≤ salida` en el orden de `points` (`timestamp, slot`).
+pub fn return_at(
+    e: &Entry2,
+    points: &[(i64, f64)],
+    covered_until: Option<i64>,
+    completed_at: Option<i64>,
+    h: i64,
+) -> Option<f64> {
+    let exit_t = e.entry_ts + h;
+    let fee = e.fee_bps?;
+    if covered_until? < exit_t || completed_at.is_some_and(|c| c <= exit_t) {
+        return None;
+    }
+    let exit = points.iter().filter(|(t, _)| *t <= exit_t).max_by_key(|(t, _)| *t).map(|x| x.1)?;
+    Some(net_return(e.entry_price, exit, fee))
+}
+
+/// Retorno (b) de la validación 2 en un horizonte.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExitB {
+    /// Mismas reglas de n/e que (a).
+    NotEvaluable,
+    /// El slot de salida tiene un solo trade: coincide con (a).
+    Single(f64),
+    /// Slot de salida con varios trades, orden de ejecución reconstruido.
+    Rebuilt(f64),
+    /// Slot de salida con varios trades sin orden reconstruible: n/e.
+    Unresolved,
+}
+
+impl ExitB {
+    pub fn value(self) -> Option<f64> {
+        match self {
+            ExitB::Single(v) | ExitB::Rebuilt(v) => Some(v),
+            _ => None,
         }
-        let exit = points.iter().filter(|(t, _)| *t <= exit_t).max_by_key(|(t, _)| *t).map(|x| x.1)?;
-        Some(net_return(e.entry_price, exit, fee))
-    })
+    }
+}
+
+/// Versión (b): como (a), pero el precio de salida es el del último trade en
+/// orden de ejecución con `timestamp ≤ salida`. `points` = (timestamp, slot,
+/// precio) en orden `(timestamp, slot)`; `chain` = trades de la ventana
+/// temprana cuyo orden de ejecución está reconstruido (prefijo encadenado de
+/// `execution_order`). El slot de salida es el del punto que elige (a); si
+/// tiene varios trades, solo es evaluable si todos están en `chain`.
+pub fn return_b(
+    e: &Entry2,
+    points: &[(i64, u64, f64)],
+    chain: &[&Trade],
+    covered_until: Option<i64>,
+    completed_at: Option<i64>,
+    h: i64,
+) -> ExitB {
+    let exit_t = e.entry_ts + h;
+    let Some(fee) = e.fee_bps else { return ExitB::NotEvaluable };
+    if covered_until.is_none_or(|c| c < exit_t) || completed_at.is_some_and(|c| c <= exit_t) {
+        return ExitB::NotEvaluable;
+    }
+    let Some(&(_, slot, price)) = points.iter().filter(|x| x.0 <= exit_t).max_by_key(|x| x.0) else {
+        return ExitB::NotEvaluable;
+    };
+    let in_slot = points.iter().filter(|x| x.1 == slot).count();
+    if in_slot == 1 {
+        return ExitB::Single(net_return(e.entry_price, price, fee));
+    }
+    let rebuilt: Vec<&&Trade> = chain.iter().filter(|t| t.slot == slot).collect();
+    match rebuilt.last() {
+        Some(t) if rebuilt.len() == in_slot => {
+            ExitB::Rebuilt(net_return(e.entry_price, t.quote_reserves as f64 / t.token_reserves as f64, fee))
+        }
+        _ => ExitB::Unresolved,
+    }
+}
+
+/// Prefijo de `execution_order` que encadena de verdad desde `v0` (lo que no
+/// encadena queda fuera).
+pub fn chained<'a>(v0: u64, trades: &[&'a Trade]) -> Vec<&'a Trade> {
+    let (ordered, _) = execution_order(v0, trades);
+    let mut cur = v0;
+    ordered
+        .into_iter()
+        .take_while(|t| {
+            let before = if t.is_buy { t.token_reserves.checked_add(t.token_amount) } else { t.token_reserves.checked_sub(t.token_amount) };
+            let ok = before == Some(cur);
+            cur = t.token_reserves;
+            ok
+        })
+        .collect()
+}
+
+/// H10 (supervivencia): segundos tras T_entry2.
+pub const SURVIVAL_SECS: i64 = 600;
+
+/// ≥ 1 trade a más de 10 min de T_entry2; n/e si la curva se completa antes
+/// de T_entry2 + 10 min. `trade_ts` = timestamps de los trades de la curva.
+pub fn survives(e: &Entry2, trade_ts: &[i64], completed_at: Option<i64>) -> Option<bool> {
+    let t = e.entry_ts + SURVIVAL_SECS;
+    if completed_at.is_some_and(|c| c <= t) {
+        return None;
+    }
+    Some(trade_ts.iter().any(|&x| x > t))
 }
 
 /// Test U de Mann-Whitney bilateral, aproximación normal con corrección de
@@ -315,6 +411,43 @@ mod tests {
         assert!(r[0].is_some() && r[1].is_none() && r[2].is_none());
         let sin_fee = Entry2 { fee_bps: None, ..e };
         assert_eq!(returns(&sin_fee, &pts, Some(4000), None, &PARAMS), [None, None, None]);
+    }
+
+    #[test]
+    fn retorno_b_coincide_con_a_en_slot_de_un_trade_y_reconstruye_el_resto() {
+        let e = Entry2 { entry_ts: 100, entry_price: 1.0, fee_bps: Some(0), ..Default::default() };
+        // Slot 9: un solo trade. Slot 10: dos trades guardados en orden
+        // inverso al de ejecución (precio 3 se ejecuta después de 2).
+        let mut v = V0;
+        let a = t(&mut v, "a", true, 1_000_000_000_000, 10, 106);
+        let b = t(&mut v, "b", true, 1_000_000_000_000, 10, 106);
+        let pa = a.quote_reserves as f64 / a.token_reserves as f64;
+        let pb = b.quote_reserves as f64 / b.token_reserves as f64;
+        let pts = [(104, 9, 0.5), (106, 10, pb), (106, 10, pa)];
+        let flat: Vec<(i64, f64)> = pts.iter().map(|x| (x.0, x.2)).collect();
+        let r_a = |h| return_at(&e, &flat, Some(4000), None, h);
+        assert_eq!(return_b(&e, &pts, &[], Some(4000), None, 5), ExitB::Single(-0.5));
+        assert_eq!(r_a(5), Some(-0.5));
+        // (a) toma el último guardado (pa); (b), el último ejecutado (pb).
+        assert_eq!(r_a(6), Some(pa - 1.0));
+        assert_eq!(return_b(&e, &pts, &[&a, &b], Some(4000), None, 6), ExitB::Rebuilt(pb - 1.0));
+        assert_eq!(return_b(&e, &pts, &[&a], Some(4000), None, 6), ExitB::Unresolved);
+        assert_eq!(return_b(&e, &pts, &[&a, &b], Some(4000), Some(106), 6), ExitB::NotEvaluable);
+        assert_eq!(return_b(&e, &pts, &[&a, &b], Some(105), None, 6), ExitB::NotEvaluable);
+        // El prefijo encadenado reordena y corta en lo que no encadena.
+        let c = Trade { token_reserves: 5, ..b.clone() };
+        let ch = chained(V0, &[&b, &a, &c]);
+        assert_eq!(ch.len(), 2);
+        assert_eq!(ch[1].user, "b");
+    }
+
+    #[test]
+    fn supervivencia_exige_trade_tras_diez_minutos_y_es_ne_si_completa_antes() {
+        let e = Entry2 { entry_ts: 100, ..Default::default() };
+        assert_eq!(survives(&e, &[100, 700], None), Some(false));
+        assert_eq!(survives(&e, &[100, 701], None), Some(true));
+        assert_eq!(survives(&e, &[100, 701], Some(700)), None);
+        assert_eq!(survives(&e, &[100, 701], Some(701)), Some(true));
     }
 
     #[test]
