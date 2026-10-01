@@ -143,20 +143,39 @@ pub fn diff(t: &Table) -> Option<f64> {
 /// remuestreo simple de tokens en el orden de `pop`. Devuelve (lo, hi,
 /// réplicas descartadas por estadístico no evaluable).
 pub fn ci(pop: &[&Tok], cluster: bool, stat: &dyn Fn(&[&Tok]) -> Option<f64>) -> (f64, f64, usize) {
+    fn key<'x>(t: &'x &Tok) -> &'x str {
+        t.creator.as_str()
+    }
+    let k: &dyn for<'x> Fn(&'x &Tok) -> &'x str = &key;
+    bootstrap(pop, cluster.then_some(k), &|rs: &[&&Tok]| {
+        let v: Vec<&Tok> = rs.iter().map(|t| **t).collect();
+        stat(&v)
+    })
+}
+
+/// Bootstrap percentil 2.5–97.5 genérico con la semilla `SEED` (una
+/// secuencia nueva por llamada). `cluster`: clave de clúster (se remuestrean
+/// claves ordenadas con todos sus elementos); si no, remuestreo simple en el
+/// orden de `pop`. Devuelve (lo, hi, réplicas descartadas).
+pub fn bootstrap<'a, T>(
+    pop: &'a [T],
+    cluster: Option<&dyn Fn(&T) -> &str>,
+    stat: &dyn Fn(&[&'a T]) -> Option<f64>,
+) -> (f64, f64, usize) {
     let mut rng = PyRandom::new(SEED);
-    let mut groups: BTreeMap<&str, Vec<&Tok>> = BTreeMap::new();
-    if cluster {
+    let mut groups: BTreeMap<&str, Vec<&T>> = BTreeMap::new();
+    if let Some(key) = cluster {
         for t in pop {
-            groups.entry(t.creator.as_str()).or_default().push(t);
+            groups.entry(key(t)).or_default().push(t);
         }
     }
-    let groups: Vec<Vec<&Tok>> = groups.into_values().collect();
+    let groups: Vec<Vec<&T>> = groups.into_values().collect();
     let (mut vals, mut drop) = (Vec::with_capacity(REPLICATES), 0);
     for _ in 0..REPLICATES {
-        let rs: Vec<&Tok> = if cluster {
+        let rs: Vec<&T> = if cluster.is_some() {
             (0..groups.len()).flat_map(|_| groups[rng.randrange(groups.len())].iter().copied()).collect()
         } else {
-            (0..pop.len()).map(|_| pop[rng.randrange(pop.len())]).collect()
+            (0..pop.len()).map(|_| &pop[rng.randrange(pop.len())]).collect()
         };
         match stat(&rs) {
             Some(v) if !v.is_nan() => vals.push(v),

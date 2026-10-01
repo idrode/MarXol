@@ -120,6 +120,28 @@ CREATE TABLE IF NOT EXISTS price_points (
 );
 CREATE INDEX IF NOT EXISTS price_points_mint ON price_points(mint, timestamp);
 
+-- Intentos de descarga por propósito (`window`, `prices`) y mint
+-- (validación 3, adenda 3: "sin datos" tras 3 intentos). Cuenta los intentos
+-- registrados desde que existe la tabla.
+CREATE TABLE IF NOT EXISTS download_attempts (
+    purpose   TEXT NOT NULL,
+    mint      TEXT NOT NULL,
+    attempts  INTEGER NOT NULL,
+    PRIMARY KEY (purpose, mint)
+);
+
+-- Indexado de un tramo por tiempo (`index-tramo --until`): rango de blockTime
+-- listado y si quedó completo (validación 3, adenda 3 y 4).
+CREATE TABLE IF NOT EXISTS tramo_index (
+    from_ts      INTEGER NOT NULL,
+    until_bt     INTEGER NOT NULL,
+    complete     INTEGER NOT NULL,
+    creations    INTEGER NOT NULL,
+    ts_mismatch  INTEGER NOT NULL,
+    recorded_at  INTEGER NOT NULL,
+    PRIMARY KEY (from_ts, until_bt)
+);
+
 -- Cobertura de la ventana de precio (H1b) por mint.
 CREATE TABLE IF NOT EXISTS price_windows (
     mint           TEXT PRIMARY KEY,
@@ -519,7 +541,48 @@ impl Store {
             "INSERT OR REPLACE INTO trade_windows VALUES (?1,?2,?3,?4,?5,?6,?7)",
             params![mint, EARLY_WINDOW_SECS, sigs_in_window as i64, fetch_errors as i64, complete, note, now],
         )?;
+        self.note_attempt("window", mint)
+    }
+
+    /// Suma un intento de descarga (`purpose` = `window` o `prices`).
+    pub fn note_attempt(&self, purpose: &str, mint: &str) -> Result<()> {
+        self.db.execute(
+            "INSERT INTO download_attempts VALUES (?1, ?2, 1)
+             ON CONFLICT (purpose, mint) DO UPDATE SET attempts = attempts + 1",
+            params![purpose, mint],
+        )?;
         Ok(())
+    }
+
+    pub fn attempts(&self, purpose: &str, mint: &str) -> Result<i64> {
+        Ok(self
+            .db
+            .query_row("SELECT attempts FROM download_attempts WHERE purpose = ?1 AND mint = ?2", params![purpose, mint], |r| r.get(0))
+            .optional()?
+            .unwrap_or(0))
+    }
+
+    /// Registra el resultado de `index-tramo --until` (se reemplaza en cada pasada).
+    pub fn record_tramo(&self, from: i64, until_bt: i64, complete: bool, creations: usize, mismatch: usize, now: i64) -> Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO tramo_index VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![from, until_bt, complete, creations as i64, mismatch as i64, now],
+        )?;
+        Ok(())
+    }
+
+    /// Indexado completo que cubre [from, until + margen) por blockTime:
+    /// (until_bt, diferencias timestamp/blockTime) del mayor `until_bt`.
+    pub fn tramo_complete(&self, from: i64, min_until_bt: i64) -> Result<Option<(i64, i64)>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT until_bt, ts_mismatch FROM tramo_index
+                 WHERE complete = 1 AND from_ts <= ?1 AND until_bt >= ?2 ORDER BY until_bt DESC LIMIT 1",
+                params![from, min_until_bt],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?)
     }
 
     /// (creaciones, con ventana cerrada, descargadas completas, intentadas sin completar)
@@ -736,7 +799,7 @@ impl Store {
             "INSERT OR REPLACE INTO price_windows VALUES (?1,?2,?3,?4,?5,?6,?7)",
             params![mint, horizon, sigs as i64, errors as i64, complete, note, now],
         )?;
-        Ok(())
+        self.note_attempt("prices", mint)
     }
 
     /// Todo lo que necesita `h1b::compute` para un mint con ventana de precio
@@ -824,7 +887,56 @@ impl Store {
     /// Tokens con ventana temprana completa y slot de creación en
     /// `[min_slot, max_slot]`.
     pub fn entry2_inputs(&self, min_slot: u64, max_slot: u64) -> Result<Vec<Entry2Input>> {
+        self.entry2_inputs_where("c.slot BETWEEN ?1 AND ?2", min_slot as i64, max_slot.min(i64::MAX as u64) as i64)
+    }
+
+    /// Como `entry2_inputs`, con `timestamp` de creación en `[from, until)`
+    /// (validación 3: el tramo se cierra por timestamp).
+    pub fn entry2_inputs_ts(&self, from: i64, until: i64) -> Result<Vec<Entry2Input>> {
+        self.entry2_inputs_where("c.timestamp >= ?1 AND c.timestamp < ?2", from, until)
+    }
+
+    /// Creaciones con `timestamp` en `[from, until)`: (slot, mint, timestamp,
+    /// ventana temprana completa).
+    pub fn creations_in_ts(&self, from: i64, until: i64) -> Result<Vec<(u64, String, i64, bool)>> {
         let mut q = self.db.prepare(
+            "SELECT c.slot, c.mint, c.timestamp, EXISTS(SELECT 1 FROM trade_windows w WHERE w.mint = c.mint AND w.complete = 1)
+             FROM creations c WHERE c.timestamp >= ?1 AND c.timestamp < ?2 ORDER BY c.slot, c.mint",
+        )?;
+        let rows = q
+            .query_map(params![from, until], |r| Ok((r.get::<_, i64>(0)? as u64, r.get(1)?, r.get(2)?, r.get(3)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    /// Unión de identidades de creador limitada a lo anterior a `slot`
+    /// (descriptivo de la validación 3): creator y payer de la creación,
+    /// cambios de creator con slot < `slot` y creator embebido en los trades
+    /// guardados con slot < `slot`. No sustituye a `creator_identities`.
+    pub fn creator_identities_before(&self, mint: &str, slot: u64) -> Result<std::collections::HashSet<String>> {
+        let mut q = self.db.prepare(
+            "SELECT creator FROM creations WHERE mint = ?1
+             UNION SELECT user FROM creations WHERE mint = ?1
+             UNION SELECT new_creator FROM creator_changes WHERE mint = ?1 AND slot < ?2
+             UNION SELECT old_creator FROM creator_changes WHERE mint = ?1 AND slot < ?2 AND old_creator IS NOT NULL
+             UNION SELECT creator FROM early_trades WHERE mint = ?1 AND slot < ?2 AND creator IS NOT NULL",
+        )?;
+        let rows = q.query_map(params![mint, slot as i64], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// (firma, timestamp) de la creación de cada mint.
+    pub fn creation_signatures_ts(&self, mints: &[String]) -> Result<Vec<(String, i64)>> {
+        let mut q = self.db.prepare("SELECT signature, timestamp FROM creations WHERE mint = ?1")?;
+        let mut out = Vec::new();
+        for m in mints {
+            out.push(q.query_row([m], |r| Ok((r.get(0)?, r.get(1)?)))?);
+        }
+        Ok(out)
+    }
+
+    fn entry2_inputs_where(&self, cond: &str, a: i64, b: i64) -> Result<Vec<Entry2Input>> {
+        let mut q = self.db.prepare(&format!(
             "SELECT c.mint, c.timestamp, c.slot,
                     (SELECT MAX(pw.horizon_secs) FROM price_windows pw WHERE pw.mint = c.mint AND pw.complete = 1),
                     cp.timestamp, m.timestamp
@@ -832,11 +944,11 @@ impl Store {
              JOIN trade_windows w ON w.mint = c.mint AND w.complete = 1
              LEFT JOIN completions cp ON cp.mint = c.mint
              LEFT JOIN migrations m ON m.mint = c.mint
-             WHERE c.slot BETWEEN ?1 AND ?2
-             ORDER BY c.slot, c.timestamp",
-        )?;
+             WHERE {cond}
+             ORDER BY c.slot, c.timestamp"
+        ))?;
         let heads = q
-            .query_map(params![min_slot as i64, max_slot.min(i64::MAX as u64) as i64], |r| {
+            .query_map(params![a, b], |r| {
                 Ok((
                     r.get::<_, String>(0)?,
                     r.get::<_, i64>(1)?,
@@ -968,6 +1080,27 @@ mod tests {
             events,
             decode_errors: vec![],
         }
+    }
+
+    #[test]
+    fn intentos_de_descarga_y_registro_del_tramo() {
+        let st = Store::open(":memory:").unwrap();
+        assert_eq!(st.attempts("window", "M").unwrap(), 0);
+        st.record_window("M", 0, 0, false, Some("x"), 1).unwrap();
+        st.record_window("M", 0, 1, false, None, 2).unwrap();
+        st.note_attempt("window", "M").unwrap();
+        assert_eq!(st.attempts("window", "M").unwrap(), 3);
+        st.record_price_window("M", 3900, 0, 0, false, None, 3).unwrap();
+        assert_eq!(st.attempts("prices", "M").unwrap(), 1);
+        assert_eq!(st.attempts("window", "N").unwrap(), 0);
+
+        assert_eq!(st.tramo_complete(100, 220).unwrap(), None);
+        st.record_tramo(100, 220, false, 5, 0, 1).unwrap();
+        assert_eq!(st.tramo_complete(100, 220).unwrap(), None, "incompleto no vale");
+        st.record_tramo(100, 220, true, 7, 2, 2).unwrap();
+        assert_eq!(st.tramo_complete(100, 220).unwrap(), Some((220, 2)));
+        assert_eq!(st.tramo_complete(100, 221).unwrap(), None, "no cubre el margen");
+        assert_eq!(st.tramo_complete(99, 220).unwrap(), None, "no cubre el inicio");
     }
 
     #[test]

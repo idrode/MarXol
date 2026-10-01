@@ -19,6 +19,11 @@ pub const VALIDATION2_FIRST_SLOT: u64 = 451_810_013;
 pub const VALIDATION2_LAST_SLOT: u64 = 451_811_800;
 /// Por debajo de esto, los NO CONFIRMADA de la validación 2 son "baja potencia".
 pub const VALIDATION2_MIN_ENTERED: usize = 250;
+/// Validación 3 (CLAUDE.md 8, pre-registro 2026-10-01 16:39:58 UTC): creaciones
+/// con `timestamp` en [desde, hasta), fin excluido. El tramo se cierra por
+/// timestamp; los slots se anotan en CLAUDE.md al indexar.
+pub const VALIDATION3_FROM_TS: i64 = 1_790_845_200;
+pub const VALIDATION3_UNTIL_TS: i64 = 1_790_845_680;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Params {
@@ -280,6 +285,29 @@ pub fn survives(e: &Entry2, trade_ts: &[i64], completed_at: Option<i64>) -> Opti
 /// Test U de Mann-Whitney bilateral, aproximación normal con corrección de
 /// empates y de continuidad. Devuelve (U de `x`, p).
 pub fn mann_whitney(x: &[f64], y: &[f64]) -> Option<(f64, f64)> {
+    let (u, mean, var) = mw_parts(x, y)?;
+    if var <= 0.0 {
+        return Some((u, 1.0));
+    }
+    let d = (u - mean).abs() - 0.5;
+    let z = d.max(0.0) / var.sqrt();
+    Some((u, erfc(z / std::f64::consts::SQRT_2).min(1.0)))
+}
+
+/// Mann-Whitney unilateral, alternativa "`x` mayor que `y`": misma
+/// aproximación normal con corrección de empates y de continuidad que
+/// `mann_whitney`; p = P(Z ≥ (U − n₁n₂/2 − 0.5) / σ). Devuelve (U de `x`, p).
+pub fn mann_whitney_greater(x: &[f64], y: &[f64]) -> Option<(f64, f64)> {
+    let (u, mean, var) = mw_parts(x, y)?;
+    if var <= 0.0 {
+        return Some((u, 1.0));
+    }
+    let z = (u - mean - 0.5) / var.sqrt();
+    Some((u, (0.5 * erfc(z / std::f64::consts::SQRT_2)).min(1.0)))
+}
+
+/// (U de `x`, media n₁n₂/2, varianza con corrección de empates).
+fn mw_parts(x: &[f64], y: &[f64]) -> Option<(f64, f64, f64)> {
     let (n1, n2) = (x.len() as f64, y.len() as f64);
     if x.is_empty() || y.is_empty() {
         return None;
@@ -302,12 +330,7 @@ pub fn mann_whitney(x: &[f64], y: &[f64]) -> Option<(f64, f64)> {
     let u = r1 - n1 * (n1 + 1.0) / 2.0;
     let nn = n1 + n2;
     let var = n1 * n2 / 12.0 * ((nn + 1.0) - ties / (nn * (nn - 1.0)));
-    if var <= 0.0 {
-        return Some((u, 1.0));
-    }
-    let d = (u - n1 * n2 / 2.0).abs() - 0.5;
-    let z = d.max(0.0) / var.sqrt();
-    Some((u, erfc(z / std::f64::consts::SQRT_2).min(1.0)))
+    Some((u, n1 * n2 / 2.0, var))
 }
 
 /// erfc con la aproximación de Numerical Recipes (error relativo < 1.2e-7).
@@ -448,6 +471,24 @@ mod tests {
         assert_eq!(survives(&e, &[100, 701], None), Some(true));
         assert_eq!(survives(&e, &[100, 701], Some(700)), None);
         assert_eq!(survives(&e, &[100, 701], Some(701)), Some(true));
+    }
+
+    #[test]
+    fn mann_whitney_unilateral_coincide_con_valores_de_referencia() {
+        // scipy.stats.mannwhitneyu(x, y, alternative="greater", method="asymptotic"):
+        // [4,5,6] vs [1,2,3]: U = 9, z = (9 − 4.5 − 0.5)/√5.25 → p = 0.04043.
+        let (u, p) = mann_whitney_greater(&[4.0, 5.0, 6.0], &[1.0, 2.0, 3.0]).unwrap();
+        assert_eq!(u, 9.0);
+        assert!((p - 0.04043).abs() < 1e-4, "{p}");
+        // Con empates: [2,3,3,4] vs [1,2,2,3]: U = 13, varianza 16/12·(9 − 48/56),
+        // z = 4.5/√10.857 → p = 0.08600 (la mitad del bilateral 0.1720).
+        let (u, p) = mann_whitney_greater(&[2.0, 3.0, 3.0, 4.0], &[1.0, 2.0, 2.0, 3.0]).unwrap();
+        assert_eq!(u, 13.0);
+        assert!((p - 0.08600).abs() < 1e-4, "{p}");
+        // Dirección contraria: p grande.
+        let (_, p) = mann_whitney_greater(&[1.0, 2.0, 3.0], &[4.0, 5.0, 6.0]).unwrap();
+        assert!(p > 0.95, "{p}");
+        assert!(mann_whitney_greater(&[], &[1.0]).is_none());
     }
 
     #[test]

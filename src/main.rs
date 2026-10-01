@@ -10,6 +10,7 @@ mod replica;
 mod rpc;
 mod store;
 mod tx;
+mod v3;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -110,6 +111,12 @@ enum Cmd {
         from: i64,
         #[arg(long, default_value_t = 400)]
         count: usize,
+        /// Cierra el tramo por tiempo (validación 3): solo firmas con
+        /// blockTime < esto, todas; `count` pasa a ser un tope holgado (si se
+        /// alcanza antes, el tramo queda incompleto y se avisa). Sin esto, el
+        /// comportamiento es el de la validación 2 (primeras `count` creaciones).
+        #[arg(long)]
+        until: Option<i64>,
         #[command(flatten)]
         rate: RateArgs,
     },
@@ -161,7 +168,8 @@ enum Cmd {
         check: bool,
         /// Tramo: validacion (validación 1: slot en (último del piloto, último
         /// de la validación 1]), validacion2 (slots [S2, creación n.º 400]; sin
-        /// --check calcula el veredicto de réplica) o piloto. El piloto solo
+        /// --check calcula el veredicto de réplica), validacion3 (timestamp en
+        /// [09:00, 09:08) UTC del 2026-10-01; filtro D2) o piloto. El piloto solo
         /// admite --check.
         #[arg(long, default_value = "validacion")]
         tramo: String,
@@ -170,6 +178,10 @@ enum Cmd {
         /// validacion2 es siempre el criterio.
         #[arg(long)]
         replica: bool,
+        /// Prueba del código de la validación 3 sobre validacion2 (sin
+        /// veredicto): % descartado por D2 y diferencia de medianas.
+        #[arg(long)]
+        d2_prueba: bool,
     },
     /// Informe de un operador (identidad = campo `creator`, no el payer).
     Operator { creator: String },
@@ -213,9 +225,9 @@ fn main() -> Result<()> {
             let mut st = store::Store::open(&cli.db)?;
             index(&rpc, &idl, &mut st, &address, limit, delay_ms)
         }
-        Cmd::IndexTramo { from, count, rate } => {
+        Cmd::IndexTramo { from, count, until, rate } => {
             let mut st = store::Store::open(&cli.db)?;
-            index_tramo(&rpc, &idl, &mut st, from, count, &rate.budget(&cli.rpc)?)
+            index_tramo(&rpc, &idl, &mut st, from, count, until, &rate.budget(&cli.rpc)?)
         }
         Cmd::Windows { limit, max_pages, rate } => {
             let mut st = store::Store::open(&cli.db)?;
@@ -237,8 +249,16 @@ fn main() -> Result<()> {
             let st = store::Store::open(&cli.db)?;
             entry_report(&st, cli.json)
         }
-        Cmd::Entry2 { check, tramo, replica } => {
+        Cmd::Entry2 { check, tramo, replica, d2_prueba } => {
             let st = store::Store::open(&cli.db)?;
+            if tramo == "validacion3" {
+                anyhow::ensure!(!replica && !d2_prueba, "validacion3 no admite --replica ni --d2-prueba");
+                return entry2_v3_report(&st, cli.json, check);
+            }
+            if d2_prueba {
+                anyhow::ensure!(tramo == "validacion2" && !check && !replica, "--d2-prueba solo con --tramo validacion2");
+                return d2_prueba_report(&st, cli.json);
+            }
             entry2_report(&st, cli.json, check, &tramo, replica)
         }
         Cmd::Operator { creator } => {
@@ -356,12 +376,82 @@ fn index(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, address: &str, limit
     Ok(())
 }
 
+/// Fase 2 de `index_tramo` con `--until` (validación 3): `getTransaction` de
+/// todas las firmas exitosas con blockTime en [from, until), por slots
+/// enteros, con `count` como tope de creaciones. El tramo se cierra después
+/// por el `timestamp` de las creaciones, no por el count.
+#[allow(clippy::too_many_arguments)]
+fn index_tramo_until(
+    rpc: &RpcClient,
+    idl: &Idl,
+    st: &mut store::Store,
+    from: i64,
+    until: i64,
+    count: usize,
+    ok: &[&tx::SigInfo],
+    budget: &rpc::Budget,
+    done: &mut usize,
+) -> Result<()> {
+    let (mut fetched, mut no_create, mut i) = (0, 0, 0);
+    while i < ok.len() && st.creations_in_ts(from, until)?.len() < count {
+        let slot = ok[i].slot;
+        while i < ok.len() && ok[i].slot == slot {
+            let sig = &ok[i].signature;
+            i += 1;
+            if st.seen(sig)? {
+                continue;
+            }
+            let t = rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig))
+                .with_context(|| format!("getTransaction {sig} (el slot {slot} queda incompleto; reanudable)"))?;
+            fetched += 1;
+            for e in &t.decode_errors {
+                eprintln!("{sig}: error decodificando evento: {e}");
+            }
+            if !t.events.iter().any(|e| e.name == "CreateEvent") {
+                no_create += 1;
+            }
+            st.ingest(&t)?;
+            *done += 1;
+        }
+    }
+    let created = st.creations_in_ts(from, until)?;
+    println!("getTransaction: {fetched} (sin CreateEvent: {no_create}); creaciones con timestamp en [{from}, {until}): {}", created.len());
+    if i < ok.len() {
+        st.record_tramo(from, until, false, created.len(), 0, unix_now())?;
+        anyhow::bail!(
+            "tope --count {count} alcanzado con {} firmas del tramo sin pedir: el tramo queda INCOMPLETO (reanudable con un --count mayor)",
+            ok.len() - i
+        );
+    }
+    let (lo, hi) = (created.first().map(|c| c.0), created.last().map(|c| c.0));
+    println!("tramo completo: {} creaciones, slots [{}, {}]", created.len(), lo.map_or("-".into(), |x| x.to_string()), hi.map_or("-".into(), |x| x.to_string()));
+    // El tramo se define por el timestamp del CreateEvent; las firmas se
+    // filtran por blockTime. Si difieren en el borde, se avisa.
+    let bt: std::collections::HashMap<&str, i64> = ok.iter().filter_map(|s| s.block_time.map(|b| (s.signature.as_str(), b))).collect();
+    let mismatch = st.creation_signatures_ts(&created.iter().map(|c| c.1.clone()).collect::<Vec<_>>())?
+        .iter()
+        .filter(|(sig, ts)| bt.get(sig.as_str()).is_some_and(|b| b != ts))
+        .count();
+    println!("creaciones con timestamp del CreateEvent ≠ blockTime de su firma: {mismatch}");
+    st.record_tramo(from, until, true, created.len(), mismatch, unix_now())?;
+    Ok(())
+}
+
 /// Ver `Cmd::IndexTramo`. Fase 1: listas de firmas hasta `from` (40 CU por
 /// página de 1000 en Alchemy). Fase 2: `getTransaction` de las firmas
 /// exitosas con blockTime ≥ `from`, de la más antigua a la más nueva y por
 /// slots enteros, hasta que haya ≥ `count` creaciones con slot ≥ S2; así el
 /// slot frontera queda completo para ordenar por (slot, mint).
-fn index_tramo(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, from: i64, count: usize, budget: &rpc::Budget) -> Result<()> {
+#[allow(clippy::too_many_arguments)]
+fn index_tramo(
+    rpc: &RpcClient,
+    idl: &Idl,
+    st: &mut store::Store,
+    from: i64,
+    count: usize,
+    until: Option<i64>,
+    budget: &rpc::Budget,
+) -> Result<()> {
     let address = pump::mint_authority_pda().to_string();
     with_budget(st, "index-tramo", budget, |st, done| {
         let (mut sigs, mut before, mut pages) = (Vec::new(), None::<String>, 0);
@@ -376,7 +466,10 @@ fn index_tramo(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, from: i64, cou
             for s in page {
                 let bt = s.block_time.with_context(|| format!("firma sin blockTime: {}", s.signature))?;
                 if bt >= from {
-                    sigs.push(s);
+                    // Con `until`, las firmas de blockTime ≥ until quedan fuera del tramo.
+                    if until.is_none_or(|u| bt < u) {
+                        sigs.push(s);
+                    }
                 } else if oldest_before_from.is_none() {
                     oldest_before_from = Some((s.slot, bt));
                 }
@@ -397,6 +490,9 @@ fn index_tramo(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, from: i64, cou
 
         let mut ok: Vec<&tx::SigInfo> = sigs.iter().filter(|s| !s.failed).collect();
         ok.sort_by(|a, b| (a.slot, &a.signature).cmp(&(b.slot, &b.signature)));
+        if let Some(until) = until {
+            return index_tramo_until(rpc, idl, st, from, until, count, &ok, budget, done);
+        }
         let (mut fetched, mut no_create, mut i) = (0, 0, 0);
         while i < ok.len() && st.creations_in_slots(s2, ok[i].slot.saturating_sub(1))?.len() < count {
             let slot = ok[i].slot;
@@ -573,6 +669,7 @@ fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_
                 Err(e) => {
                     // El token queda pendiente; la próxima pasada lo reintenta.
                     eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
+                    st.note_attempt("window", &w.mint)?;
                     incomplete += 1;
                     continue;
                 }
@@ -625,6 +722,7 @@ fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_p
                     Ok(s) => s,
                     Err(e) => {
                         eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
+                        st.note_attempt("prices", &w.mint)?;
                         incomplete += 1;
                         continue;
                     }
@@ -1585,6 +1683,431 @@ fn entry2_replica_report(
         println!("{}", serde_json::to_string_pretty(&v)?);
     } else {
         print!("{out}");
+    }
+    Ok(())
+}
+
+/// Fila por token con T_entry2 para la validación 3 (y su prueba sobre V2).
+struct V3Row<'a> {
+    i: &'a store::Entry2Input,
+    e: entry2::Entry2,
+    creator: String,
+    mayhem: bool,
+    /// H4', H6', H7' con las definiciones congeladas.
+    h4: bool,
+    h6: Option<bool>,
+    h7: bool,
+    d2: Option<bool>,
+    /// Pump-y-caída en 1 h; `None` sin ventana de precio de 1 h.
+    pd: Option<bool>,
+    ret_a: [Option<f64>; 5],
+    ret_b: [entry2::ExitB; 5],
+    /// Slot del primer punto con precio ≥ 2× el inicial en la primera hora.
+    first_2x: Option<u64>,
+    /// H4' y H7' con identidades de creador limitadas a lo anterior a T_entry2.
+    strict: (bool, bool),
+}
+
+/// Filas de los tokens con T_entry2; devuelve también cuántos no tienen
+/// precio inicial y cuántos no tienen T_entry2.
+fn v3_rows<'a>(st: &store::Store, inputs: &'a [store::Entry2Input]) -> Result<(Vec<V3Row<'a>>, usize, usize)> {
+    let (p, pb) = (entry2::PARAMS, h1b::PARAMS_1H);
+    let (mut rows, mut no_init, mut no_entry) = (Vec::new(), 0, 0);
+    for i in inputs {
+        let Some(init) = i.initial else {
+            no_init += 1;
+            continue;
+        };
+        let compute = |ids: &std::collections::HashSet<String>| {
+            entry2::compute(i.t0, i.create_slot, (init.quote_reserves, init.token_reserves), &i.trades, ids, &p)
+        };
+        let Some(e) = compute(&i.creator_ids) else {
+            no_entry += 1;
+            continue;
+        };
+        let strict_e = compute(&st.creator_identities_before(&i.mint, e.entry_slot)?)
+            .context("T_entry2 no depende de las identidades")?;
+        let price = |x: &h1b::Point| x.quote_reserves as f64 / x.token_reserves as f64;
+        let flat: Vec<(i64, f64)> = i.points.iter().map(|x| (x.timestamp, price(x))).collect();
+        let pts3: Vec<(i64, u64, f64)> =
+            i.points.iter().zip(&i.point_slots).map(|(x, &s)| (x.timestamp, s, price(x))).collect();
+        let window: Vec<&entry::Trade> =
+            i.trades.iter().filter(|t| (i.t0..i.t0 + p.window_secs).contains(&t.timestamp)).collect();
+        let chain = entry2::chained(init.token_reserves, &window);
+        let covered = i.price_horizon.map(|h| i.t0 + h - 1);
+        let hour = i.price_horizon.is_some_and(|h| h >= pb.horizon_secs);
+        let pd = hour.then(|| {
+            let r = h1b::compute(i.t0, init, &i.points, i.completed_at, i.migrated_at, &pb);
+            r.peak_multiple >= pb.min_peak_multiple && r.drawdown > pb.max_drawdown
+        });
+        let p0 = price(&init);
+        let first_2x = hour
+            .then(|| pts3.iter().find(|x| (i.t0..i.t0 + pb.horizon_secs).contains(&x.0) && x.2 >= 2.0 * p0).map(|x| x.1))
+            .flatten();
+        let (h4, h6, h7) = (e.h4() == Some(true), e.h6(&p), e.h7(&p) == Some(true));
+        rows.push(V3Row {
+            i,
+            creator: st.creation_creator(&i.mint)?,
+            mayhem: st.is_mayhem(&i.mint)?,
+            h4,
+            h6,
+            h7,
+            d2: v3::d2(h4, h6, h7),
+            pd,
+            ret_a: v3::HORIZONS.map(|(h, _)| entry2::return_at(&e, &flat, covered, i.completed_at, h)),
+            ret_b: v3::HORIZONS.map(|(h, _)| entry2::return_b(&e, &pts3, &chain, covered, i.completed_at, h)),
+            first_2x,
+            strict: (strict_e.h4() == Some(true), strict_e.h7(&p) == Some(true)),
+            e,
+        });
+    }
+    Ok((rows, no_init, no_entry))
+}
+
+fn v3_cands<'a>(rows: &'a [V3Row]) -> Vec<v3::Cand<'a>> {
+    rows.iter()
+        .map(|r| v3::Cand { mint: &r.i.mint, creator: &r.creator, slot: r.i.create_slot, mayhem: r.mayhem })
+        .collect()
+}
+
+/// Mediana · fracción > 0 (n) de los valores.
+fn med_frac(v: &[f64]) -> String {
+    let n = v.len();
+    let pos = v.iter().filter(|&&x| x > 0.0).count();
+    let m = replica::median(&mut v.to_vec());
+    format!("{} · {} ({n})", pct1(m), if n == 0 { "n/a".into() } else { format!("{:.0}%", 100.0 * pos as f64 / n as f64) })
+}
+
+/// Tablas descriptivas por grupo D2 y horizonte (versiones (a) y (b)).
+fn v3_return_tables(out: &mut String, rows: &[&V3Row]) {
+    for (k, (_, hl)) in v3::HORIZONS.iter().enumerate() {
+        let (mut single, mut rebuilt, mut unresolved) = (0, 0, 0);
+        for r in rows {
+            match r.ret_b[k] {
+                entry2::ExitB::Single(_) => single += 1,
+                entry2::ExitB::Rebuilt(_) => rebuilt += 1,
+                entry2::ExitB::Unresolved => unresolved += 1,
+                entry2::ExitB::NotEvaluable => {}
+            }
+        }
+        out.push_str(&format!(
+            "  {hl}: (b) slot de salida con un trade {single}, varios reconstruidos {rebuilt}, no reconstruidos (n/e en (b)) {unresolved}\n"
+        ));
+        for (label, g) in [("pasan", Some(false)), ("descartados", Some(true)), ("D2 n/e", None)] {
+            let grp: Vec<&&V3Row> = rows.iter().filter(|r| r.d2 == g).collect();
+            if g.is_none() && grp.is_empty() {
+                continue;
+            }
+            let a: Vec<f64> = grp.iter().filter_map(|r| r.ret_a[k]).collect();
+            let b: Vec<f64> = grp.iter().filter_map(|r| r.ret_b[k].value()).collect();
+            out.push_str(&format!("    {label:11} (a) {:28} (b) {}\n", med_frac(&a), med_frac(&b)));
+        }
+    }
+}
+
+/// Validación 3 (CLAUDE.md 8, pre-registro 2026-10-01 16:39:58 UTC y adenda
+/// operativa 17:00:21 UTC): filtro D2 contra el retorno neto (a) a +30 min.
+/// Con `check`, solo señales, poblaciones y estado de los datos, sin ningún
+/// retorno.
+fn entry2_v3_report(st: &store::Store, json: bool, check: bool) -> Result<()> {
+    let (from, until) = (entry2::VALIDATION3_FROM_TS, entry2::VALIDATION3_UNTIL_TS);
+    let indexed = st.tramo_complete(from, until + v3::UNTIL_MARGIN_SECS)?;
+    let created = st.creations_in_ts(from, until)?;
+    let inputs = st.entry2_inputs_ts(from, until)?;
+    let (rows, no_init, no_entry) = v3_rows(st, &inputs)?;
+
+    // Estado de los datos (adenda 3).
+    let mut no_window: Vec<(String, String, u64, bool, v3::Data)> = Vec::new();
+    for (slot, mint, _, complete) in &created {
+        if !complete {
+            let d = v3::data_status(false, st.attempts("window", mint)?);
+            no_window.push((mint.clone(), st.creation_creator(mint)?, *slot, st.is_mayhem(mint)?, d));
+        }
+    }
+    let mut price_data = std::collections::HashMap::new();
+    for r in &rows {
+        let ok = r.i.price_horizon.is_some_and(|h| h >= PRICE_DOWNLOAD_SECS);
+        price_data.insert(r.i.mint.as_str(), v3::data_status(ok, st.attempts("prices", &r.i.mint)?));
+    }
+    let window_pending = no_window.iter().filter(|x| x.4 == v3::Data::Pending).count();
+    let window_sin_datos = no_window.iter().filter(|x| x.4 == v3::Data::SinDatos).count();
+    let price_pending = price_data.values().filter(|&&d| d == v3::Data::Pending).count();
+
+    let cands = v3_cands(&rows);
+    let (pop_idx, ties) = v3::population(&cands, false);
+    let (may_idx, may_ties) = v3::population(&cands, true);
+    let pop: Vec<&V3Row> = pop_idx.iter().map(|&i| &rows[i]).collect();
+    let mayhem_all: Vec<&V3Row> = rows.iter().filter(|r| r.mayhem).collect();
+    let mayhem_one: Vec<&V3Row> = may_idx.iter().map(|&i| &rows[i]).collect();
+    let nd_cands: Vec<v3::Cand> = no_window
+        .iter()
+        .filter(|x| x.4 == v3::Data::SinDatos)
+        .map(|x| v3::Cand { mint: &x.0, creator: &x.1, slot: x.2, mayhem: x.3 })
+        .collect();
+    let chosen: Vec<&v3::Cand> = pop_idx.iter().map(|&i| &cands[i]).collect();
+    let creators_out = v3::creators_sin_datos(&chosen, &nd_cands);
+    let pop_sin_datos = pop.iter().filter(|r| price_data[r.i.mint.as_str()] == v3::Data::SinDatos).count();
+    let count = |g: &[&V3Row], d: Option<bool>| g.iter().filter(|r| r.d2 == d).count();
+    let strict = |g: &[&V3Row]| {
+        v3::identity_changes(&g.iter().map(|r| ((r.h4, r.h7), r.strict)).collect::<Vec<_>>())
+    };
+
+    let mut out = String::new();
+    macro_rules! say { ($($a:tt)*) => { out.push_str(&format!($($a)*)); out.push('\n'); } }
+    say!(
+        "VALIDACIÓN 3 — FILTRO D2{}. Tramo: timestamp del CreateEvent en [{from}, {until}). Parámetros: {}",
+        if check { " — CHEQUEO (sin ningún retorno)" } else { "" },
+        serde_json::to_string(&entry2::PARAMS)?
+    );
+    say!(
+        "indexado del tramo (index-tramo --until ≥ {}): {}",
+        until + v3::UNTIL_MARGIN_SECS,
+        match indexed {
+            Some((u, m)) => format!("COMPLETO hasta blockTime {u}; creaciones con timestamp ≠ blockTime (borde, se reportan, no cambian el tramo): {m}"),
+            None => "NO REGISTRADO COMO COMPLETO".into(),
+        }
+    );
+    say!(
+        "creaciones en el tramo: {} (slots [{}, {}])  sin precio inicial: {no_init}  sin T_entry2: {no_entry}  con T_entry2: {} (sin mayhem {}, mayhem {})",
+        created.len(),
+        created.first().map_or("-".into(), |c| c.0.to_string()),
+        created.last().map_or("-".into(), |c| c.0.to_string()),
+        rows.len(),
+        rows.iter().filter(|r| !r.mayhem).count(),
+        mayhem_all.len()
+    );
+    say!(
+        "ventana temprana incompleta: {} (sin datos tras {} intentos: {window_sin_datos}; pendientes: {window_pending})  \
+         precio de 65 min incompleto entre los de T_entry2: {} (sin datos: {}; pendientes: {price_pending})",
+        no_window.len(),
+        v3::MAX_ATTEMPTS,
+        price_data.values().filter(|&&d| d != v3::Data::Complete).count(),
+        price_data.values().filter(|&&d| d == v3::Data::SinDatos).count()
+    );
+    say!(
+        "población (sin mayhem, un token por creator): {} tokens, {} creators; empates de slot resueltos por mint: {ties}",
+        pop.len(),
+        v3::creators(&cands, &pop_idx)
+    );
+    say!(
+        "D2 en la población: descartados {}  pasan {}  no evaluables (H6' n/e y una sola de H4'/H7'; adenda 1): {}  sin datos de precio (adenda 3): {pop_sin_datos}",
+        count(&pop, Some(true)),
+        count(&pop, Some(false)),
+        count(&pop, None)
+    );
+    let (c4, c7) = strict(&pop);
+    say!("identidades limitadas a lo anterior a T_entry2 (descriptivo): cambiarían H4' en {c4} y H7' en {c7} tokens de la población");
+    say!(
+        "mayhem (aparte, sin criterio): {} tokens con T_entry2 ({} un token por creator; empates {may_ties}); D2 descartados {} pasan {} no evaluables {}",
+        mayhem_all.len(),
+        mayhem_one.len(),
+        count(&mayhem_all, Some(true)),
+        count(&mayhem_all, Some(false)),
+        count(&mayhem_all, None)
+    );
+    say!(
+        "creators fuera de la comparación por un token sin ventana temprana anterior a su token elegido (adenda 7, 'sin datos'): {}{}",
+        creators_out.len(),
+        if creators_out.is_empty() { String::new() } else { format!(" ({})", creators_out.join(", ")) }
+    );
+    if check {
+        if json {
+            let v: Vec<_> = rows
+                .iter()
+                .map(|r| serde_json::json!({"mint": r.i.mint, "creator": r.creator, "mayhem": r.mayhem, "entry2": r.e,
+                    "h4": r.h4, "h6": r.h6, "h7": r.h7, "d2": r.d2, "strict_h4_h7": r.strict,
+                    "price_data": price_data[r.i.mint.as_str()],
+                    "in_population": pop.iter().any(|p| p.i.mint == r.i.mint)}))
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&v)?);
+        } else {
+            print!("{out}");
+        }
+        return Ok(());
+    }
+
+    // Ejecución única: solo con el indexado completo y sin descargas pendientes (adenda 3).
+    if indexed.is_none() || created.is_empty() {
+        anyhow::bail!("validacion3: indexado del tramo incompleto o no registrado; no se calcula el veredicto. Revisa con --check");
+    }
+    if window_pending > 0 || price_pending > 0 {
+        anyhow::bail!(
+            "validacion3: descargas pendientes (ventanas {window_pending}, precios {price_pending}, con menos de {} intentos); \
+             no se calcula el veredicto. Revisa con --check",
+            v3::MAX_ATTEMPTS
+        );
+    }
+    let items: Vec<v3::Item> = pop
+        .iter()
+        .map(|r| v3::Item {
+            mint: &r.i.mint,
+            slot: r.i.create_slot,
+            window_trades: r.e.window_trades,
+            d2: r.d2,
+            creator_sin_datos: creators_out.contains(&r.creator.as_str()),
+            sin_datos: price_data[r.i.mint.as_str()] == v3::Data::SinDatos,
+            ret: r.ret_a[v3::PRIMARY],
+        })
+        .collect();
+    let (obs, ex) = v3::comparison(&items);
+    let heaviest = v3::heaviest(&obs);
+    let c = v3::criteria(&obs, heaviest);
+    let (verdict, ok) = v3::decide(&c);
+    say!(
+        "excluidos de la comparación: creators sin datos (adenda 7) {} · sin datos de precio {} · no evaluables {} · retorno (a) +30 min n/e {}  (comparación: {} tokens)",
+        ex.creator_sin_datos,
+        ex.sin_datos,
+        ex.no_evaluable,
+        ex.ret_ne,
+        obs.len()
+    );
+    let mark = |b: bool| if b { "cumple" } else { "NO cumple" };
+    say!("\n==== Resultado principal: retorno neto (a) desde T_entry2 a +30 min, pasan frente a descartados ====");
+    say!(
+        "1. tokens: pasan {}, descartados {} (mínimo {} en cada grupo): {}",
+        c.n_pass,
+        c.n_disc,
+        v3::MIN_GROUP,
+        mark(ok[0])
+    );
+    say!(
+        "2. Mann-Whitney unilateral (pasan > descartados): U = {}, p = {} (umbral < {}): {}",
+        c.mw_u.map_or("n/a".into(), |u| format!("{u:.1}")),
+        c.mw_p.map_or("n/a".into(), |p| format!("{p:.6}")),
+        v3::MAX_P,
+        mark(ok[1])
+    );
+    say!(
+        "3. medianas: pasan {}%, descartados {}%; diferencia {} pts (umbral ≥ {:.0}, tolerancia 1e-9): {}",
+        pct1(c.median_pass),
+        pct1(c.median_disc),
+        pct1(c.diff),
+        100.0 * v3::MIN_DIFF,
+        mark(ok[2])
+    );
+    let hw = heaviest.map(|i| obs[i].window_trades).unwrap_or(0);
+    let ties_h = obs.iter().filter(|o| o.window_trades == hw).count();
+    say!(
+        "4. sin el token de mayor peso ({}, {hw} trades en 5 min; tokens con ese máximo: {ties_h}, desempate por slot y mint): diferencia {} pts (> 0): {}",
+        c.heaviest.as_deref().unwrap_or("-"),
+        pct1(c.diff_without_heaviest),
+        mark(ok[3])
+    );
+    say!(
+        "5. bootstrap ({} réplicas, semilla {}, por tokens): IC 95 % [{}, {}] (excluye 0, estricto): {}; réplicas descartadas por un grupo vacío: {}",
+        replica::REPLICATES,
+        replica::SEED,
+        pct1(Some(c.ci.0)),
+        pct1(Some(c.ci.1)),
+        mark(ok[4]),
+        c.ci.2
+    );
+    say!("VEREDICTO: {verdict}");
+
+    say!("\n==== SECUNDARIO, DESCRIPTIVO, SIN CRITERIO ====");
+    say!(
+        "% descartado: población {} de {} ({}); comparación {} de {} ({})",
+        count(&pop, Some(true)),
+        pop.len(),
+        pct1(Some(count(&pop, Some(true)) as f64 / pop.len().max(1) as f64)),
+        c.n_disc,
+        obs.len(),
+        pct1(Some(c.n_disc as f64 / obs.len().max(1) as f64))
+    );
+    say!("\nRetorno neto por horizonte, población (celda: mediana · fracción > 0 (n))");
+    v3_return_tables(&mut out, &pop);
+    say!("\nPump-y-caída en 1 h (población) y momento del primer 2x respecto a T_entry2");
+    for (label, g) in [("descartados", Some(true)), ("pasan", Some(false)), ("no evaluables", None)] {
+        let grp: Vec<&&V3Row> = pop.iter().filter(|r| r.d2 == g).collect();
+        if g.is_none() && grp.is_empty() {
+            continue;
+        }
+        let pd: Vec<&&&V3Row> = grp.iter().filter(|r| r.pd == Some(true)).collect();
+        let mut t: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+        for r in &pd {
+            *t.entry(v3::first_2x_timing(r.first_2x, r.e.entry_slot)).or_default() += 1;
+        }
+        say!(
+            "  {label:13} p&c {}/{} evaluables ({}%)  momento del primer 2x: {}",
+            pd.len(),
+            grp.iter().filter(|r| r.pd.is_some()).count(),
+            pct1(Some(pd.len() as f64 / grp.iter().filter(|r| r.pd.is_some()).count().max(1) as f64)),
+            t.iter().map(|(k, v)| format!("{k} {v}")).collect::<Vec<_>>().join(", ")
+        );
+    }
+    let total_pd = pop.iter().filter(|r| r.pd == Some(true)).count();
+    let cap = pop.iter().filter(|r| r.pd == Some(true) && r.d2 == Some(true)).count();
+    say!("  capturados por D2: {cap} de {total_pd} p&c");
+    say!("\nIdentidades de creador limitadas a lo anterior a T_entry2: cambiarían H4' en {c4} y H7' en {c7} tokens de la población");
+    for (label, g) in [("MAYHEM, todos con T_entry2", &mayhem_all), ("MAYHEM, un token por creator", &mayhem_one)] {
+        say!(
+            "\n[{label}] n = {}  D2 descartados {}  pasan {}  no evaluables {}  p&c {}/{}",
+            g.len(),
+            count(g, Some(true)),
+            count(g, Some(false)),
+            count(g, None),
+            g.iter().filter(|r| r.pd == Some(true)).count(),
+            g.iter().filter(|r| r.pd.is_some()).count()
+        );
+        v3_return_tables(&mut out, g);
+    }
+
+    if json {
+        let v = serde_json::json!({
+            "verdict": verdict, "criteria_ok": ok, "criteria": c, "excluded": ex, "obs": obs,
+            "population": pop.iter().map(|r| &r.i.mint).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&v)?);
+    } else {
+        print!("{out}");
+    }
+    Ok(())
+}
+
+/// Prueba del código de la validación 3 sobre la validación 2 (sin veredicto):
+/// % descartado por D2 y diferencia de medianas del retorno (a) a +30 min en
+/// la población de `cribado_posthoc` (un token por creator con mayhem y luego
+/// sin mayhem) y en la de la validación 3 (sin mayhem primero).
+fn d2_prueba_report(st: &store::Store, json: bool) -> Result<()> {
+    let inputs = st.entry2_inputs(entry2::VALIDATION2_FIRST_SLOT, entry2::VALIDATION2_LAST_SLOT)?;
+    let (rows, _, _) = v3_rows(st, &inputs)?;
+    let cands = v3_cands(&rows);
+    let all_as_one: Vec<v3::Cand> =
+        cands.iter().map(|c| v3::Cand { mint: c.mint, creator: c.creator, slot: c.slot, mayhem: false }).collect();
+    let cribado: Vec<usize> = v3::population(&all_as_one, false).0.into_iter().filter(|&i| !rows[i].mayhem).collect();
+    let v3pop = v3::population(&cands, false).0;
+    let mut res = Vec::new();
+    for (label, idx) in [("cribado_posthoc (V2 primaria, sin mayhem)", &cribado), ("regla de la validación 3", &v3pop)] {
+        let pop: Vec<&V3Row> = idx.iter().map(|&i| &rows[i]).collect();
+        let disc = pop.iter().filter(|r| r.d2 == Some(true)).count();
+        let obs: Vec<v3::Obs> = pop
+            .iter()
+            .filter_map(|r| {
+                Some(v3::Obs {
+                    mint: r.i.mint.clone(),
+                    slot: r.i.create_slot,
+                    discarded: r.d2?,
+                    ret: r.ret_a[v3::PRIMARY]?,
+                    window_trades: 0,
+                })
+            })
+            .collect();
+        let refs: Vec<&v3::Obs> = obs.iter().collect();
+        let d = v3::median_diff(&refs);
+        if !json {
+            println!(
+                "PRUEBA DEL CÓDIGO SOBRE V2 (sin veredicto) — {label}: n {}  descartados {disc} ({})  comparación {}  diferencia de medianas {} pts",
+                pop.len(),
+                pct1(Some(disc as f64 / pop.len() as f64)),
+                obs.len(),
+                pct1(d)
+            );
+        }
+        res.push(serde_json::json!({"label": label, "n": pop.len(), "discarded": disc, "comparison": obs.len(), "median_diff": d,
+            "mints": pop.iter().map(|r| &r.i.mint).collect::<Vec<_>>()}));
+    }
+    if json {
+        println!("{}", serde_json::to_string_pretty(&res)?);
     }
     Ok(())
 }
