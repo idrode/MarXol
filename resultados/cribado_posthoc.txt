@@ -1,0 +1,154 @@
+CRIBADO — POST HOC, SIN PRE-REGISTRO, SOLO DESCRIPTIVO (sin contrastes ni p-valores)
+controles: V1 con T_entry2 = 251 (entry2 --json: 251); p&c distinto de entry2 --json: 0; retorno +10/+30/+60 distinto: 0; V2 primaria = 197 (V2 con T_entry2: 283)
+  V1: p&c 63/251; H6' n/e 0; sin mayhem 203, mayhem 48
+  V2 primaria: p&c 39/197; H6' n/e 0; sin mayhem 174, mayhem 23
+
+====================================================================================================
+PARTE 1. FILTRO DE DESCARTE CON LAS SEÑALES CONFIRMADAS
+D = H4' o H6' o H7'.  D2 = al menos 2 de las 3.  Las señales se eligieron mirando V1:
+la cifra honesta es la de V2. Los retornos de los tokens mayhem no son fiables (precio fuera de los trades).
+
+## V2 primaria (cifra honesta) — sin mayhem: n = 174
+  [D: H4' o H6' o H7'] descartados 118/174 (68 %)  pasan 56/174 (32 %)
+    descartados  n=118  p&c 33/118 (28 %)  superv 34/117 (29 %)  buenos 2/117
+                 retorno neto mediano: +5 s -4.1 % (n=118)  +30 s -6.9 % (n=118)  +5 min -12.0 % (n=117)  +30 min -17.3 % (n=117)  +60 min -18.4 % (n=117)
+    pasan        n= 56  p&c 0/56 (0 %)  superv 15/56 (27 %)  buenos 1/56
+                 retorno neto mediano: +5 s -4.2 % (n=56)  +30 s -4.7 % (n=56)  +5 min -5.5 % (n=56)  +30 min -5.6 % (n=56)  +60 min -5.6 % (n=56)
+    como detector de p&c: precisión 33/118 (28 %)  cobertura 33/33 (100 %)
+    buenos (ret +30 > 0): 3 en total; descartados 2, pasan 1  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+  [D2: >= 2 de 3] descartados 74/174 (43 %)  pasan 100/174 (57 %)
+    descartados  n= 74  p&c 30/74 (41 %)  superv 23/74 (31 %)  buenos 0/74
+                 retorno neto mediano: +5 s -5.2 % (n=74)  +30 s -11.3 % (n=74)  +5 min -25.8 % (n=74)  +30 min -30.8 % (n=74)  +60 min -30.8 % (n=74)
+    pasan        n=100  p&c 3/100 (3 %)  superv 26/99 (26 %)  buenos 3/99
+                 retorno neto mediano: +5 s -3.4 % (n=100)  +30 s -4.4 % (n=100)  +5 min -5.6 % (n=99)  +30 min -5.9 % (n=99)  +60 min -5.9 % (n=99)
+    como detector de p&c: precisión 30/74 (41 %)  cobertura 30/33 (91 %)
+    buenos (ret +30 > 0): 3 en total; descartados 0, pasan 3  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+
+## V2 primaria (cifra honesta) — MAYHEM (aparte): n = 23
+  [D: H4' o H6' o H7'] descartados 4/23 (17 %)  pasan 19/23 (83 %)
+    descartados  n=  4  p&c 2/4 (50 %)  superv 0/3 (0 %)  buenos 0/3
+                 retorno neto mediano: +5 s -40.4 % (n=4)  +30 s -66.2 % (n=4)  +5 min -56.7 % (n=3)  +30 min -56.7 % (n=3)  +60 min -56.7 % (n=3)
+    pasan        n= 19  p&c 4/19 (21 %)  superv 6/19 (32 %)  buenos 4/18
+                 retorno neto mediano: +5 s -14.9 % (n=19)  +30 s -23.4 % (n=19)  +5 min -48.7 % (n=19)  +30 min -45.0 % (n=18)  +60 min -45.0 % (n=18)
+    como detector de p&c: precisión 2/4 (50 %)  cobertura 2/6 (33 %)
+    buenos (ret +30 > 0): 4 en total; descartados 0, pasan 4  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+  [D2: >= 2 de 3] descartados 0/23 (0 %)  pasan 23/23 (100 %)
+    descartados  n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)  buenos 0/0
+                 retorno neto mediano: +5 s n/a (n=0)  +30 s n/a (n=0)  +5 min n/a (n=0)  +30 min n/a (n=0)  +60 min n/a (n=0)
+    pasan        n= 23  p&c 6/23 (26 %)  superv 6/22 (27 %)  buenos 4/21
+                 retorno neto mediano: +5 s -23.4 % (n=23)  +30 s -32.0 % (n=23)  +5 min -52.7 % (n=22)  +30 min -48.8 % (n=21)  +60 min -48.8 % (n=21)
+    como detector de p&c: precisión 0/0 (n/a)  cobertura 0/6 (0 %)
+    buenos (ret +30 > 0): 4 en total; descartados 0, pasan 4  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+
+## V1 (251; señales elegidas aquí, optimista) — sin mayhem: n = 203
+  [D: H4' o H6' o H7'] descartados 129/203 (64 %)  pasan 74/203 (36 %)
+    descartados  n=129  p&c 51/129 (40 %)  superv 53/129 (41 %)  buenos 5/128
+                 retorno neto mediano: +5 s -3.0 % (n=129)  +30 s -6.7 % (n=129)  +5 min -13.9 % (n=129)  +30 min -19.1 % (n=128)  +60 min -19.5 % (n=128)
+    pasan        n= 74  p&c 2/74 (3 %)  superv 19/74 (26 %)  buenos 1/74
+                 retorno neto mediano: +5 s -2.8 % (n=74)  +30 s -3.6 % (n=74)  +5 min -5.7 % (n=74)  +30 min -6.9 % (n=74)  +60 min -6.9 % (n=74)
+    como detector de p&c: precisión 51/129 (40 %)  cobertura 51/53 (96 %)
+    buenos (ret +30 > 0): 6 en total; descartados 5, pasan 1  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+  [D2: >= 2 de 3] descartados 82/203 (40 %)  pasan 121/203 (60 %)
+    descartados  n= 82  p&c 41/82 (50 %)  superv 35/82 (43 %)  buenos 3/82
+                 retorno neto mediano: +5 s -3.0 % (n=82)  +30 s -7.8 % (n=82)  +5 min -19.9 % (n=82)  +30 min -27.7 % (n=82)  +60 min -27.7 % (n=82)
+    pasan        n=121  p&c 12/121 (10 %)  superv 37/121 (31 %)  buenos 3/120
+                 retorno neto mediano: +5 s -2.8 % (n=121)  +30 s -4.0 % (n=121)  +5 min -6.5 % (n=121)  +30 min -8.4 % (n=120)  +60 min -8.6 % (n=120)
+    como detector de p&c: precisión 41/82 (50 %)  cobertura 41/53 (77 %)
+    buenos (ret +30 > 0): 6 en total; descartados 3, pasan 3  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+
+## V1 (251; señales elegidas aquí, optimista) — MAYHEM (aparte): n = 48
+  [D: H4' o H6' o H7'] descartados 19/48 (40 %)  pasan 29/48 (60 %)
+    descartados  n= 19  p&c 6/19 (32 %)  superv 6/19 (32 %)  buenos 6/19
+                 retorno neto mediano: +5 s -2.5 % (n=19)  +30 s -3.3 % (n=19)  +5 min -16.8 % (n=19)  +30 min -16.8 % (n=19)  +60 min -16.8 % (n=19)
+    pasan        n= 29  p&c 4/29 (14 %)  superv 6/28 (21 %)  buenos 10/28
+                 retorno neto mediano: +5 s -2.2 % (n=29)  +30 s -3.1 % (n=29)  +5 min -10.5 % (n=28)  +30 min -10.5 % (n=28)  +60 min -10.5 % (n=28)
+    como detector de p&c: precisión 6/19 (32 %)  cobertura 6/10 (60 %)
+    buenos (ret +30 > 0): 16 en total; descartados 6, pasan 10  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+  [D2: >= 2 de 3] descartados 3/48 (6 %)  pasan 45/48 (94 %)
+    descartados  n=  3  p&c 0/3 (0 %)  superv 1/3 (33 %)  buenos 0/3
+                 retorno neto mediano: +5 s -11.8 % (n=3)  +30 s -11.8 % (n=3)  +5 min -11.8 % (n=3)  +30 min -11.8 % (n=3)  +60 min -11.9 % (n=3)
+    pasan        n= 45  p&c 10/45 (22 %)  superv 11/44 (25 %)  buenos 16/44
+                 retorno neto mediano: +5 s -2.0 % (n=45)  +30 s -2.0 % (n=45)  +5 min -21.5 % (n=44)  +30 min -21.5 % (n=44)  +60 min -21.5 % (n=44)
+    como detector de p&c: precisión 0/3 (0 %)  cobertura 0/10 (0 %)
+    buenos (ret +30 > 0): 16 en total; descartados 0, pasan 16  — n muy pequeño: sin potencia para decir nada sobre la pérdida de buenos
+
+====================================================================================================
+PARTE 2. REPETICIÓN DE CREADORES (creator del CreateEvent, no el payer)
+creaciones en marxol.db: 777 (piloto 40, V1 337, V2 400)
+creator != payer: 146
+eventos de cambio de creator: {'migrate_to_sharing': 81} (SetCreatorEvent: 0)
+  ráfaga 1: creaciones con migración a sharing_config en la misma tx: 4 de 377
+  ráfaga 2: creaciones con migración a sharing_config en la misma tx: 2 de 400
+  (el análisis usa el creator de la creación; si la tx ya migra a sharing_config, el creator del
+   CreateEvent sigue siendo la wallet original, así que no afecta a la identidad usada aquí)
+
+2.1 Tokens por creator (distribución 1 / 2 / 3 / 4+)
+  ráfaga 1 (piloto + V1): 1: 248  2: 8  3: 4  4+: 12   (creators 272, tokens 377)
+  ráfaga 2 (V2):          1: 188  2: 17  3: 10  4+: 10   (creators 225, tokens 400)
+  creators en las dos ráfagas: 2
+    tokens totales de esos creators: 1: 0  2: 0  3: 0  4+: 2   (creators 2, tokens 37)
+    EjcwXG6ywzorxLcX7565C614LdhxiHF6uJhkYyRTDVgZ: ráfaga 1 8, ráfaga 2 19, mayhem 27/27, p&c ráfaga 1 1, ráfaga 2 2
+    3yct19th5Cjpu8wMzDWpYVF32ESzo4gtrtTwiuWNBKo8: ráfaga 1 5, ráfaga 2 5, mayhem 9/10, p&c ráfaga 1 0, ráfaga 2 1
+
+2.2 Creators con tokens en V1 y en V2: ¿el p&c de V1 predice el de V2?
+  Creator 'malo' en un tramo = al menos un token con p&c. Todas las creaciones del tramo (no solo las de T_entry2).
+  [solo tokens sin mayhem] creators con tokens en ambos tramos: 0
+                     V2 p&c sí   V2 p&c no
+    V1 p&c sí                0           0
+    V1 p&c no                0           0
+  [solo tokens mayhem (aparte)] creators con tokens en ambos tramos: 2
+                     V2 p&c sí   V2 p&c no
+    V1 p&c sí                1           0
+    V1 p&c no                1           0
+
+2.3 Cribado retroactivo V1 -> V2 (creador marcado = tenía en V1 un token con p&c, ya conocido al decidir)
+  sobre las 400 creaciones de V2: marcadas 19 (sin mayhem 0, mayhem 19)
+  [V2 primaria — sin mayhem] marcados: n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)
+                               resto:     n=174  p&c 33/174 (19 %)  superv 49/173 (28 %)
+  [V2 primaria — MAYHEM] marcados: n=  1  p&c 1/1 (100 %)  superv 0/1 (0 %)
+                               resto:     n= 22  p&c 5/22 (23 %)  superv 6/21 (29 %)
+  [V2 con T_entry2 (283) — sin mayhem] marcados: n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)
+                                         resto:     n=220  p&c 42/220 (19 %)  superv 54/219 (25 %)
+  [V2 con T_entry2 (283) — MAYHEM] marcados: n= 14  p&c 2/14 (14 %)  superv 0/14 (0 %)
+                                         resto:     n= 49  p&c 11/49 (22 %)  superv 8/48 (17 %)
+
+2.4 Dentro de V2, orden por slot
+  ESTRICTO: el p&c de un token anterior solo se conoce en su t0 + 1 h; la ráfaga dura 8 min.
+  marcados (estricto) entre las 400 creaciones: 0
+  CON FUGA (usa el p&c de tokens anteriores antes de que se conozca; NO es un cribado realizable, solo referencia):
+  marcados (con fuga) entre las 400 creaciones: 79
+  [V2 primaria, con fuga — sin mayhem] marcados: n=  1  p&c 1/1 (100 %)  superv 0/1 (0 %)
+                                         resto:     n=173  p&c 32/173 (18 %)  superv 49/172 (28 %)
+  [V2 primaria, con fuga — MAYHEM] marcados: n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)
+                                         resto:     n= 23  p&c 6/23 (26 %)  superv 6/22 (27 %)
+  [V2 con T_entry2, con fuga — sin mayhem] marcados: n= 30  p&c 8/30 (27 %)  superv 2/30 (7 %)
+                                             resto:     n=190  p&c 34/190 (18 %)  superv 52/189 (28 %)
+  [V2 con T_entry2, con fuga — MAYHEM] marcados: n= 32  p&c 5/32 (16 %)  superv 2/32 (6 %)
+                                             resto:     n= 31  p&c 8/31 (26 %)  superv 6/30 (20 %)
+
+2.5 V2 primaria: D, creador marcado (V1) y su unión. Cobertura de p&c y buenos descartados
+  [sin mayhem] n = 174, p&c = 33, buenos (ret +30 > 0) = 3
+    D                      descarta 118/174 (68 %)  p&c capturado 33/33 (100 %)  precisión 28 %  buenos descartados 2/3
+    D2                     descarta  74/174 (43 %)  p&c capturado 30/33 (91 %)  precisión 41 %  buenos descartados 0/3
+    creador marcado        descarta   0/174 (0 %)  p&c capturado 0/33 (0 %)  precisión n/a  buenos descartados 0/3
+    D o creador marcado    descarta 118/174 (68 %)  p&c capturado 33/33 (100 %)  precisión 28 %  buenos descartados 2/3
+    D2 o creador marcado   descarta  74/174 (43 %)  p&c capturado 30/33 (91 %)  precisión 41 %  buenos descartados 0/3
+  [MAYHEM (aparte)] n = 23, p&c = 6, buenos (ret +30 > 0) = 4
+    D                      descarta   4/23 (17 %)  p&c capturado 2/6 (33 %)  precisión 50 %  buenos descartados 0/4
+    D2                     descarta   0/23 (0 %)  p&c capturado 0/6 (0 %)  precisión n/a  buenos descartados 0/4
+    creador marcado        descarta   1/23 (4 %)  p&c capturado 1/6 (17 %)  precisión 100 %  buenos descartados 0/4
+    D o creador marcado    descarta   4/23 (17 %)  p&c capturado 2/6 (33 %)  precisión 50 %  buenos descartados 0/4
+    D2 o creador marcado   descarta   1/23 (4 %)  p&c capturado 1/6 (17 %)  precisión 100 %  buenos descartados 0/4
+
+====================================================================================================
+LÍMITES
+- Todo es post hoc y sin pre-registro: no confirma ni descarta nada y no cambia ningún veredicto.
+- Las señales D se eligieron mirando V1; las cifras de V1 son optimistas. La cifra honesta es V2.
+- n pequeño: los tokens 'buenos' (ret +30 > 0) son unos pocos; no hay potencia para medir cuántos buenos
+  pierde un filtro. Las tablas de creators repetidos en ambos tramos tienen muy pocos creators.
+- Dos ráfagas cortas (8 min cada una, 2026-09-28 y 2026-09-30): nada de esto generaliza a otras horas o días.
+- Dentro de una ráfaga de 8 min, el p&c de un token anterior no se conoce a tiempo (hace falta 1 h): el
+  cribado por creator dentro de la ráfaga solo existe con fuga de información.
+- Identidad = creator del CreateEvent. No hay SetCreatorEvent en la base, pero un creator puede cambiar después
+  (SetCreatorEvent, migración a sharing_config) o usar wallets distintas: la repetición está infraestimada.
+- Los retornos de los tokens mayhem no son fiables (sus reservas virtuales cambian fuera de los trades).

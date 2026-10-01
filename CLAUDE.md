@@ -892,6 +892,15 @@ H10 queda **NO CONFIRMADA EN RÉPLICA** con las cuatro señales. Con H5, H6' y H
 - Como filtro de entrada nada cambia: las señales marcan tokens peores, no un punto de entrada con retorno esperado positivo.
 - Todo esto vale para dos franjas de 8 minutos de dos días distintos, no más.
 
+### Cribado de descarte y repetición de creadores (2026-10-01) — POST HOC, SIN PRE-REGISTRO
+
+Solo descriptivo, sin contrastes. Script: `scripts/cribado_posthoc.py`; salida: `resultados/cribado_posthoc.txt`. Mayhem siempre aparte.
+- **D = H4' o H6' o H7'**, en V2 primaria sin mayhem (n = 174; es la cifra honesta, porque las señales se eligieron con V1): descarta el 68 %, captura **33/33 p&c** (precisión 28 %) y descarta 2 de 3 "buenos". En V1 sin mayhem: 64 % descartado y 51/53 p&c.
+- **D2 = ≥ 2 de 3**, en V2 sin mayhem: descarta el 43 %, captura 30/33 p&c (precisión 41 %) y descarta 0 de 3 buenos. Con 3 buenos no hay potencia para medir la pérdida de buenos.
+- Los que pasan cualquiera de los dos filtros siguen con retorno mediano negativo (−5.6 % a −5.9 % a +30 min).
+- **Repetición de creadores**: solo **2 creators** aparecen en las dos ráfagas, los dos casi solo mayhem. El cribado "creador con p&c en V1" marca 0 tokens sin mayhem de V2 y no añade nada a D.
+- Dentro de una ráfaga de 8 min no se puede cribar por creator sin fuga: el p&c de un token anterior solo se conoce 1 h después.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
