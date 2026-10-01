@@ -901,6 +901,72 @@ Solo descriptivo, sin contrastes. Script: `scripts/cribado_posthoc.py`; salida: 
 - **Repetición de creadores**: solo **2 creators** aparecen en las dos ráfagas, los dos casi solo mayhem. El cribado "creador con p&c en V1" marca 0 tokens sin mayhem de V2 y no añade nada a D.
 - Dentro de una ráfaga de 8 min no se puede cribar por creator sin fuga: el p&c de un token anterior solo se conoce 1 h después.
 
+### Cribado, segunda pasada (2026-10-01) — POST HOC, SIN PRE-REGISTRO
+
+Script: `scripts/cribado_posthoc2.py`; salida: `resultados/cribado_posthoc2.txt`. Población primaria (V1 210, V2 197), mayhem aparte. Las cifras siguientes son de V2 sin mayhem (n = 174, 33 p&c, 3 "buenos").
+- **Sin H6', D2 no se sostiene.** D2b (H4' y H7') captura 18/33 p&c, frente a 30/33 de D2. Dany (H4' o H7') captura 32/33, pero descarta el 65 % y 2 de los 3 buenos. H6' sola captura 29/33 con precisión del 52 %. H6' es la que más pesa en D2.
+- **La mayoría del p&c ya ha ocurrido al entrar.** En **27 de 33** p&c el primer 2x es anterior a T_entry2 (V1: 34 de 53), y en 18 el pico de la hora también. Entre los 6 posteriores, D2 captura 3 y Dany 5.
+- Esto no quita valor al filtro para quien entra: los descartados por D2 pierden −31 % de mediana a +30 min, frente a −5.9 % de los que pasan. Pero el p&c medido desde el precio inicial mezcla lo ya ocurrido con lo evitable. El resultado relevante es el retorno desde T_entry2.
+- **Identidades de creador con información posterior a T_entry2**: `creator_identities` incluye cambios de creator y el creator embebido en trades posteriores. Afecta a 4/197 (V2) y 3/210 (V1) tokens, pero no cambia ninguna H4' ni H7'. No se ha corregido.
+- V2 también se ha mirado para elegir variantes: cualquier filtro que se congele necesita una ráfaga nueva.
+
+### Validación 3: filtro de descarte D2 — CONGELADO antes de descargar (2026-10-01 16:39:58 UTC)
+
+Fijado **antes de indexar ni descargar ningún token del tramo** (0 creaciones con `timestamp ≥ 1790845200` en `marxol.db` al congelar). Se evalúa **una sola vez**. Cualquier cambio posterior es una hipótesis nueva que exige un pre-registro y tokens nuevos.
+
+**Origen**:
+- D2 salió de análisis post hoc sobre V1 y V2 (`resultados/cribado_posthoc.txt` y `cribado_posthoc2.txt`), así que ambas están contaminadas para elegirlo. La validación 3 es la prueba fuera de muestra.
+- No pretende demostrar una entrada rentable: los tokens que pasan el filtro siguen con retorno mediano negativo. **Mide solo si el filtro separa grupos.**
+
+**Filtro D2 (congelado)**:
+- Un token se descarta si cumple al menos 2 de H4', H6' y H7', con las definiciones ya congeladas en esta sección ("Validación de H4', H5, H6', H7', H8 — CONGELADO", incluido el umbral de 13.65 % de H6').
+- Las señales se calculan con las definiciones congeladas. La unión de identidades de creador (paso 2 de H1) incluye información posterior a T_entry2: 4 tokens en V2 y 3 en V1, sin cambiar ninguna señal. No se modifica. En V3 se reporta, de forma descriptiva, cuántas señales cambiarían si la unión se limitara a lo anterior a T_entry2.
+
+**Tramo**:
+- Creaciones con `timestamp` en **[1790845200, 1790845680)**, es decir, del 2026-10-01 entre las 09:00:00 y las 09:08:00 UTC, con el fin excluido. De esa franja no se ha descargado ningún dato de ventanas ni de precios.
+- Se indexa con `index-tramo --from 1790845200` y un `--count` holgado. **El tramo se cierra por timestamp, no por el count.**
+- El rango de slots resultante se anota aquí antes de descargar ventanas o precios. No se amplía ni se cambia después.
+
+**Población (decide el veredicto)**:
+- Primero se excluyen los tokens mayhem. Entre los restantes con T_entry2, se toma **un token por creator** con la misma regla que la validación 2:
+  - La identidad es `CreateEvent.creator`.
+  - Se queda el token de menor slot. Si hay empate, el de menor orden de ejecución; si no está disponible, el mint en orden lexicográfico.
+- "El creador es el del `CreateEvent`" se aplica solo a la población y a esta selección, no a las señales.
+- Los tokens mayhem se reportan en una tabla aparte, sin criterio.
+
+**Resultado principal**:
+- Retorno neto desde T_entry2 a **+30 min**, versión (a) (la definición congelada de `entry2::returns`).
+- Comparación: tokens que **pasan** el filtro frente a tokens **descartados**.
+- Los tokens sin precio de salida en el horizonte se tratan igual que en la validación 2: son n/e si la curva se completa en o antes de la salida, si la salida cae fuera del rango descargado o si no se conoce la comisión. Se cuentan aparte y se excluyen de la comparación.
+
+**Criterio de éxito**: se declara **"D2 SEPARA GRUPOS"** solo si se cumplen TODAS las condiciones, sobre los tokens de la población que entran en la comparación:
+1. Al menos 20 tokens descartados y al menos 20 que pasan (incluye el mínimo de 3 por grupo de la validación 2).
+2. Mann-Whitney **unilateral** (pasan > descartados) con p < 0.01. Se usa la misma aproximación normal, con corrección por empates y de continuidad, que la implementación actual (`entry2::mann_whitney`), en versión unilateral.
+3. Diferencia de medianas (pasan − descartados) de al menos **10 puntos** de retorno neto. El umbral está por debajo, a propósito, de los ~25 puntos observados en V2.
+4. La misma dirección (diferencia de medianas > 0) sin el **token de mayor peso (definición congelada)**: el token con más trades en su ventana de 5 min, entre los tokens de la comparación.
+5. Bootstrap de 2 000 réplicas, semilla 20260930, remuestreando tokens (equivale al clúster de creator, con un token por creator). El IC al 95 % de la diferencia de medianas (percentiles 2.5–97.5) **excluye 0**.
+
+Veredictos posibles:
+- Si falla el criterio 1: **"NO CONCLUYENTE POR POTENCIA"**. No se lee como negativo. No se amplía el tramo. Repetirlo con otro tramo exige un pre-registro nuevo, y el resultado de este se conserva en el registro.
+- Si se cumple el criterio 1 y falla cualquiera de los criterios 2–5: **"NO CONFIRMADO"**. No se reinterpreta.
+
+**Secundario (descriptivo, sin criterio)**:
+- Las mismas tablas a +5 s, +30 s, +5 min y +60 min.
+- Porcentaje de tokens descartados.
+- Versión (b) del retorno (definición de la validación 2).
+- Fracción con retorno neto > 0.
+- Pump-y-caída capturados, con el momento del primer 2x respecto a T_entry2 (antes, en su slot o después; como en `cribado_posthoc2`).
+- Cuántas señales H4' y H7' cambiarían con identidades de creador limitadas a lo anterior a T_entry2.
+- La tabla de los tokens mayhem.
+
+**Lo que NO se concluye**:
+- Un veredicto positivo no implica que los tokens que pasan sean rentables, ni que el filtro sirva fuera de estas condiciones de mercado.
+- Solo **"NO CONFIRMADO"** cierra D2 como filtro de descarte. **"NO CONCLUYENTE POR POTENCIA"** no lo cierra.
+
+**Costes y límites**:
+- Se estima en torno a 1.4 M CU por tramo.
+- Cubre otra franja horaria, pero sigue siendo una sola ráfaga de unos 8 minutos.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
