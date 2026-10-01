@@ -1,0 +1,186 @@
+CRIBADO, SEGUNDA PASADA — POST HOC, SIN PRE-REGISTRO, SOLO DESCRIPTIVO (sin contrastes ni p-valores)
+controles (heredados de cribado_posthoc): p&c distinto de entry2 --json 0/251; retornos distintos 0
+  V2 primaria (cifra honesta): n = 197 (sin mayhem 174, mayhem 23); H6' n/e 0
+  V1 primaria (señales elegidas aquí, optimista): n = 210 (sin mayhem 192, mayhem 18); H6' n/e 0
+
+====================================================================================================
+PARTE A. D2 SIN H6'
+
+## V2 primaria (cifra honesta) — sin mayhem: n = 174, p&c = 33
+  [D2  (>= 2 de H4'/H6'/H7')] descartados 74/174 (43 %)  pasan 100
+    p&c capturados 30/33 (91 %), escapados 3  precisión 30/74 (41 %)  buenos: descartados 0, pasan 3 (de 3)
+    descartados  n= 74  p&c 30/74 (41 %)  superv 23/74 (31 %)  buenos 0/74
+                 retorno neto mediano: +5 s -5.2 % (n=74)  +30 s -11.3 % (n=74)  +5 min -25.8 % (n=74)  +30 min -30.8 % (n=74)  +60 min -30.8 % (n=74)
+    pasan        n=100  p&c 3/100 (3 %)  superv 26/99 (26 %)  buenos 3/99
+                 retorno neto mediano: +5 s -3.4 % (n=100)  +30 s -4.4 % (n=100)  +5 min -5.6 % (n=99)  +30 min -5.9 % (n=99)  +60 min -5.9 % (n=99)
+  [D2b (H4' y H7')] descartados 44/174 (25 %)  pasan 130
+    p&c capturados 18/33 (55 %), escapados 15  precisión 18/44 (41 %)  buenos: descartados 0, pasan 3 (de 3)
+    descartados  n= 44  p&c 18/44 (41 %)  superv 12/44 (27 %)  buenos 0/44
+                 retorno neto mediano: +5 s -5.4 % (n=44)  +30 s -7.7 % (n=44)  +5 min -14.4 % (n=44)  +30 min -17.7 % (n=44)  +60 min -19.5 % (n=44)
+    pasan        n=130  p&c 15/130 (12 %)  superv 37/129 (29 %)  buenos 3/129
+                 retorno neto mediano: +5 s -4.0 % (n=130)  +30 s -5.5 % (n=130)  +5 min -7.1 % (n=129)  +30 min -8.6 % (n=129)  +60 min -8.6 % (n=129)
+  [Dany (H4' o H7')] descartados 113/174 (65 %)  pasan 61
+    p&c capturados 32/33 (97 %), escapados 1  precisión 32/113 (28 %)  buenos: descartados 2, pasan 1 (de 3)
+    descartados  n=113  p&c 32/113 (28 %)  superv 33/112 (29 %)  buenos 2/112
+                 retorno neto mediano: +5 s -4.1 % (n=113)  +30 s -5.9 % (n=113)  +5 min -11.9 % (n=112)  +30 min -17.0 % (n=112)  +60 min -17.0 % (n=112)
+    pasan        n= 61  p&c 1/61 (2 %)  superv 16/61 (26 %)  buenos 1/61
+                 retorno neto mediano: +5 s -4.4 % (n=61)  +30 s -5.5 % (n=61)  +5 min -5.6 % (n=61)  +30 min -5.6 % (n=61)  +60 min -5.7 % (n=61)
+  [H6' sola] descartados 56/174 (32 %)  pasan 118
+    p&c capturados 29/33 (88 %), escapados 4  precisión 29/56 (52 %)  buenos: descartados 0, pasan 3 (de 3)
+    descartados  n= 56  p&c 29/56 (52 %)  superv 21/56 (38 %)  buenos 0/56
+                 retorno neto mediano: +5 s -10.0 % (n=56)  +30 s -21.7 % (n=56)  +5 min -35.3 % (n=56)  +30 min -40.0 % (n=56)  +60 min -40.0 % (n=56)
+    pasan        n=118  p&c 4/118 (3 %)  superv 28/117 (24 %)  buenos 3/117
+                 retorno neto mediano: +5 s -3.1 % (n=118)  +30 s -4.0 % (n=118)  +5 min -5.6 % (n=117)  +30 min -5.7 % (n=117)  +60 min -5.9 % (n=117)
+  Solapamiento por pares (n · p&c en la celda)
+    H4'×H6':  H4' sí/H6' sí  29 · 18/29 (62 %)   H4' sí/H6' no  28 · 2/28 (7 %)   H4' no/H6' sí  27 · 11/27 (41 %)   H4' no/H6' no  90 · 2/90 (2 %)
+    H4'×H7':  H4' sí/H7' sí  44 · 18/44 (41 %)   H4' sí/H7' no  13 · 2/13 (15 %)   H4' no/H7' sí  56 · 12/56 (21 %)   H4' no/H7' no  61 · 1/61 (2 %)
+    H6'×H7':  H6' sí/H7' sí  43 · 26/43 (60 %)   H6' sí/H7' no  13 · 3/13 (23 %)   H6' no/H7' sí  57 · 4/57 (7 %)   H6' no/H7' no  61 · 0/61 (0 %)
+
+## V2 primaria (cifra honesta) — MAYHEM (aparte; retornos no fiables): n = 23, p&c = 6
+  [D2  (>= 2 de H4'/H6'/H7')] descartados 0/23 (0 %)  pasan 23
+    p&c capturados 0/6 (0 %), escapados 6  precisión 0/0 (n/a)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)  buenos 0/0
+                 retorno neto mediano: +5 s n/a (n=0)  +30 s n/a (n=0)  +5 min n/a (n=0)  +30 min n/a (n=0)  +60 min n/a (n=0)
+    pasan        n= 23  p&c 6/23 (26 %)  superv 6/22 (27 %)  buenos 4/21
+                 retorno neto mediano: +5 s -23.4 % (n=23)  +30 s -32.0 % (n=23)  +5 min -52.7 % (n=22)  +30 min -48.8 % (n=21)  +60 min -48.8 % (n=21)
+  [D2b (H4' y H7')] descartados 0/23 (0 %)  pasan 23
+    p&c capturados 0/6 (0 %), escapados 6  precisión 0/0 (n/a)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)  buenos 0/0
+                 retorno neto mediano: +5 s n/a (n=0)  +30 s n/a (n=0)  +5 min n/a (n=0)  +30 min n/a (n=0)  +60 min n/a (n=0)
+    pasan        n= 23  p&c 6/23 (26 %)  superv 6/22 (27 %)  buenos 4/21
+                 retorno neto mediano: +5 s -23.4 % (n=23)  +30 s -32.0 % (n=23)  +5 min -52.7 % (n=22)  +30 min -48.8 % (n=21)  +60 min -48.8 % (n=21)
+  [Dany (H4' o H7')] descartados 4/23 (17 %)  pasan 19
+    p&c capturados 2/6 (33 %), escapados 4  precisión 2/4 (50 %)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  4  p&c 2/4 (50 %)  superv 0/3 (0 %)  buenos 0/3
+                 retorno neto mediano: +5 s -40.4 % (n=4)  +30 s -66.2 % (n=4)  +5 min -56.7 % (n=3)  +30 min -56.7 % (n=3)  +60 min -56.7 % (n=3)
+    pasan        n= 19  p&c 4/19 (21 %)  superv 6/19 (32 %)  buenos 4/18
+                 retorno neto mediano: +5 s -14.9 % (n=19)  +30 s -23.4 % (n=19)  +5 min -48.7 % (n=19)  +30 min -45.0 % (n=18)  +60 min -45.0 % (n=18)
+  [H6' sola] descartados 0/23 (0 %)  pasan 23
+    p&c capturados 0/6 (0 %), escapados 6  precisión 0/0 (n/a)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)  buenos 0/0
+                 retorno neto mediano: +5 s n/a (n=0)  +30 s n/a (n=0)  +5 min n/a (n=0)  +30 min n/a (n=0)  +60 min n/a (n=0)
+    pasan        n= 23  p&c 6/23 (26 %)  superv 6/22 (27 %)  buenos 4/21
+                 retorno neto mediano: +5 s -23.4 % (n=23)  +30 s -32.0 % (n=23)  +5 min -52.7 % (n=22)  +30 min -48.8 % (n=21)  +60 min -48.8 % (n=21)
+  Solapamiento por pares (n · p&c en la celda)
+    H4'×H6':  H4' sí/H6' sí   0 · 0/0 (n/a)   H4' sí/H6' no   2 · 1/2 (50 %)   H4' no/H6' sí   0 · 0/0 (n/a)   H4' no/H6' no  21 · 5/21 (24 %)
+    H4'×H7':  H4' sí/H7' sí   0 · 0/0 (n/a)   H4' sí/H7' no   2 · 1/2 (50 %)   H4' no/H7' sí   2 · 1/2 (50 %)   H4' no/H7' no  19 · 4/19 (21 %)
+    H6'×H7':  H6' sí/H7' sí   0 · 0/0 (n/a)   H6' sí/H7' no   0 · 0/0 (n/a)   H6' no/H7' sí   2 · 1/2 (50 %)   H6' no/H7' no  21 · 5/21 (24 %)
+
+## V1 primaria (señales elegidas aquí, optimista) — sin mayhem: n = 192, p&c = 53
+  [D2  (>= 2 de H4'/H6'/H7')] descartados 81/192 (42 %)  pasan 111
+    p&c capturados 41/53 (77 %), escapados 12  precisión 41/81 (51 %)  buenos: descartados 3, pasan 3 (de 6)
+    descartados  n= 81  p&c 41/81 (51 %)  superv 35/81 (43 %)  buenos 3/81
+                 retorno neto mediano: +5 s -3.1 % (n=81)  +30 s -8.0 % (n=81)  +5 min -20.0 % (n=81)  +30 min -28.0 % (n=81)  +60 min -28.0 % (n=81)
+    pasan        n=111  p&c 12/111 (11 %)  superv 36/111 (32 %)  buenos 3/110
+                 retorno neto mediano: +5 s -3.1 % (n=111)  +30 s -4.0 % (n=111)  +5 min -6.5 % (n=111)  +30 min -8.4 % (n=110)  +60 min -8.6 % (n=110)
+  [D2b (H4' y H7')] descartados 54/192 (28 %)  pasan 138
+    p&c capturados 26/53 (49 %), escapados 27  precisión 26/54 (48 %)  buenos: descartados 3, pasan 3 (de 6)
+    descartados  n= 54  p&c 26/54 (48 %)  superv 23/54 (43 %)  buenos 3/54
+                 retorno neto mediano: +5 s -3.0 % (n=54)  +30 s -6.3 % (n=54)  +5 min -12.1 % (n=54)  +30 min -17.0 % (n=54)  +60 min -18.6 % (n=54)
+    pasan        n=138  p&c 27/138 (20 %)  superv 48/138 (35 %)  buenos 3/137
+                 retorno neto mediano: +5 s -3.1 % (n=138)  +30 s -4.8 % (n=138)  +5 min -8.6 % (n=138)  +30 min -10.1 % (n=137)  +60 min -10.3 % (n=137)
+  [Dany (H4' o H7')] descartados 115/192 (60 %)  pasan 77
+    p&c capturados 47/53 (89 %), escapados 6  precisión 47/115 (41 %)  buenos: descartados 5, pasan 1 (de 6)
+    descartados  n=115  p&c 47/115 (41 %)  superv 51/115 (44 %)  buenos 5/114
+                 retorno neto mediano: +5 s -3.0 % (n=115)  +30 s -6.2 % (n=115)  +5 min -11.7 % (n=115)  +30 min -16.2 % (n=114)  +60 min -16.8 % (n=114)
+    pasan        n= 77  p&c 6/77 (8 %)  superv 20/77 (26 %)  buenos 1/77
+                 retorno neto mediano: +5 s -3.1 % (n=77)  +30 s -4.3 % (n=77)  +5 min -7.6 % (n=77)  +30 min -8.2 % (n=77)  +60 min -8.5 % (n=77)
+  [H6' sola] descartados 65/192 (34 %)  pasan 127
+    p&c capturados 38/53 (72 %), escapados 15  precisión 38/65 (58 %)  buenos: descartados 0, pasan 6 (de 6)
+    descartados  n= 65  p&c 38/65 (58 %)  superv 29/65 (45 %)  buenos 0/65
+                 retorno neto mediano: +5 s -3.8 % (n=65)  +30 s -22.3 % (n=65)  +5 min -33.3 % (n=65)  +30 min -37.1 % (n=65)  +60 min -37.5 % (n=65)
+    pasan        n=127  p&c 15/127 (12 %)  superv 42/127 (33 %)  buenos 6/126
+                 retorno neto mediano: +5 s -3.0 % (n=127)  +30 s -3.7 % (n=127)  +5 min -5.8 % (n=127)  +30 min -7.5 % (n=126)  +60 min -7.6 % (n=126)
+  Solapamiento por pares (n · p&c en la celda)
+    H4'×H6':  H4' sí/H6' sí  31 · 20/31 (65 %)   H4' sí/H6' no  37 · 8/37 (22 %)   H4' no/H6' sí  34 · 18/34 (53 %)   H4' no/H6' no  90 · 7/90 (8 %)
+    H4'×H7':  H4' sí/H7' sí  54 · 26/54 (48 %)   H4' sí/H7' no  14 · 2/14 (14 %)   H4' no/H7' sí  47 · 19/47 (40 %)   H4' no/H7' no  77 · 6/77 (8 %)
+    H6'×H7':  H6' sí/H7' sí  50 · 33/50 (66 %)   H6' sí/H7' no  15 · 5/15 (33 %)   H6' no/H7' sí  51 · 12/51 (24 %)   H6' no/H7' no  76 · 3/76 (4 %)
+
+## V1 primaria (señales elegidas aquí, optimista) — MAYHEM (aparte; retornos no fiables): n = 18, p&c = 2
+  [D2  (>= 2 de H4'/H6'/H7')] descartados 1/18 (6 %)  pasan 17
+    p&c capturados 0/2 (0 %), escapados 2  precisión 0/1 (0 %)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  1  p&c 0/1 (0 %)  superv 0/1 (0 %)  buenos 0/1
+                 retorno neto mediano: +5 s -62.1 % (n=1)  +30 s -62.1 % (n=1)  +5 min -16.8 % (n=1)  +30 min -16.8 % (n=1)  +60 min -16.8 % (n=1)
+    pasan        n= 17  p&c 2/17 (12 %)  superv 7/16 (44 %)  buenos 4/16
+                 retorno neto mediano: +5 s +14.9 % (n=17)  +30 s -2.0 % (n=17)  +5 min -41.0 % (n=16)  +30 min -41.1 % (n=16)  +60 min -41.1 % (n=16)
+  [D2b (H4' y H7')] descartados 1/18 (6 %)  pasan 17
+    p&c capturados 0/2 (0 %), escapados 2  precisión 0/1 (0 %)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  1  p&c 0/1 (0 %)  superv 0/1 (0 %)  buenos 0/1
+                 retorno neto mediano: +5 s -62.1 % (n=1)  +30 s -62.1 % (n=1)  +5 min -16.8 % (n=1)  +30 min -16.8 % (n=1)  +60 min -16.8 % (n=1)
+    pasan        n= 17  p&c 2/17 (12 %)  superv 7/16 (44 %)  buenos 4/16
+                 retorno neto mediano: +5 s +14.9 % (n=17)  +30 s -2.0 % (n=17)  +5 min -41.0 % (n=16)  +30 min -41.1 % (n=16)  +60 min -41.1 % (n=16)
+  [Dany (H4' o H7')] descartados 5/18 (28 %)  pasan 13
+    p&c capturados 1/2 (50 %), escapados 1  precisión 1/5 (20 %)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  5  p&c 1/5 (20 %)  superv 2/5 (40 %)  buenos 0/5
+                 retorno neto mediano: +5 s -6.1 % (n=5)  +30 s -36.9 % (n=5)  +5 min -83.7 % (n=5)  +30 min -83.7 % (n=5)  +60 min -83.7 % (n=5)
+    pasan        n= 13  p&c 1/13 (8 %)  superv 5/12 (42 %)  buenos 4/12
+                 retorno neto mediano: +5 s +16.2 % (n=13)  +30 s +9.3 % (n=13)  +5 min -14.3 % (n=12)  +30 min -14.4 % (n=12)  +60 min -14.4 % (n=12)
+  [H6' sola] descartados 0/18 (0 %)  pasan 18
+    p&c capturados 0/2 (0 %), escapados 2  precisión 0/0 (n/a)  buenos: descartados 0, pasan 4 (de 4)
+    descartados  n=  0  p&c 0/0 (n/a)  superv 0/0 (n/a)  buenos 0/0
+                 retorno neto mediano: +5 s n/a (n=0)  +30 s n/a (n=0)  +5 min n/a (n=0)  +30 min n/a (n=0)  +60 min n/a (n=0)
+    pasan        n= 18  p&c 2/18 (11 %)  superv 7/17 (41 %)  buenos 4/17
+                 retorno neto mediano: +5 s +14.2 % (n=18)  +30 s -5.9 % (n=18)  +5 min -25.3 % (n=17)  +30 min -25.5 % (n=17)  +60 min -25.5 % (n=17)
+  Solapamiento por pares (n · p&c en la celda)
+    H4'×H6':  H4' sí/H6' sí   0 · 0/0 (n/a)   H4' sí/H6' no   1 · 0/1 (0 %)   H4' no/H6' sí   0 · 0/0 (n/a)   H4' no/H6' no  17 · 2/17 (12 %)
+    H4'×H7':  H4' sí/H7' sí   1 · 0/1 (0 %)   H4' sí/H7' no   0 · 0/0 (n/a)   H4' no/H7' sí   4 · 1/4 (25 %)   H4' no/H7' no  13 · 1/13 (8 %)
+    H6'×H7':  H6' sí/H7' sí   0 · 0/0 (n/a)   H6' sí/H7' no   0 · 0/0 (n/a)   H6' no/H7' sí   5 · 1/5 (20 %)   H6' no/H7' no  13 · 1/13 (8 %)
+
+====================================================================================================
+PARTE B. REALIZABILIDAD TEMPORAL
+
+B1. Pump-y-caída: ¿el primer 2x ocurre antes o después de T_entry2?
+  V2 primaria (cifra honesta) — sin mayhem: p&c 33; primer 2x antes de T_entry2 27, en su slot 0, después 6   (pico máximo de la hora antes de T_entry2: 18)
+      múltiplo de precio en T_entry2 de esos p&c: mediana 1.94x, máx 3.91x
+  V2 primaria (cifra honesta) — MAYHEM: p&c 6; primer 2x antes de T_entry2 3, en su slot 0, después 3   (pico máximo de la hora antes de T_entry2: 3)
+      múltiplo de precio en T_entry2 de esos p&c: mediana 0.93x, máx 1.31x
+  V1 primaria (señales elegidas aquí, optimista) — sin mayhem: p&c 53; primer 2x antes de T_entry2 34, en su slot 0, después 19   (pico máximo de la hora antes de T_entry2: 20)
+      múltiplo de precio en T_entry2 de esos p&c: mediana 1.53x, máx 7.56x
+  V1 primaria (señales elegidas aquí, optimista) — MAYHEM: p&c 2; primer 2x antes de T_entry2 1, en su slot 0, después 1   (pico máximo de la hora antes de T_entry2: 0)
+      múltiplo de precio en T_entry2 de esos p&c: mediana 1.29x, máx 1.40x
+
+B2. Capturas restringidas a los p&c con el primer 2x en el slot de T_entry2 o después (evitables en la práctica)
+  V2 primaria (cifra honesta) — sin mayhem: p&c evitables 6, ya con 2x antes de entrar 27
+    D2  (>= 2 de H4'/H6'/H7')  evitables capturados 3/6 (50 %), escapados 3   (ya con 2x: 27/27)
+    D2b (H4' y H7')            evitables capturados 1/6 (17 %), escapados 5   (ya con 2x: 17/27)
+    Dany (H4' o H7')           evitables capturados 5/6 (83 %), escapados 1   (ya con 2x: 27/27)
+  V2 primaria (cifra honesta) — MAYHEM: p&c evitables 3, ya con 2x antes de entrar 3
+    D2  (>= 2 de H4'/H6'/H7')  evitables capturados 0/3 (0 %), escapados 3   (ya con 2x: 0/3)
+    D2b (H4' y H7')            evitables capturados 0/3 (0 %), escapados 3   (ya con 2x: 0/3)
+    Dany (H4' o H7')           evitables capturados 0/3 (0 %), escapados 3   (ya con 2x: 2/3)
+  V1 primaria (señales elegidas aquí, optimista) — sin mayhem: p&c evitables 19, ya con 2x antes de entrar 34
+    D2  (>= 2 de H4'/H6'/H7')  evitables capturados 10/19 (53 %), escapados 9   (ya con 2x: 31/34)
+    D2b (H4' y H7')            evitables capturados 6/19 (32 %), escapados 13   (ya con 2x: 20/34)
+    Dany (H4' o H7')           evitables capturados 15/19 (79 %), escapados 4   (ya con 2x: 32/34)
+  V1 primaria (señales elegidas aquí, optimista) — MAYHEM: p&c evitables 1, ya con 2x antes de entrar 1
+    D2  (>= 2 de H4'/H6'/H7')  evitables capturados 0/1 (0 %), escapados 1   (ya con 2x: 0/1)
+    D2b (H4' y H7')            evitables capturados 0/1 (0 %), escapados 1   (ya con 2x: 0/1)
+    Dany (H4' o H7')           evitables capturados 0/1 (0 %), escapados 1   (ya con 2x: 1/1)
+
+B3. ¿Las señales usan solo datos hasta T_entry2?
+  Código (src/entry2.rs, compute): H4', H7' y H6' se calculan con `before` = los trades anteriores a T_entry2 en
+  orden de ejecución, y H6' con las reservas tras el último de ellos. Los trades son anteriores. PERO el conjunto
+  de identidades de creador (`creator_ids`, store::creator_identities) es la unión de: creator y payer de la
+  creación, TODOS los cambios de creator del mint y el `creator` embebido en TODOS los trades guardados de la
+  ventana de 5 min, también los posteriores a T_entry2. Eso es información posterior a T_entry2. Afecta a
+  H4' (quién cuenta como dev) y a H7' (quién se excluye de los pares). H6' no depende de identidades.
+  No se corrige. Efecto medido recalculando H4'/H7' con identidades limitadas a lo anterior a T_entry2
+  (creator y payer de la creación, cambios con slot < slot de T_entry2, creator embebido en trades con slot <
+  slot de T_entry2):
+  V2 primaria (cifra honesta): tokens con identidades posteriores a T_entry2 en el conjunto: 4/197; H4' recalculada (identidades completas) != entry2: 0; H7' recalculada (identidades completas) != entry2: 0; H4' cambia con identidades estrictas: 0; H7' cambia con identidades estrictas: 0
+  V1 primaria (señales elegidas aquí, optimista): tokens con identidades posteriores a T_entry2 en el conjunto: 3/210; H4' recalculada (identidades completas) != entry2: 0; H7' recalculada (identidades completas) != entry2: 0; H4' cambia con identidades estrictas: 0; H7' cambia con identidades estrictas: 0
+
+====================================================================================================
+LÍMITES
+- Post hoc, sin pre-registro: no confirma ni descarta nada y no cambia ningún veredicto ni definición.
+- Las señales y estas variantes se eligieron mirando datos (V1 y, en esta pasada, también V2): ninguna cifra
+  de aquí es una estimación limpia. Cualquier filtro que se congele tiene que evaluarse en una ráfaga nueva.
+- n pequeño: 33 p&c y 3 'buenos' en V2 sin mayhem; los mayhem son 23 tokens. No hay potencia para comparar
+  filtros por pérdida de buenos.
+- Dos ráfagas cortas de 8 min (2026-09-28 y 2026-09-30).
+- 'Antes/después de T_entry2' se mide por slot; el pico de 2x usa el orden (timestamp, slot) de los puntos y
+  no el orden de ejecución dentro de un slot posterior (no cambia el slot del primer 2x).
+- H6' es en parte mecánica: mide cuánto ha subido ya el precio antes de entrar, lo mismo que se acerca al 2x
+  de la definición de p&c.
+- Las identidades de creador usan datos posteriores a T_entry2 (B3); el efecto medido está arriba.
+- Mayhem: precio que cambia fuera de los trades; sus retornos y picos no son fiables.

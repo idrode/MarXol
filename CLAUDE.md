@@ -967,6 +967,26 @@ Veredictos posibles:
 - Se estima en torno a 1.4 M CU por tramo.
 - Cubre otra franja horaria, pero sigue siendo una sola ráfaga de unos 8 minutos.
 
+#### Adenda operativa (anterior a indexar y descargar) — redactada 2026-10-01 17:00:21 UTC
+
+Solo concreta casos que el texto congelado de la validación 3 no cubre. **No cambia ningún criterio** ni ninguna definición. Redactada antes de indexar y descargar ningún token del tramo.
+
+1. **H6' no evaluable.** Si H6' no es evaluable en un token y se cumple exactamente una de H4'/H7', el token es "no evaluable": se excluye de la comparación y se cuenta aparte. No bloquea el veredicto.
+2. **Empate en el token de mayor peso** (más trades en su ventana de 5 min): se desempata por menor slot y, después, por mint lexicográfico.
+3. **Datos que faltan.**
+   - Si faltan las ventanas o los precios de un token tras 3 intentos de descarga, el token es n/e "sin datos": se excluye de la comparación y se cuenta aparte.
+   - Si faltan creaciones del tramo (indexado incompleto), no se calcula el veredicto hasta completarlo.
+4. **Borde del tramo.**
+   - La población se define siempre por el timestamp del `CreateEvent` en la base, en [1790845200, 1790845680).
+   - El listado por blockTime se hace con un margen de 120 s en `--until`.
+   - Si hay diferencias en el borde, se reportan y no cambian el tramo.
+5. **Prueba previa.** La primera ejecución de `index-tramo --until` usa un `--count` pequeño para comprobar el comportamiento, antes de la ejecución completa.
+6. **Detalles de cálculo.**
+   - Criterio 3 con tolerancia 1e-9.
+   - "El IC excluye 0" se lee como estricto.
+   - En el bootstrap se descartan las réplicas con un grupo vacío y se reporta cuántas fueron.
+7. **Token sin ventana temprana que precede a otros de su creator** (añadido 2026-10-01 17:04:43 UTC, antes de indexar y descargar). Es un token sin ventana temprana tras 3 intentos que es el primero de un creator con más tokens en el tramo. No se puede saber si tenía T_entry2, y por tanto qué token representa al creator. El creator queda fuera de la comparación y se cuenta aparte como "sin datos". No entra el siguiente token del creator.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
