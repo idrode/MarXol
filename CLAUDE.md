@@ -985,7 +985,7 @@ Solo concreta casos que el texto congelado de la validación 3 no cubre. **No ca
    - Criterio 3 con tolerancia 1e-9.
    - "El IC excluye 0" se lee como estricto.
    - En el bootstrap se descartan las réplicas con un grupo vacío y se reporta cuántas fueron.
-7. **Token sin ventana temprana que precede a otros de su creator** (añadido 2026-10-01 17:04:43 UTC, antes de indexar y descargar). Es un token sin ventana temprana tras 3 intentos que es el primero de un creator con más tokens en el tramo. No se puede saber si tenía T_entry2, y por tanto qué token representa al creator. El creator queda fuera de la comparación y se cuenta aparte como "sin datos". No entra el siguiente token del creator.
+7. **Token sin ventana temprana que precede a otros de su creator** (añadido 2026-10-01 17:04:43 UTC, antes de indexar y descargar). Es un token sin ventana temprana tras 3 intentos que precede al token que se habría elegido para su creator. No se puede saber si tenía T_entry2, y por tanto qué token representa al creator. El creator queda fuera de la comparación y se cuenta aparte como "sin datos". No entra el siguiente token del creator. (Redacción ajustada 2026-10-01 17:06:50 UTC, antes de indexar y descargar: antes decía "que es el primero de un creator con más tokens en el tramo". Solo alinea el texto con la regla ya implementada; no cambia ningún criterio).
 
 ### H2 y H3
 
