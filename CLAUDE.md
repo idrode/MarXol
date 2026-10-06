@@ -987,6 +987,23 @@ Solo concreta casos que el texto congelado de la validación 3 no cubre. **No ca
    - En el bootstrap se descartan las réplicas con un grupo vacío y se reporta cuántas fueron.
 7. **Token sin ventana temprana que precede a otros de su creator** (añadido 2026-10-01 17:04:43 UTC, antes de indexar y descargar). Es un token sin ventana temprana tras 3 intentos que precede al token que se habría elegido para su creator. No se puede saber si tenía T_entry2, y por tanto qué token representa al creator. El creator queda fuera de la comparación y se cuenta aparte como "sin datos". No entra el siguiente token del creator. (Redacción ajustada 2026-10-01 17:06:50 UTC, antes de indexar y descargar: antes decía "que es el primero de un creator con más tokens en el tramo". Solo alinea el texto con la regla ya implementada; no cambia ningún criterio).
 
+#### Ejecución, fase 1: indexado del tramo (2026-10-06, antes de descargar ventanas ni precios)
+
+- **Prueba previa** (adenda, punto 5): `index-tramo --from 1790845200 --until 1790845800 --count 20 --provider alchemy --max-rps 10 --max-requests 1000`. Indexó las 20 creaciones más antiguas del tramo (slots 452 240 867–452 241 084), dejó el tramo registrado como incompleto (`tramo_index.complete = 0`) y costó 13 440 CU.
+  - Una ejecución anterior, sin `MARXOL_RPC_URL`, falló al construir el cliente y no llegó a enviar ninguna petición. Aun así dejó en `rpc_usage` una fila de 1 `getSignaturesForAddress` (40 CU, `run_at 1791272510`), porque el presupuesto cuenta la petición antes de enviarla.
+- **Ejecución completa**: la misma con `--count 400 --max-requests 1500`.
+  - Listado de 271 páginas: 259 firmas con blockTime en [1790845200, 1790845800), 20 de ellas fallidas.
+  - 219 `getTransaction` nuevas, 1 sin `CreateEvent`.
+  - `tramo completo: 238 creaciones` en el listado con margen, slots [452 240 867, 452 243 116]. **0 creaciones con timestamp del `CreateEvent` ≠ blockTime de su firma**, así que no hay diferencias en el borde.
+  - Consumo: 21 640 CU (219 `getTransaction` + 322 `getSignaturesForAddress`; las páginas de más son reintentos). El listado se repite entero en cada ejecución, porque las páginas no se guardan.
+- **S3 = slot 452 240 867** (blockTime 1790845201). La última firma anterior está en el slot 452 240 861 (blockTime 1790845199).
+- **Tramo validación 3 = 196 creaciones con timestamp en [1790845200, 1790845680)**:
+  - **Slots [452 240 867, 452 242 654]**, timestamps de 1790845201 a 1790845678.
+  - Las 42 creaciones del margen (timestamp en [1790845680, 1790845800), slots 452 242 691–452 243 116) quedan **fuera** del tramo.
+  - El último token del tramo tiene timestamp 1790845678 y el primero del margen 1790845687: no hay empates en el corte.
+  - Este rango no se amplía ni se cambia.
+- **Actividad**: 196 creaciones en 8 minutos, frente a 400 en la validación 2 y 337 en la validación 1. Se anota como hecho; no cambia ningún criterio.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
