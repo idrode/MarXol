@@ -1,0 +1,79 @@
+VALIDACIÓN 3 — FILTRO D2. Tramo: timestamp del CreateEvent en [1790845200, 1790845680). Parámetros: {"window_secs":300,"min_delay_secs":10,"fill_threshold_pct":13.65,"min_pairs":1,"creator_buy_pct":15.0,"supply":1000000000000000,"v0_std":1073000000000000,"r0_std":793100000000000,"return_horizons":[600,1800,3600]}
+indexado del tramo (index-tramo --until ≥ 1790845800): COMPLETO hasta blockTime 1790845800; creaciones con timestamp ≠ blockTime (borde, se reportan, no cambian el tramo): 0
+creaciones en el tramo: 196 (slots [452240867, 452242654])  sin precio inicial: 0  sin T_entry2: 38  con T_entry2: 158 (sin mayhem 83, mayhem 75)
+ventana temprana incompleta: 0 (sin datos tras 3 intentos: 0; pendientes: 0)  precio de 65 min incompleto entre los de T_entry2: 0 (sin datos: 0; pendientes: 0)
+población (sin mayhem, un token por creator): 75 tokens, 75 creators; empates de slot resueltos por mint: 0
+D2 en la población: descartados 29  pasan 46  no evaluables (H6' n/e y una sola de H4'/H7'; adenda 1): 0  sin datos de precio (adenda 3): 0
+identidades limitadas a lo anterior a T_entry2 (descriptivo): cambiarían H4' en 0 y H7' en 0 tokens de la población
+mayhem (aparte, sin criterio): 75 tokens con T_entry2 (30 un token por creator; empates 0); D2 descartados 1 pasan 74 no evaluables 0
+creators fuera de la comparación por un token sin ventana temprana anterior a su token elegido (adenda 7, 'sin datos'): 0
+excluidos de la comparación: creators sin datos (adenda 7) 0 · sin datos de precio 0 · no evaluables 0 · retorno (a) +30 min n/e 1  (comparación: 74 tokens)
+
+==== Resultado principal: retorno neto (a) desde T_entry2 a +30 min, pasan frente a descartados ====
+1. tokens: pasan 46, descartados 28 (mínimo 20 en cada grupo): cumple
+2. Mann-Whitney unilateral (pasan > descartados): U = 967.5, p = 0.000159 (umbral < 0.01): cumple
+3. medianas: pasan -5.6%, descartados -24.7%; diferencia +19.0 pts (umbral ≥ 10, tolerancia 1e-9): cumple
+4. sin el token de mayor peso (FuaR8Pz4aS81vUbb2JKfnmEGQaRGsJwDotkxNA22pump, 550 trades en 5 min; tokens con ese máximo: 1, desempate por slot y mint): diferencia +19.1 pts (> 0): cumple
+5. bootstrap (2000 réplicas, semilla 20260930, por tokens): IC 95 % [+11.2, +27.2] (excluye 0, estricto): cumple; réplicas descartadas por un grupo vacío: 0
+VEREDICTO: D2 SEPARA GRUPOS
+
+==== SECUNDARIO, DESCRIPTIVO, SIN CRITERIO ====
+% descartado: población 29 de 75 (+38.7); comparación 28 de 74 (+37.8)
+
+Retorno neto por horizonte, población (celda: mediana · fracción > 0 (n))
+  +5 s: (b) slot de salida con un trade 66, varios reconstruidos 9, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -2.5 · 13% (46)              (b) -2.5 · 13% (46)
+    descartados (a) -8.0 · 10% (29)              (b) -6.4 · 14% (29)
+  +30 s: (b) slot de salida con un trade 63, varios reconstruidos 12, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -3.1 · 4% (46)               (b) -3.1 · 4% (46)
+    descartados (a) -6.7 · 28% (29)              (b) -6.7 · 24% (29)
+  +5 min: (b) slot de salida con un trade 67, varios reconstruidos 7, no reconstruidos (n/e en (b)) 1
+    pasan       (a) -5.4 · 4% (46)               (b) -5.4 · 4% (46)
+    descartados (a) -19.7 · 17% (29)             (b) -23.2 · 14% (28)
+  +30 min: (b) slot de salida con un trade 67, varios reconstruidos 4, no reconstruidos (n/e en (b)) 3
+    pasan       (a) -5.6 · 2% (46)               (b) -6.0 · 2% (44)
+    descartados (a) -24.7 · 11% (28)             (b) -24.6 · 11% (27)
+  +60 min: (b) slot de salida con un trade 64, varios reconstruidos 4, no reconstruidos (n/e en (b)) 6
+    pasan       (a) -5.7 · 0% (46)               (b) -6.0 · 0% (42)
+    descartados (a) -24.8 · 4% (28)              (b) -25.6 · 4% (26)
+
+Pump-y-caída en 1 h (población) y momento del primer 2x respecto a T_entry2
+  descartados   p&c 13/29 evaluables (+44.8%)  momento del primer 2x: antes 7, después 5, en el slot de T_entry2 1
+  pasan         p&c 1/46 evaluables (+2.2%)  momento del primer 2x: después 1
+  capturados por D2: 13 de 14 p&c
+
+Identidades de creador limitadas a lo anterior a T_entry2: cambiarían H4' en 0 y H7' en 0 tokens de la población
+
+[MAYHEM, todos con T_entry2] n = 75  D2 descartados 1  pasan 74  no evaluables 0  p&c 17/75
+  +5 s: (b) slot de salida con un trade 72, varios reconstruidos 3, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -6.5 · 35% (74)              (b) -6.5 · 35% (74)
+    descartados (a) -66.5 · 0% (1)               (b) -66.5 · 0% (1)
+  +30 s: (b) slot de salida con un trade 69, varios reconstruidos 6, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -30.1 · 30% (74)             (b) -30.1 · 30% (74)
+    descartados (a) -94.4 · 0% (1)               (b) -94.4 · 0% (1)
+  +5 min: (b) slot de salida con un trade 71, varios reconstruidos 4, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -53.5 · 23% (74)             (b) -53.5 · 23% (74)
+    descartados (a) -100.0 · 0% (1)              (b) -100.0 · 0% (1)
+  +30 min: (b) slot de salida con un trade 71, varios reconstruidos 4, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -55.2 · 23% (74)             (b) -55.2 · 23% (74)
+    descartados (a) -100.0 · 0% (1)              (b) -100.0 · 0% (1)
+  +60 min: (b) slot de salida con un trade 71, varios reconstruidos 4, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -55.2 · 23% (74)             (b) -55.2 · 23% (74)
+    descartados (a) -100.0 · 0% (1)              (b) -100.0 · 0% (1)
+
+[MAYHEM, un token por creator] n = 30  D2 descartados 0  pasan 30  no evaluables 0  p&c 6/30
+  +5 s: (b) slot de salida con un trade 28, varios reconstruidos 2, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -10.3 · 40% (30)             (b) -10.3 · 40% (30)
+    descartados (a) n/a · n/a (0)                (b) n/a · n/a (0)
+  +30 s: (b) slot de salida con un trade 28, varios reconstruidos 2, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -23.6 · 37% (30)             (b) -23.6 · 37% (30)
+    descartados (a) n/a · n/a (0)                (b) n/a · n/a (0)
+  +5 min: (b) slot de salida con un trade 28, varios reconstruidos 2, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -53.1 · 23% (30)             (b) -53.1 · 23% (30)
+    descartados (a) n/a · n/a (0)                (b) n/a · n/a (0)
+  +30 min: (b) slot de salida con un trade 28, varios reconstruidos 2, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -56.4 · 23% (30)             (b) -56.4 · 23% (30)
+    descartados (a) n/a · n/a (0)                (b) n/a · n/a (0)
+  +60 min: (b) slot de salida con un trade 28, varios reconstruidos 2, no reconstruidos (n/e en (b)) 0
+    pasan       (a) -56.4 · 23% (30)             (b) -56.4 · 23% (30)
+    descartados (a) n/a · n/a (0)                (b) n/a · n/a (0)

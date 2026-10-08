@@ -1018,6 +1018,51 @@ Solo concreta casos que el texto congelado de la validación 3 no cubre. **No ca
   - Adenda, punto 7: 0 creators fuera.
   - Ambos grupos ≥ 20 antes de excluir los n/e del retorno a +30 min. Esos n/e solo se ven al calcular el veredicto, así que el criterio 1 se vuelve a comprobar entonces.
 
+### Resultado de la validación 3 (2026-10-08, `marxol entry2 --tramo validacion3`, ejecutada una sola vez)
+
+**Alcance, antes que nada**: una sola franja de 8 minutos (2026-10-01, 09:00–09:08 UTC), con 75 tokens en la población. Es una tercera franja y otra hora del día, pero no generaliza a otros regímenes de mercado. Una asociación aquí es correlación, no causalidad (principio 6). Salida completa en `resultados/validacion3_d2.txt`. Código del commit `b65f9ae`.
+
+**Datos**:
+- Población: 75 tokens (sin mayhem, un token por creator).
+- 1 token con retorno (a) a +30 min n/e, excluido.
+- **Comparación: 74 tokens (46 pasan, 28 descartados).**
+- Token de mayor peso: `FuaR8Pz4aS81vUbb2JKfnmEGQaRGsJwDotkxNA22pump` (550 trades en 5 min, sin empate).
+
+**Resultado principal: retorno neto (a) desde T_entry2 a +30 min, pasan frente a descartados.**
+
+| Criterio | Valor | Umbral | |
+|---|---|---|---|
+| 1. Tokens por grupo | pasan 46, descartados 28 | ≥ 20 | cumple |
+| 2. Mann-Whitney unilateral (pasan > descartados) | U = 967.5, p = 0.000159 | < 0.01 | cumple |
+| 3. Diferencia de medianas | pasan −5.6 %, descartados −24.7 % → **+19.0 pts** | ≥ 10 | cumple |
+| 4. Sin el token de mayor peso | +19.1 pts | > 0 | cumple |
+| 5. IC bootstrap 95 % (2 000 réplicas, semilla 20260930) | [+11.2, +27.2], 0 réplicas descartadas | excluye 0 | cumple |
+
+**VEREDICTO: D2 SEPARA GRUPOS.**
+
+**Secundario (descriptivo, sin criterio)**:
+- D2 descarta el 39 % de la población (29 de 75).
+- Retorno neto mediano y fracción > 0, versión (a). La versión (b) difiere en menos de 3.5 puntos en todos los casos:
+
+| Horizonte | Pasan (n = 46) | Descartados (n = 29; 28 a +30 y +60 min) |
+|---|---|---|
+| +5 s | −2.5 % · 13 % | −8.0 % · 10 % |
+| +30 s | −3.1 % · 4 % | −6.7 % · 28 % |
+| +5 min | −5.4 % · 4 % | −19.7 % · 17 % |
+| +30 min | −5.6 % · 2 % | −24.7 % · 11 % |
+| +60 min | −5.7 % · 0 % | −24.8 % · 4 % |
+
+  - En (b) quedan sin reconstruir 0, 0, 1, 3 y 6 slots de salida en los cinco horizontes.
+- **Pump-y-caída en 1 h**: 13 de 29 descartados frente a 1 de 46 que pasan. **D2 captura 13 de los 14 p&c.** El primer 2x de los capturados cae antes de T_entry2 en 7, en su slot en 1 y después en 5.
+- Limitar las identidades de creador a lo anterior a T_entry2 cambiaría H4' y H7' en 0 tokens.
+- **Mayhem, aparte**: 75 tokens con T_entry2. D2 solo descarta 1 (30 tokens con un token por creator, 0 descartados). p&c 17/75. El retorno mediano de los que pasan es **−55 % a +30 min**, con un 23 % de tokens con retorno > 0. En los mayhem, D2 no actúa y el retorno es mucho peor. Recordar que su precio no es comparable (sección 8).
+
+**Lectura (obligatoria junto al veredicto)**:
+- D2, fijado con V1 y V2, separa grupos fuera de muestra en una tercera franja: los descartados pierden unos 19 puntos más a +30 min.
+- **No es una señal de entrada.** Los que pasan siguen con retorno mediano negativo (−5.6 % a +30 min, solo un 2 % con retorno > 0). Es aproximadamente la comisión de ida y vuelta más la inactividad. Como en V1 y V2, el filtro mejora el "evitar", no genera un "entrar".
+- Parte de la captura de p&c es lo ya ocurrido antes de entrar (7 de 13 con el primer 2x anterior a T_entry2), como en V2 (sección 8, segunda pasada del cribado). Por eso el resultado que decide es el retorno desde T_entry2, no el p&c.
+- La población es pequeña (75), porque casi la mitad de los tokens con T_entry2 de esta franja son mayhem, y D2 no se aplica a ellos.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
@@ -1062,6 +1107,7 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
    - Salvedad: cuanto más tiempo pasa desde la creación, más firmas posteriores hay que paginar hacia atrás en la bonding curve hasta llegar a la creación. Descargar tarde encarece los tokens que siguieron activos.
    **Validación congelada (2026-09-29 15:24 UTC)**: ejecutada el mismo día con Alchemy (`windows` → `prices` → `entry2 --check` → `entry2` una vez). Resultado y consumo (906 320 CU) en la sección 8: H5, H6', H7' y H8 confirmadas; H4' no confirmada (+19 pts). Todas marcan tokens **peores** para entrar (retorno neto mediano negativo en todos los grupos). Solo vale para la ráfaga de 8 min del 2026-09-28.
    **Validación 2 (réplica), ejecutada 2026-10-01**: H4', H6' y H7' se confirman en réplica; H5, H8 y H10 no (sección 8). Sigue siendo una sola franja de 8 minutos de otro día.
+   **Validación 3 (filtro D2), ejecutada 2026-10-08**: **D2 SEPARA GRUPOS** (+19.0 pts de retorno mediano a +30 min, p = 0.00016, IC [+11.2, +27.2]). Los tokens que pasan siguen con retorno mediano negativo (sección 8).
    **Siguiente**: repetir la validación en más franjas y días antes de dar ningún indicador por general, y pre-registrar H9/H10 y el resultado medido desde el precio de entrada (sección 8). Pre-registrar también H11 (lanzamiento previo del creator, con N horas y estratificado por mayhem y mismo símbolo), H12 (persistencia de dev-sell entre tokens del mismo creator) y H13 (repetir H5/H6'/H7'/H8 con un token por creator como control de seudorreplicación), surgidas de la exploración de operadores (sección 8).
    **Comprobación de robustez de la validación congelada — POST HOC, SIN VEREDICTO, EJECUTADA 2026-09-30** (definiciones fijadas antes de calcular; resultado en la sección 8, "ROBUSTEZ POST HOC"). Solo `marxol.db`, sin red. No cambia ningún veredicto congelado ni ninguna definición previa.
    - **Población base**: los 251 tokens de validación con T_entry2 (los de las tablas congeladas). Quedan fuera los 40 del piloto y los 86 sin T_entry2.
