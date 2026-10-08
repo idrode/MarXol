@@ -1004,6 +1004,20 @@ Solo concreta casos que el texto congelado de la validación 3 no cubre. **No ca
   - Este rango no se amplía ni se cambia.
 - **Actividad**: 196 creaciones en 8 minutos, frente a 400 en la validación 2 y 337 en la validación 1. Se anota como hecho; no cambia ningún criterio.
 
+#### Ejecución, fase 2: descargas y chequeo (2026-10-08, sin mirar el resultado)
+
+- `windows --limit 196 --provider alchemy --max-rps 10 --max-requests 25000`: **196 ventanas completas, 0 incompletas**, 11 445 trades. La cola va por timestamp, así que tomó exactamente los 196 del tramo y ninguno de los 42 del margen. Consumo: 17 122 `getTransaction` + 221 `getSignaturesForAddress` = **693 720 CU**.
+- `prices --limit 196 … --max-requests 8000`: **196 ventanas de precio completas (65 min), 0 incompletas**, 5 732 puntos nuevos. Consumo: 6 172 + 205 = **255 080 CU**.
+- Ningún token necesitó reintentos de la adenda (punto 3). **Total de la validación 3: 970 440 CU** (indexado 21 640 + 948 800), por debajo de la estimación de ~1.4M CU para un tramo de 400 tokens. Se descargó 7 días después de las creaciones.
+- **`entry2 --check --tramo validacion3`** (sin ningún retorno):
+  - Indexado completo hasta blockTime 1790845800; 0 diferencias de borde.
+  - 196 creaciones: 38 sin T_entry2 y 158 con T_entry2, de las que **83 son no-mayhem y 75 mayhem**. Es una proporción de mayhem mucho mayor que en V1 (48/251) y V2 (63/283). Se anota como hecho; no cambia ningún criterio.
+  - **Población: 75 tokens de 75 creators** (sin mayhem, un token por creator), sin empates de slot. **D2: 29 descartados, 46 pasan**, 0 no evaluables (adenda, punto 1) y 0 sin datos (adenda, punto 3).
+  - Limitar las identidades de creador a lo anterior a T_entry2 cambiaría H4' en 0 tokens y H7' en 0.
+  - Mayhem, aparte: 75 tokens con T_entry2 (30 con un token por creator); D2 descarta 1 y pasan 74.
+  - Adenda, punto 7: 0 creators fuera.
+  - Ambos grupos ≥ 20 antes de excluir los n/e del retorno a +30 min. Esos n/e solo se ven al calcular el veredicto, así que el criterio 1 se vuelve a comprobar entonces.
+
 ### H2 y H3
 
 - **H2**: los operadores que migran a `sharing_config` (`MigrateBondingCurveCreatorEvent`) tienen un perfil de comportamiento distinto (más profesionalizados, más colaborativos, más propensos a repetir lanzamientos) que los que no lo hacen. Señal nueva, sin equivalente en el modelo de Pons/Robinhood Chain.
