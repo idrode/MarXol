@@ -1,0 +1,80 @@
+ETAPA 0: MARGEN REAL DEL AVISO — POST HOC, SIN PRE-REGISTRO, SOLO DESCRIPTIVO (sin p-valores)
+controles:
+  V1 (heredados de cribado_posthoc): p&c distinto de entry2 --json 0/251; retornos distintos 0
+  V3: población sin mayhem igual a la congelada (in_population): True; D2 distinto del congelado: 0/158
+  V3: retorno (a) +30 min, mediana pasan -5.6 % (n 46), descartados -24.7 % (n 28)  [resultados/validacion3_d2.txt: -5.6 % (46), -24.7 % (28)]
+  V1: creaciones 337, con T_entry2 251; sin mayhem (1 por creator) 193, mayhem (1 por creator) 18
+  V2: creaciones 400, con T_entry2 283; sin mayhem (1 por creator) 174, mayhem (1 por creator) 24
+  V3: creaciones 196, con T_entry2 158; sin mayhem (1 por creator) 75, mayhem (1 por creator) 30
+
+====================================================================================================
+1. RETRASO T_entry2 − creación (s)
+  población                       n    p25    med    p75    p90   máx  ≤15 s  ≤20 s  ≤30 s  ≤60 s
+  V1 sin mayhem                 193   10.0   13.0   28.0   66.8   290    60 %    67 %    78 %    88 %
+  V1 mayhem                      18   10.0   10.0   11.8   17.0    25    83 %    94 %   100 %   100 %
+  V2 sin mayhem                 174   11.0   15.5   43.0   71.7   292    50 %    56 %    65 %    79 %
+  V2 mayhem                      24   10.0   10.0   11.0   12.7    43    92 %    92 %    96 %   100 %
+  V3 sin mayhem                  75   11.0   16.0   50.0   83.0   225    49 %    57 %    64 %    84 %
+  V3 mayhem                      30   10.0   10.0   11.8   17.1    53    87 %    90 %    93 %   100 %
+  (≤15 s: porcentaje con T_entry2 a 15 s o menos de la creación; T_entry2 >= 10 s por definición)
+
+====================================================================================================
+2. D2 RESTRINGIDO A LOS TOKENS CON T_entry2 ≤ X
+  Clasificación D2 congelada (se mide en T_entry2, no cambia con X). Retorno = mediana del retorno neto (a) a
+  +30 min; n = tokens con retorno evaluable. n/e = D2 no evaluable (adenda 1).
+
+  [V1 sin mayhem] n = 193, p&c = 53
+    ≤20 s  tokens 130/193 ( 67 %)  descartados  69 ( 53 %)  pasan  61  p&c capturados 38/46  retorno +30: descartados -32.0 % (n 69), pasan -8.7 % (n 60)
+    ≤30 s  tokens 150/193 ( 78 %)  descartados  72 ( 48 %)  pasan  78  p&c capturados 38/47  retorno +30: descartados -29.3 % (n 72), pasan -8.6 % (n 77)
+    ≤60 s  tokens 170/193 ( 88 %)  descartados  76 ( 45 %)  pasan  94  p&c capturados 40/51  retorno +30: descartados -28.8 % (n 76), pasan -8.6 % (n 93)
+    todos  tokens 193/193 (100 %)  descartados  81 ( 42 %)  pasan 112  p&c capturados 41/53  retorno +30: descartados -28.0 % (n 81), pasan -8.2 % (n 111)
+
+  [V1 mayhem (retornos no fiables)] n = 18, p&c = 2
+    ≤20 s  tokens  17/18 ( 94 %)  descartados   1 (  6 %)  pasan  16  p&c capturados 0/2  retorno +30: descartados -16.8 % (n 1), pasan -41.1 % (n 16)
+    ≤30 s  tokens  18/18 (100 %)  descartados   1 (  6 %)  pasan  17  p&c capturados 0/2  retorno +30: descartados -16.8 % (n 1), pasan -41.1 % (n 16)
+    ≤60 s  tokens  18/18 (100 %)  descartados   1 (  6 %)  pasan  17  p&c capturados 0/2  retorno +30: descartados -16.8 % (n 1), pasan -41.1 % (n 16)
+    todos  tokens  18/18 (100 %)  descartados   1 (  6 %)  pasan  17  p&c capturados 0/2  retorno +30: descartados -16.8 % (n 1), pasan -41.1 % (n 16)
+
+  [V2 sin mayhem] n = 174, p&c = 33
+    ≤20 s  tokens  98/174 ( 56 %)  descartados  62 ( 63 %)  pasan  36  p&c capturados 30/32  retorno +30: descartados -32.5 % (n 62), pasan -9.7 % (n 35)
+    ≤30 s  tokens 113/174 ( 65 %)  descartados  66 ( 58 %)  pasan  47  p&c capturados 30/32  retorno +30: descartados -32.4 % (n 66), pasan -8.6 % (n 46)
+    ≤60 s  tokens 137/174 ( 79 %)  descartados  69 ( 50 %)  pasan  68  p&c capturados 30/33  retorno +30: descartados -32.5 % (n 69), pasan -7.7 % (n 67)
+    todos  tokens 174/174 (100 %)  descartados  74 ( 43 %)  pasan 100  p&c capturados 30/33  retorno +30: descartados -30.8 % (n 74), pasan -5.9 % (n 99)
+
+  [V2 mayhem (retornos no fiables)] n = 24, p&c = 6
+    ≤20 s  tokens  22/24 ( 92 %)  descartados   0 (  0 %)  pasan  22  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -52.8 % (n 20)
+    ≤30 s  tokens  23/24 ( 96 %)  descartados   0 (  0 %)  pasan  23  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -48.8 % (n 21)
+    ≤60 s  tokens  24/24 (100 %)  descartados   0 (  0 %)  pasan  24  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -45.0 % (n 22)
+    todos  tokens  24/24 (100 %)  descartados   0 (  0 %)  pasan  24  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -45.0 % (n 22)
+
+  [V3 sin mayhem] n = 75, p&c = 14
+    ≤20 s  tokens  43/75 ( 57 %)  descartados  27 ( 63 %)  pasan  16  p&c capturados 13/14  retorno +30: descartados -24.7 % (n 26), pasan -6.3 % (n 16)
+    ≤30 s  tokens  48/75 ( 64 %)  descartados  29 ( 60 %)  pasan  19  p&c capturados 13/14  retorno +30: descartados -24.7 % (n 28), pasan -6.3 % (n 19)
+    ≤60 s  tokens  63/75 ( 84 %)  descartados  29 ( 46 %)  pasan  34  p&c capturados 13/14  retorno +30: descartados -24.7 % (n 28), pasan -5.9 % (n 34)
+    todos  tokens  75/75 (100 %)  descartados  29 ( 39 %)  pasan  46  p&c capturados 13/14  retorno +30: descartados -24.7 % (n 28), pasan -5.6 % (n 46)
+
+  [V3 mayhem (retornos no fiables)] n = 30, p&c = 6
+    ≤20 s  tokens  27/30 ( 90 %)  descartados   0 (  0 %)  pasan  27  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -57.6 % (n 27)
+    ≤30 s  tokens  28/30 ( 93 %)  descartados   0 (  0 %)  pasan  28  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -64.7 % (n 28)
+    ≤60 s  tokens  30/30 (100 %)  descartados   0 (  0 %)  pasan  30  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -56.4 % (n 30)
+    todos  tokens  30/30 (100 %)  descartados   0 (  0 %)  pasan  30  p&c capturados 0/6  retorno +30: descartados n/a (n 0), pasan -56.4 % (n 30)
+
+  Tokens con T_entry2 > 60 s (los que un aviso a 60 s no ve), sin mayhem:
+    V1: 23 tokens, D2 descartados 5, p&c 2
+    V2: 37 tokens, D2 descartados 5, p&c 0
+    V3: 12 tokens, D2 descartados 0, p&c 0
+
+====================================================================================================
+LÍMITES
+- Post hoc, sin pre-registro: no confirma ni descarta nada y no cambia ningún veredicto ni definición.
+- V1, V2 y V3 se han mirado antes (V1 y V2 para elegir D2). Estas cifras describen el margen temporal, no
+  estiman la utilidad de D2 en un tramo nuevo.
+- 'T_entry2 ≤ X' mide cuándo existe el dato en la cadena (timestamp de bloque, resolución 1 s). Un grabador en
+  vivo lo ve con la latencia del stream además; esa latencia se mide en la Etapa 1 y no está sumada aquí.
+- T_entry2 >= 10 s y en un slot posterior al de creación por definición: ningún token puede clasificarse antes.
+- Los tokens sin T_entry2 (no tienen trade en un slot posterior a >= 10 s dentro de 5 min) quedan fuera, igual que
+  en las validaciones; un aviso en vivo los vería como 'sin entrada'.
+- La misma regla de población (mayhem fuera primero, un token por creator) en los tres tramos: en V1 y V2 no es
+  exactamente la primaria de la validación 2 (allí el token por creator se elegía con mayhem incluidos).
+- Tres franjas de 8 minutos (2026-09-28, 2026-09-30, 2026-10-01). n pequeños en los cortes de 20 s.
+- Mayhem: precio que cambia fuera de los trades; sus retornos no son fiables.

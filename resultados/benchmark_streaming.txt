@@ -1,0 +1,53 @@
+BENCHMARK DE STREAMING (Etapa 1) — 2026-10-09
+Script: scripts/bench_stream.py (base aparte marxol.bench.db, no versionada). Solo lectura; clave desde .env.
+
+ESTADO: PRUEBA CORTA DE 15 s, NO DE 10 MIN. NO SE LANZÓ EL DÍA COMPLETO.
+- La documentación de Alchemy (compute-unit-costs) factura las suscripciones WebSocket de Solana POR BYTES y
+  da dos tarifas en la misma página: 0.0002 CU/byte ("Solana: WebSocket Subscriptions") y 0.04 CU/byte
+  ("All other subscriptions"). Hay un factor 200 y no queda claro cuál se aplica. CLAUDE.md, sección 7, decía "gratis".
+  Esto no cuadra, así que se paró antes de la prueba de 10 min.
+- Con la tarifa conservadora (0.04), los 15 s ya cuentan 142 530 CU; 10 min serían ~5.9 M CU (tope 300 000).
+- El día completo no se lanza: la extrapolación supera 1 000 000 CU/día con cualquiera de las dos tarifas (punto 6).
+
+Pre-vuelo
+- CU gastados este mes en marxol.db (rpc_usage, Alchemy, octubre): 983 920. Septiembre: 2 260 920.
+  El ciclo de facturación real de la cuenta no está verificado (se supone el mes natural).
+- a) Facturación WebSocket: por bandwidth (bytes entregados), prorrateado al byte. Tarifa ambigua (ver arriba).
+- b) logsSubscribe en el plan gratuito: la documentación no lo restringe. Comprobado: la suscripción se acepta
+  (wss://solana-mainnet.streaming.alchemy.com) y entrega datos con la clave actual.
+- c) Yellowstone gRPC: "only available to PAYG (Pay-As-You-Go) and Enterprise teams" (yellowstone-grpc-quickstart).
+  No está disponible en el plan gratuito, así que no se ha medido.
+
+Prueba corta (run 'humo', logsSubscribe mentions = 6EF8rrec…, commitment confirmed, 2026-10-09 08:15:09–08:15:24 UTC)
+- Sesiones 1, reconexiones 0, caídas 0 (15 s: no dice nada de estabilidad en horas).
+- Notificaciones 1 692 (0 duplicadas): 116.8 msg/s.
+- Bytes en la red 3.56 MB: 245.9 kB/s, 2 106 bytes por notificación de media.
+- Transacciones fallidas (err != null): 1 101/1 692 = 65.1 % (CLAUDE.md, sección 11, daba ~68 % con otra muestra).
+- Latencia, recepción local − blockTime (50 slots con getBlockTime; blockTime es entero, así que cada valor lleva un error de [0, 1) s):
+    todos los mensajes: mediana 1.18 s, p90 1.71 s, p99 2.13 s (mín 0.65, máx 2.24)
+    primer mensaje de cada slot: mediana 1.22 s, p90 1.62 s, p99 1.94 s
+- Completitud: slots [454 809 614, 454 809 664] (51 slots, ~20 s, NO 2 min, porque la prueba duró 15 s).
+  getSignaturesForAddress 1 608 firmas, stream 1 608, perdidas 0 (completitud 100.00 %), extra 0.
+  2 páginas de getSignaturesForAddress.
+
+Consumo (rpc_usage y stream_usage de marxol.bench.db; rpc_usage.units = estimación conservadora)
+- Stream: 3.56 MB = 713 CU (0.0002/byte) o 142 530 CU (0.04/byte).
+- Análisis: 50 getBlockTime (20 CU) + 2 getSignaturesForAddress (40 CU) = 1 080 CU.
+- El CU real solo lo da el panel de Alchemy: Alchemy no devuelve el CU por mensaje. Conviene mirar el panel para saber qué tarifa se aplicó.
+
+Extrapolación a 24 h al ritmo medido (245.9 kB/s = 21.2 GB/día; un solo tramo de 15 s, sin perfil horario)
+- 0.0002 CU/byte: ~4.25 M CU/día (~127 M/mes; el free tier es de 30 M/mes).
+- 0.04 CU/byte: ~850 M CU/día.
+- En los dos casos supera el límite de 1 000 000 CU/día del punto 6. No se lanza.
+
+Qué cambiaría
+1. Saber la tarifa real: mirar en el panel de Alchemy el consumo de las 08:15 UTC de hoy (713 frente a 142 530 CU).
+2. Reducir lo que llega: el 65 % son tx fallidas que logsSubscribe no permite filtrar, y "mentions" sobre el programa
+   trae todo el tráfico de trades. Alternativa: logsSubscribe sobre la PDA mint-authority (TSLvdd1p…, solo creaciones,
+   ~0.8/s frente a ~117/s) y una suscripción por bonding curve durante sus primeros 60 s (unas 50 concurrentes).
+   El volumen sería del orden de 100 veces menor en creaciones, más los trades tempranos de cada token. Hay que medirlo.
+   Pendiente: comprobar cuántas suscripciones concurrentes admite el plan gratuito.
+3. Otro proveedor: Helius free tier (WebSocket estándar, 2 conexiones; la facturación del stream habría que verificarla).
+4. Yellowstone: exige el plan PAYG ($75/TB prorrateado; 21 GB/día ≈ $1.6/día con el filtro actual). No se ha contratado nada.
+
+Desglose por horas: no aplica (no hubo escucha de 24 h).

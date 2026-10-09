@@ -145,6 +145,8 @@ pump.fun usa el patrón Anchor `#[event_cpi]` / `emit_cpi!`: el programa se llam
 
 **Flujo correcto de indexado**: `solana-client` para leer transacciones (`getTransaction`) → extraer las inner instructions dirigidas al `event_authority` PDA → decodificar con Anchor/Borsh contra el IDL. No parsear logs de texto a mano — se truncan si son largos y no tienen garantía de formato estable.
 
+**Observado en mainnet (2026-10-09, 1 tx, `SellV3`)**: el programa emite el evento **por las dos vías a la vez**. La línea `Program data:` del log trae el mismo payload, byte a byte, que la inner instruction de `emit_cpi` (`TradeEvent`, 383 bytes, discriminador `bddb7fd34ee661ee`). Por eso un grabador sobre `logsSubscribe` puede decodificar sin `getTransaction`, salvo cuando el log se trunca (10 KB). Se ha comprobado en una sola tx: hay que verificarlo en volumen antes de depender de ello (`docs/diseno_record.md`).
+
 ### 5.4 Token program: Token-2022, no SPL clásico
 
 El mint se crea con **Token-2022** (`TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`), no el SPL Token Program clásico. Afecta a cómo se consultan balances y metadata — las librerías `spl-token` clásicas no sirven tal cual, hace falta `spl-token-2022`.
@@ -259,7 +261,7 @@ address: pubkey, share_bps: u16
 
 | Proveedor | Cuota gratuita | Rate limit | Coste de métodos históricos | Streaming |
 |---|---|---|---|---|
-| Alchemy | 30M CU/mes | 25 req/s (500 CU/s) | `getTransaction`=40 CU, `getSignaturesForAddress`=40 CU, `getBlock`=40 CU, `getProgramAccounts`=20 CU | Yellowstone gRPC facturado aparte por bandwidth ($75/TB, prorrateado); disponibilidad en free tier no confirmada explícitamente — **pendiente de verificar en el dashboard real antes de diseñar sobre ello** |
+| Alchemy | 30M CU/mes | 25 req/s (500 CU/s) | `getTransaction`=40 CU, `getSignaturesForAddress`=40 CU, `getBlock`=40 CU, `getProgramAccounts`=20 CU | Yellowstone gRPC facturado aparte por bandwidth ($75/TB, prorrateado); **solo PAYG/Enterprise, no en el free tier** (verificado en la doc, 2026-10-09). WebSocket de Solana facturado por byte (sección 7, corrección) |
 | Helius | 1M créditos/mes | 10 req/s, 2 req/s DAS, 2 conexiones WebSocket | Métodos de archivo (`getTransaction`, `getBlock`, `getSignaturesForAddress`) = 10 créditos (10x el resto) | `logsSubscribe`/WebSocket estándar sí disponible en free tier; LaserStream gRPC solo en plan Professional (pago) |
 | QuickNode | 10M créditos/mes | — | — | Streams como add-on de pago |
 | dRPC | 210M CU/mes | Solo contra nodos públicos compartidos | — | — |
@@ -270,7 +272,12 @@ Volumen citado: 9,000–24,000 lanzamientos diarios solo en pump.fun en picos, s
 
 ### Decisión de arquitectura
 
-1. **Captura en tiempo real de creaciones**: WebSocket `logsSubscribe` filtrado por el program ID de pump.fun (gratis en Alchemy y Helius), reforzado con `getTransaction` puntual cuando el log se trunca o hace falta el payload completo decodificado. Nota: `blockSubscribe` está marcado "inestable" oficialmente por el equipo de Solana (desconexiones reportadas en carga alta) — no usar como vía principal.
+1. **Captura en tiempo real de creaciones**: WebSocket `logsSubscribe` filtrado por el program ID de pump.fun, reforzado con `getTransaction` puntual cuando el log se trunca o hace falta el payload completo decodificado. Nota: `blockSubscribe` está marcado "inestable" oficialmente por el equipo de Solana (desconexiones reportadas en carga alta) — no usar como vía principal.
+   **Corrección (2026-10-09, Etapa 1, `scripts/bench_stream.py`): en Alchemy NO es gratis.**
+   - Se factura por bytes entregados. La página de costes da dos tarifas sin aclarar cuál aplica: 0.0002 CU/byte (sección "Solana: WebSocket Subscriptions") y 0.04 CU/byte ("All other subscriptions").
+   - Verificado que funciona con la clave del plan gratuito (`wss://solana-mainnet.streaming.alchemy.com/v2/…`).
+   - Con `mentions` = programa pump y commitment `confirmed` (15 s): 117 msg/s, 246 kB/s (≈ 21 GB/día), 65 % de tx fallidas (no se pueden filtrar), latencia mediana 1.2 s y p99 2.1 s respecto a `blockTime`, 0 firmas perdidas frente a `getSignaturesForAddress`.
+   - Extrapolado: ≈ 4.2 M CU/día con la tarifa barata y ≈ 850 M con la genérica. Ninguna de las dos cabe en el free tier con este filtro. Detalle en `resultados/benchmark_streaming.txt`.
 2. **Medir consumo real antes de descartar Alchemy**: el caso de uso (solo eventos de creación + cambios de creador, no todo el volumen de swaps) es mucho más ligero que indexar trades completos. No asumir que el free tier no alcanza sin medirlo con tráfico real de un día.
 3. **Benchmarking Helius como alternativa**, especialmente por el coste distinto por método (10 créditos por llamada de archivo vs. 40 CU-equivalente de Alchemy) — puede rendir distinto según el patrón real de consumo.
 4. **Devnet para probar el pipeline de decodificación** sin gastar cuota de mainnet (el programa pump.fun también está desplegado en devnet).
@@ -1078,7 +1085,8 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
 
 - ~~Que el program ID es ejecutable y corresponde al programa pump.fun activo~~ → **verificado 2026-09-28** (sección 4).
 - ~~El umbral de graduación real actual~~ → **verificado 2026-09-28**: 85.0054 SOL reales (sección 4). Nota: `final_real_sol_reserves` no está en `Global`, solo en `SetParamsEvent`; el umbral se deriva de `initial_*`.
-- Si Yellowstone gRPC de Alchemy está disponible en el plan free o requiere pago — no documentado explícitamente por Alchemy, confirmar en el dashboard real.
+- ~~Si Yellowstone gRPC de Alchemy está disponible en el plan free~~ → **no lo está** (2026-10-09): "only available to PAYG (Pay-As-You-Go) and Enterprise teams" (`yellowstone-grpc-quickstart`).
+- Qué tarifa por byte aplica Alchemy a los WebSocket de Solana (0.0002 o 0.04 CU/byte): mirarlo en el panel con el consumo del 2026-10-09 a las 08:15 UTC (3.56 MB).
 - Cualquier cambio reciente en el IDL no reflejado en la copia descargada (el repo está activo, con actualizaciones frecuentes — releer antes de asumir que esta sección sigue vigente si ha pasado tiempo desde la última actualización de este documento). Señales de desfase: `marxol verify` muestra campos ausentes o bytes sobrantes en `Global`, o aparecen "evento con discriminador desconocido" / "campos del IDL ausentes" al decodificar tx recientes.
 - Casos reales de `SetCreatorEvent` (no observados aún, ver 5.2). `MigrateBondingCurveCreatorEvent` ya observado (2026-09-28).
 
@@ -1133,6 +1141,16 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
      - En (a), remuestreo simple de tokens.
      - En (b), (c) y (d), remuestreo de creators con reemplazo, con todos sus tokens (clúster). **Decisión confirmada por Roi**: (c) y (d) también llevan intervalo.
      - Una réplica con algún grupo vacío se descarta para esa estadística, y se reporta cuántas.
+   **Margen real del aviso (Etapa 0, 2026-10-09) — POST HOC, sin p-valores** (`scripts/etapa0_latencia.py` → `resultados/etapa0_latencia.txt`, sin red):
+   - T_entry2 − creación, sin mayhem (1 por creator): mediana **13 s** en V1 (n 193), **15.5 s** en V2 (174) y **16 s** en V3 (75). El p90 está en 67–83 s, y ≤ 30 s lo cumple el 64–78 %. En mayhem la mediana es 10 s.
+   - Si solo se atienden los tokens con T_entry2 ≤ 30 s, D2 sigue capturando casi todos los p&c: 38/53 en V1, 30/33 en V2 y 13/14 en V3. Ningún p&c de V2 ni de V3 tiene T_entry2 > 60 s.
+   - Las medianas a +30 min se mantienen: descartados −24.7 % a −32.4 % frente a −6.3 % a −8.6 % de los que pasan.
+   - **Para el grabador**: unos 60 s de trades por token cubren el 79–88 % de los tokens. A la latencia del stream (Etapa 1) hay que sumarle 10–16 s de margen intrínseco.
+   **Reglas de salida corta (2026-10-09) — post hoc, sin pre-registro** (`scripts/salidas_posthoc.py` → `resultados/salidas_posthoc.txt`, sin red). Se probaron 1 920 combinaciones (3 648 estimaciones): 27 reglas TP/SL/tiempo × 4 latencias × 3 grupos de D2 × V1/V2/V3/juntas, más horizontes fijos y mayhem aparte.
+   - **La comisión domina.** Cuesta ≈ 2.7 pts por ida y vuelta. Con latencia ≥ 2 s, la mediana del movimiento bruto a +5, +30 y +120 s es **0.0 %** (el token mediano no opera), así que la mediana neta es −2.5 % (solo comisión). Con L = 0, el bruto mediano a +2 min es −3.9 % y en los descartados por D2 llega a −16.6 %.
+   - **Juntas sin mayhem**: ninguna regla da mediana neta positiva, con ninguna latencia ni grupo. Las 15 estimaciones positivas sin mayhem (de 2 592) son todas de **V3, descartados por D2** (n = 28–29, TP 10 %, IC que incluye 0). En juntas, las mismas reglas dan −3.1 % a −4.6 %. Es el patrón esperable por comparaciones múltiples.
+   - **No salibles** (ningún trade antes del límite de tiempo; en una curva se puede vender igual, pagando la comisión): juntas, 22–31 % con L = 0 y 27–45 % con L = 5–10 s. Entre los que pasan D2, 37–59 %.
+   - Medias netas positivas aisladas en "pasan D2" (+1 % a +7 %), con IC que cruzan 0 y medianas negativas: son colas de pocos tokens, no una regla.
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.
 
 ---
