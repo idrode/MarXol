@@ -1,0 +1,77 @@
+Cota superior de rentabilidad, universo de madurez — POST HOC, SIN PRE-REGISTRO, OPTIMISTA A PROPÓSITO
+Generado con: python3 -B scripts/madurez_cota.py --day 2026-08-20  (solo lee madurez.db, sin red)
+
+AVISO: sin liquidez histórica no se puede estimar el deslizamiento ni el impacto de precio. Cualquier
+retorno positivo de este informe NO se puede dar por válido: es una cota superior, no una estimación.
+
+== Universo volumen 24 h ≥ 5,000 USD: 299 observaciones, 59 tokens (sin rejilla suficiente: 0)
+  retraso  TP     stop   comisión |   n  acierto   media   IC95 media          mediana  IC95 mediana
+  0 h      +50%     -20%    0.5%  | 299   30.1%    +2.9%  [ -3.1%,  +8.6%]   -21.6%  [-22.2%, -21.1%]
+  0 h      +50%     -20%    2.5%  | 299   29.1%    +0.9%  [ -5.1%,  +6.4%]   -23.2%  [-23.8%, -22.7%]
+  0 h      +50%     -40%    0.5%  | 299   39.5%    +2.0%  [ -5.8%,  +8.6%]   -40.4%  [-41.0%, -21.3%]
+  0 h      +50%     -40%    2.5%  | 299   38.1%    -0.1%  [ -7.7%,  +6.5%]   -41.6%  [-42.2%, -22.9%]
+  0 h      +50%  ninguno    0.5%  | 299   43.5%    -2.1%  [-12.5%,  +8.9%]   -24.2%  [-44.6%,  +1.0%]
+  0 h      +50%  ninguno    2.5%  | 299   42.1%    -4.0%  [-14.3%,  +6.7%]   -25.8%  [-45.7%,  -1.0%]
+  0 h      +100%     -20%    0.5%  | 299   21.4%    +5.9%  [ -2.5%, +14.4%]   -22.0%  [-22.9%, -21.6%]
+  0 h      +100%     -20%    2.5%  | 299   20.4%    +3.8%  [ -4.4%, +12.1%]   -23.6%  [-24.5%, -23.2%]
+  0 h      +100%     -40%    0.5%  | 299   27.8%    +2.7%  [ -9.4%, +14.4%]   -41.0%  [-41.3%, -37.1%]
+  0 h      +100%     -40%    2.5%  | 299   26.4%    +0.6%  [-11.2%, +12.1%]   -42.1%  [-42.5%, -38.3%]
+  0 h      +100%  ninguno    0.5%  | 299   29.8%    -4.5%  [-20.0%, +10.2%]   -43.4%  [-54.0%, -27.5%]
+  0 h      +100%  ninguno    2.5%  | 299   28.4%    -6.4%  [-21.6%,  +7.9%]   -44.5%  [-54.9%, -29.0%]
+  1 h      +50%     -20%    0.5%  | 299   31.4%    +6.3%  [ +0.7%, +11.7%]   -21.6%  [-22.1%, -21.3%]
+  1 h      +50%     -20%    2.5%  | 299   30.8%    +4.2%  [ -1.3%,  +9.4%]   -23.2%  [-23.7%, -22.9%]
+  1 h      +50%     -40%    0.5%  | 299   40.1%    +4.9%  [ -3.3%, +12.4%]   -37.5%  [-40.6%, -19.1%]
+  1 h      +50%     -40%    2.5%  | 299   39.5%    +2.8%  [ -5.2%, +10.1%]   -38.8%  [-41.8%, -20.7%]
+  1 h      +50%  ninguno    0.5%  | 299   44.8%    +1.3%  [ -9.6%, +11.9%]   -21.9%  [-40.9%,  +5.6%]
+  1 h      +50%  ninguno    2.5%  | 299   44.1%    -0.8%  [-11.4%,  +9.7%]   -23.5%  [-42.1%,  +3.5%]
+  1 h      +100%     -20%    0.5%  | 299   21.4%    +5.5%  [ -2.3%, +13.0%]   -22.3%  [-22.8%, -21.8%]
+  1 h      +100%     -20%    2.5%  | 299   20.4%    +3.3%  [ -4.2%, +10.7%]   -23.8%  [-24.4%, -23.4%]
+  1 h      +100%     -40%    0.5%  | 299   27.8%    +1.9%  [ -9.8%, +12.8%]   -40.7%  [-41.0%, -35.3%]
+  1 h      +100%     -40%    2.5%  | 299   26.4%    -0.2%  [-11.6%, +10.5%]   -41.9%  [-42.2%, -36.6%]
+  1 h      +100%  ninguno    0.5%  | 299   30.1%    -4.7%  [-19.8%,  +9.6%]   -41.9%  [-52.3%, -26.7%]
+  1 h      +100%  ninguno    2.5%  | 299   28.8%    -6.7%  [-21.4%,  +7.4%]   -43.1%  [-53.3%, -28.2%]
+
+== Universo volumen 24 h ≥ 1,000 USD: 438 observaciones, 100 tokens (sin rejilla suficiente: 0)
+  retraso  TP     stop   comisión |   n  acierto   media   IC95 media          mediana  IC95 mediana
+  0 h      +50%     -20%    0.5%  | 438   28.3%    +2.4%  [ -2.8%,  +7.4%]   -21.1%  [-21.5%, -20.7%]
+  0 h      +50%     -20%    2.5%  | 438   27.2%    +0.3%  [ -4.8%,  +5.2%]   -22.7%  [-23.1%, -22.3%]
+  0 h      +50%     -40%    0.5%  | 438   35.6%    +1.3%  [ -4.8%,  +7.3%]   -21.5%  [-33.0%, -13.7%]
+  0 h      +50%     -40%    2.5%  | 438   34.2%    -0.8%  [ -6.7%,  +5.1%]   -23.1%  [-34.4%, -15.4%]
+  0 h      +50%  ninguno    0.5%  | 438   38.4%    -1.8%  [-10.4%,  +6.4%]   -18.6%  [-27.9%,  -6.5%]
+  0 h      +50%  ninguno    2.5%  | 438   37.0%    -3.8%  [-12.2%,  +4.3%]   -20.2%  [-29.4%,  -8.3%]
+  0 h      +100%     -20%    0.5%  | 438   21.2%    +3.8%  [ -2.5%, +10.4%]   -21.5%  [-21.7%, -21.1%]
+  0 h      +100%     -20%    2.5%  | 438   20.1%    +1.7%  [ -4.5%,  +8.2%]   -23.1%  [-23.3%, -22.7%]
+  0 h      +100%     -40%    0.5%  | 438   26.3%    +0.9%  [ -7.8%,  +9.7%]   -32.0%  [-40.6%, -21.5%]
+  0 h      +100%     -40%    2.5%  | 438   24.9%    -1.2%  [ -9.7%,  +7.5%]   -33.4%  [-41.8%, -23.1%]
+  0 h      +100%  ninguno    0.5%  | 438   27.6%    -4.4%  [-14.8%,  +6.4%]   -28.5%  [-38.3%, -19.6%]
+  0 h      +100%  ninguno    2.5%  | 438   26.3%    -6.3%  [-16.5%,  +4.3%]   -30.0%  [-39.5%, -21.2%]
+  1 h      +50%     -20%    0.5%  | 438   29.2%    +3.8%  [ -0.9%,  +8.6%]   -21.1%  [-21.3%, -20.7%]
+  1 h      +50%     -20%    2.5%  | 438   27.9%    +1.7%  [ -2.9%,  +6.4%]   -22.7%  [-22.9%, -22.3%]
+  1 h      +50%     -40%    0.5%  | 438   36.1%    +2.5%  [ -3.6%,  +9.0%]   -20.5%  [-30.3%, -12.5%]
+  1 h      +50%     -40%    2.5%  | 438   34.7%    +0.4%  [ -5.6%,  +6.8%]   -22.1%  [-31.7%, -14.3%]
+  1 h      +50%  ninguno    0.5%  | 438   39.3%    -0.4%  [ -8.5%,  +7.7%]   -17.1%  [-24.2%,  -5.5%]
+  1 h      +50%  ninguno    2.5%  | 438   37.9%    -2.4%  [-10.3%,  +5.6%]   -18.7%  [-25.7%,  -7.4%]
+  1 h      +100%     -20%    0.5%  | 438   21.2%    +2.5%  [ -3.4%,  +8.6%]   -21.5%  [-21.8%, -21.1%]
+  1 h      +100%     -20%    2.5%  | 438   19.6%    +0.4%  [ -5.3%,  +6.4%]   -23.0%  [-23.4%, -22.7%]
+  1 h      +100%     -40%    0.5%  | 438   26.3%    -0.7%  [ -9.0%,  +7.6%]   -30.8%  [-40.5%, -21.7%]
+  1 h      +100%     -40%    2.5%  | 438   24.4%    -2.7%  [-10.8%,  +5.5%]   -32.2%  [-41.7%, -23.3%]
+  1 h      +100%  ninguno    0.5%  | 438   27.9%    -5.7%  [-16.3%,  +4.7%]   -28.0%  [-37.7%, -19.6%]
+  1 h      +100%  ninguno    2.5%  | 438   26.0%    -7.6%  [-18.0%,  +2.6%]   -29.5%  [-39.0%, -21.2%]
+
+== Combinaciones: 2 universos × 2 retrasos × 2 TP × 3 stops × 2 comisiones = 48 (los universos se solapan; las reglas, también)
+  Mayor límite inferior del IC de la mediana: -21.3% (mediana -21.1%; universo ≥ 1,000, retraso 1 h, TP +50%, stop -20%, comisión 0.5%)
+  Medianas netas: todas ≤ -17.1%; combinaciones con IC de la mediana por encima de 0: 0
+  Combinaciones con IC95 de la MEDIA por encima de 0: 1 de 48
+    ≥ 5,000, retraso 1 h, TP +50%, stop -20%, comisión 0.5% [+0.7%, +11.7%]
+
+== Límites
+  - Sin liquidez histórica: no hay deslizamiento ni impacto de precio. Es optimista a propósito y un resultado
+    positivo no sería válido.
+  - Salida a cierres horarios: los máximos y mínimos intrahora no se usan para el stop, así que el stop puede
+    salir mucho peor que su nivel (el cierre puede estar muy por debajo), y el TP también al cierre.
+  - Precios rellenados: en horas sin vela se entra o sale al último cierre, que puede no ser ejecutable.
+  - Un solo día de graduaciones (2026-08-20), una sola fuente (GeckoTerminal, sin verificar en cadena).
+  - Post hoc, sin pre-registro; universo tras el corte de las 72 h y elegido mirando madurez_vida.
+  - Observaciones del mismo token correlacionadas y con operaciones solapadas (una por día, horizonte 7 d):
+    no es una cartera ejecutable; el bootstrap por token solo corrige el IC.
+  - Precio en USD: en pools con quote SOL incluye la variación del SOL.

@@ -1,0 +1,43 @@
+Señales de "segunda vida" — EXPLORACIÓN POST HOC, SIN PRE-REGISTRO, SIN VEREDICTO
+Generado con: python3 -B scripts/madurez_explora.py --day 2026-08-20  (solo lee madurez.db, sin red)
+Definiciones en la cabecera del script. Evento = máximo cierre en 7 d ≥ 2× el cierre de la observación.
+
+== 0. Datos: 1068 pools del 2026-08-20; sin velas 0; observaciones (día UTC, edad 3–14 d) 11748 de 1068 pools; descartadas por no tener 7 d posteriores 0
+
+== Universo principal: volumen 24 h ≥ 5,000 USD
+  observaciones 299, tokens 59, eventos 73
+  tasa base 24.4%  IC95 bootstrap por token [17.6%, 31.0%]
+  edad de las observaciones: 3 d 41, 4 d 33, 5 d 34, 6 d 30, 7 d 28, 8 d 27, 9 d 26, 10 d 22, 11 d 21, 12 d 21, 13 d 16
+
+  señal  obs  tokens  eventos  tasa     lift   IC95 lift (boot)   réplicas descart.  potencia
+  S1      21      14        5   23.8%   0.98  [0.34, 1.72]                       0  ok
+  S2      36      25       10   27.8%   1.14  [0.73, 1.58]                       0  ok
+  S3     213      49       52   24.4%   1.00  [0.83, 1.15]                       0  ok
+  S4      86      37       24   27.9%   1.14  [0.85, 1.47]                       0  ok
+  S5      16      14        2   12.5%   0.51  [0.00, 1.33]                       0  sin potencia
+
+== Universo sensibilidad: volumen 24 h ≥ 1,000 USD
+  observaciones 438, tokens 100, eventos 86
+  tasa base 19.6%  IC95 bootstrap por token [14.3%, 24.9%]
+  edad de las observaciones: 3 d 63, 4 d 56, 5 d 49, 6 d 47, 7 d 40, 8 d 40, 9 d 34, 10 d 29, 11 d 26, 12 d 26, 13 d 28
+
+  señal  obs  tokens  eventos  tasa     lift   IC95 lift (boot)   réplicas descart.  potencia
+  S1      49      35        8   16.3%   0.83  [0.38, 1.37]                       0  ok
+  S2      60      44       12   20.0%   1.02  [0.66, 1.41]                       0  ok
+  S3     281      79       55   19.6%   1.00  [0.81, 1.18]                       0  ok
+  S4     117      54       26   22.2%   1.13  [0.81, 1.46]                       0  ok
+  S5      35      30        3    8.6%   0.44  [0.00, 1.01]                       0  sin potencia
+
+== Comparaciones: 5 señales × 2 universos = 10 combinaciones (los dos universos se solapan: el de 5 000 está contenido en el de 1 000)
+  Con 10 comparaciones, un IC95 que excluye 1 en una sola de ellas es compatible con el azar.
+
+== Límites
+  - Un solo día de graduaciones (2026-08-20) y una sola fuente de velas (GeckoTerminal, sin verificar en cadena).
+  - Post hoc, sin pre-registro: el universo y las señales se eligieron después de ver madurez_fase0b y madurez_vida.
+  - El universo está tras el corte de las 72 h (edad ≥ 3 d): solo entran los que sobrevivieron a la caída inicial,
+    y es un subconjunto pequeño y seleccionado de los 1 068.
+  - Las observaciones del mismo token están correlacionadas (días consecutivos, ventanas de 7 d solapadas);
+    el bootstrap por token lo tiene en cuenta en el IC, no en los recuentos.
+  - El evento usa el máximo cierre horario: no es un retorno alcanzable. Sin comisiones, deslizamiento ni reglas de salida.
+  - Rejilla rellenada: en horas sin vela el RSI ve cambio 0; en pools poco activos el RSI tiende a 50 y S1/S2 pierden sentido.
+  - Precio USD de GeckoTerminal: en pools con quote SOL incluye la variación del SOL.

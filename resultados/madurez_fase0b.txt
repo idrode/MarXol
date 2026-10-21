@@ -1,0 +1,94 @@
+Fase 0b de tokens maduros — POST HOC, SIN PRE-REGISTRO, SOLO DESCRIPTIVO
+Generado con: python3 -B scripts/madurez_fase0b.py --report --day 2026-08-20  (solo lee madurez.db)
+
+== 1. Listado del día 2026-08-20 UTC (blockTime en [1787184000, 1787270400))
+  dirección listada: 39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg (Global.withdraw_authority, releída 2026-10-20)
+  listado COMPLETO: 760 páginas de 1000 en total (última página hasta 2026-08-19 18:51 UTC)
+  firmas del día: 173715 (1329 sin error); tx sin error con migración 1068, sin migración 261, sin pedir 0
+  migraciones (CompletePumpAmmMigrationEvent): 1068; pool = PDA derivado en 1068/1068
+  primera 2026-08-20 00:00, última 2026-08-20 23:58 UTC; fuera del día por timestamp del evento: 0
+  quotes: 11111111… 1036, EPjFWdd5… 32
+  por hora UTC: 00:45 01:53 02:47 03:44 04:45 05:38 06:39 07:46 08:35 09:31 10:40 11:36 12:35 13:28 14:41 15:45 16:51 17:51 18:75 19:44 20:54 21:50 22:52 23:43
+  validación con las 16 de marxol.db: no coinciden en fechas (2026-09-28 a 2026-10-01). El decodificador se
+  comprobó re-decodificando sus 16 tx: 16/16 campo a campo (mint, pool, quote, importes, comisión, timestamp).
+
+== 2. Consumo
+  ejecución 2026-10-20 21:58: 60 páginas, 5840 CU, 0 llamadas a GeckoTerminal
+  ejecución 2026-10-20 22:41: 760 páginas, 107240 CU, 1 llamadas a GeckoTerminal
+  ejecución 2026-10-20 22:49: 0 páginas, 0 CU, 43 llamadas a GeckoTerminal
+  ejecución 2026-10-20 22:53: 0 páginas, 0 CU, 13 llamadas a GeckoTerminal
+  total --run: 113080 CU (rpc_usage: 1347 getTransaction + 1480 getSignaturesForAddress = 113080 CU,
+  contando cada reintento por 429); más 1 370 CU de la etapa A (--check)
+  listado: 760 páginas útiles, 1480 llamadas reales (59200 CU; incluye 60 páginas de una ejecución
+  cortada por 429 que no guardaba cursor y los reintentos). La etapa A estimaba ~112 páginas: el tráfico de agosto y
+  septiembre tiene muchas más tx fallidas que la página de octubre medida (99 % frente a 5 %).
+  coste por día listado: getTransaction de las 1329 firmas sin error = 53160 CU, más el listado, que depende de
+  la distancia a hoy y del tráfico intermedio (760 páginas para llegar a 2026-08-20 desde 2026-10-20)
+
+== 3. Muestra: 40 pools al azar (random.Random(20260930).sample sobre las migraciones ordenadas por (slot, mint))
+  muerto = GeckoTerminal no conoce el pool o ninguna vela horaria con volumen > 0 en los 7 días
+          anteriores a la descarga de su ficha
+  segunda vida = con cierres horarios (currency=token), un cierre <= 20% del máximo de cierre previo
+          y después un cierre >= 2× el menor de esos cierres caídos
+  evaluables 40/40; GeckoTerminal no conoce 0
+  MUERTOS: 33/40 (82%, IC95 Wilson 68%–91%)
+  con caída >= 80% desde el máximo de cierre: 2/40
+  SEGUNDA VIDA: 1/40 de la muestra (2%, IC95 Wilson 0%–13%); 1/2 de los que caen
+  Lectura: casi ningún pool cae >= 80 % en cierres horarios porque la mayoría deja de operar en pocas horas
+  (mediana de velas por pool baja); muerto = abandono, no desplome. La tasa de segunda vida condicionada a la
+  caída (n = 2) no es interpretable.
+    de ellos muertos hoy: 0; horas hasta la segunda vida desde la migración (mediana): 62
+
+  rank pool                                          estado  cae80  2ª vida            reserve_usd  velas
+     0 8N5j3cUK4LqESCLT86dCy2hfUVfwyeDnZY8S4ERcDTti muerto  no     -                    2790.5632     20
+     1 5qpgXfTKjpcjGmFpUVkRtaNKY3UzbQukD6LS5SuBuHnm muerto  no     -                       1.4681      4
+     2 4xetryrT8PYL2JERYfjNkvdFGpUvcmyp1piw8EKbhAdp muerto  sí     -                      26.9548     11
+     3 F7K6YHQoMhmRAegJvoB8pjccZdeiUaRTT4HbCTXyfb2L vivo    no     -                   11353.5158    152
+     4 FNENeBghrkRJtrDmZFkJbLqAzbJDw5JfsMkTRjTrUFQ7 muerto  no     -                    2268.0634      7
+     5 BDaqzqiGEYmzRAQunvxMYVhHi6qB3fDaYDM9gFsLm8SU muerto  no     -                      10.9478      9
+     6 BJGWqttGmnDP39RWgZEF8HCcSoy8YzEFmVth6KViVYbt muerto  no     -                     1872.952      5
+     7 DG3KmsEXikYuUFdvwnBxd3drdh9PVGhdkNWGtkisFz5  vivo    no     -                    1922.1647      5
+     8 CNZhuow8qBBLtL746HpqhJcN7G3iWhGhs8KQXhx8zUzm vivo    sí     2026-08-23 04:00     5564.8358   1163
+     9 c7GmcQbt9YDzDTfWzZjEjW1j9veKZqnZFMMNHzqmqN5  muerto  no     -                    1847.0652      6
+    10 CsZTtoR9DT6hy6WCVxf2r9MZqskMCYXtEGDEt8BREm2e muerto  no     -                       0.7687      5
+    11 5vLoLRffhiydPJpjhieqX8nCq2BmAbwxxZ3bbQTo4FTr muerto  no     -                       0.9252      4
+    12 G8hHN9LfvLJnYuSgB7x4R37M3NRBzKmp63qPeNh5qxhz muerto  no     -                       3.6833      2
+    13 B8UTNDgPSeE76gnJK2So3P3u2K9vVePMXMKua8QgZHg6 muerto  no     -                    2086.9941      7
+    14 rF1JgBA4PmAH2P7TjoC77vAHfMZhS9kB9hMEbrWZGZp  muerto  no     -                    1902.9344      3
+    15 3ijY77EbNysznRfdG5zyKYNznnpBfhLKhVqkQSG5PNbo muerto  no     -                      77.1561      7
+    16 9fqVttauQsmaEZ8DYRnNZBN4qiDhAV3UTEjQpLnJUV7A muerto  no     -                    1858.2744      7
+    17 42JBGL9WKFqcLs7xju3wysqbtJ9Dg8QLN2eRsEZSFTuD muerto  no     -                    2228.5255      7
+    18 8s5cSYY1GUfn1bJ9bNCaoyFZcyphwv6GAfCogtu247p8 muerto  no     -                        8.708      2
+    19 AwBoq5srbicwEU9cG8ALjarahSHzWrgBcdJcVGVmzA5v muerto  no     -                    2825.1326      7
+    20 C1DSSjjoTgFkMxTXNacv5VVx8dvoVncPgdCaMRSEXoyZ vivo    no     -                    2123.0951     10
+    21 8a9tMpp4s3jG2XwsU9Kp9Qm2QDNH5REvaJW4yYWN274E muerto  no     -                      12.8299      4
+    22 HThvZEXWa9ygKsSP26xUz3Bj5FYAt2fjZESUi9jaREVM muerto  no     -                    2155.2237      2
+    23 HgvbS6TxZeiHJMXu3mQnvAbHYT42ooQHAeHNWjK4TYL6 muerto  no     -                       2.2891      1
+    24 3MN4vySfJoXrxRWEqV83JVwKot5WjJiazjsXBuUs9tdQ vivo    no     -                    3137.3535      4
+    25 CZwnQEEXtt8TLuASsZvCHCMSAcQEgCbuQBFnBnegLYHs muerto  no     -                    2064.7428      4
+    26 Edz8hotJS3FYZVqTgbasX3VtnPrsVgs543FRkR6czgsi muerto  no     -                    2419.3164      5
+    27 5rDL7heDZduAngPerfxALmmcQeiYB5qtL8qcyWzAxofR muerto  no     -                    2333.0526     24
+    28 3q1wepBEqtVEVH5WPFG8SeWsHNAQmRSgUwXuBdRZvHxX vivo    no     -                    2523.4856     30
+    29 GErTJb3hmepPgDaspb1rYrxVDmMQv2UkXsZhZeytGpTU muerto  no     -                    2097.6454     10
+    30 9QPfkhseWYoMVLbSaEseBqeYxc2X2k6LA4VnQJHeMJS7 muerto  no     -                      2302.48      4
+    31 3uyckRWNbZ3UXPqTZXUw5U7VyvxY6aY915BU9nWMHTG6 vivo    no     -                    1930.3841      4
+    32 5yurf3qLrFjuc2Y3pCQmTiBtjEVRE2EqJagfTCQ1wXct muerto  no     -                    3522.6323      6
+    33 DGaLw8dHDEaKc2jMDBuBwuLHjZn3ikFwyhdfjLuYvA2L muerto  no     -                    2255.5206      3
+    34 7k9dwz9xjwcUg9xBTHk61qw8Sz1oQnqvZUFvevfAZWZv muerto  no     -                    2111.0522     12
+    35 AnqC2anMHbEbC4UEezfF9q582vBynW39JcGd2TY4HUfW muerto  no     -                    2168.1568      9
+    36 3eUpwZ6n3yzCmL7Ujr6ipa5a84pMf96fEAKakY8hZEq2 muerto  no     -                        2.475     10
+    37 BtynU2waiNJRJbbusWaMC7iPacgjqwMEsbvgWVk5rjii muerto  no     -                    3306.7496      7
+    38 3xLKypsuKeDAeV7MFsvntyFwr7vNR79wjMShLe4GYURe muerto  no     -                    2432.8686     10
+    39 BMmVyGQyFsui8Ma7uxHiHzCSYkAnGUcmgeVP8ZmGMfiU muerto  no     -                    2060.4864      5
+
+== Límites
+  - Un solo día (2026-08-20) y 40 pools: describe, no estima con precisión (IC binomial amplio con n = 40).
+  - Post hoc y sin pre-registro: las definiciones de muerto y segunda vida se fijaron el 2026-10-20, antes de calcular,
+    pero sin pre-registro en CLAUDE.md. No valen como validación.
+  - GeckoTerminal omite las horas sin trades; los cierres son de horas con actividad. Una sola vela con un trade
+    puede bastar para marcar segunda vida (no hay mínimo de volumen ni de duración).
+  - currency=token: precio en el quote del pool, no en USD; la segunda vida es relativa y no depende del precio de SOL.
+  - Precio de GeckoTerminal, no reconstruido desde la cadena: no está verificado contra las reservas del pool.
+  - El listado depende de que todas las migraciones toquen withdraw_authority: comprobado en 3 tx conocidas y en
+    una muestra de 30 tx recientes (29 migraciones), no en todo el historial. Una migración que no la incluyera no se vería.
+  - Muerto se mide a la fecha de descarga (2026-10-20/21), unos 61 días después de la migración.
