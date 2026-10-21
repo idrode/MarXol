@@ -18,9 +18,11 @@ pub struct Provider {
 
 pub const PUBLIC: Provider =
     Provider { name: "public", max_rps: 4.0, cost_get_transaction: 0, cost_get_signatures: 0 };
-/// Free tier: 25 req/s; 40 CU por método histórico.
+/// Free tier: 25 req/s y 500 CU/s; 40 CU por método histórico. 12 req/s × 40 CU =
+/// 480 CU/s, por debajo de los 500 CU/s (con 20 req/s eran 800 CU/s, por encima).
+/// Configurable con `--max-rps` / `MARXOL_MAX_RPS`.
 pub const ALCHEMY: Provider =
-    Provider { name: "alchemy", max_rps: 20.0, cost_get_transaction: 40, cost_get_signatures: 40 };
+    Provider { name: "alchemy", max_rps: 12.0, cost_get_transaction: 40, cost_get_signatures: 40 };
 /// Free tier: 10 req/s; 10 créditos por método de archivo.
 pub const HELIUS: Provider =
     Provider { name: "helius", max_rps: 8.0, cost_get_transaction: 10, cost_get_signatures: 10 };
@@ -46,6 +48,15 @@ pub enum Method {
     GetSignatures,
 }
 
+impl Method {
+    pub fn name(self) -> &'static str {
+        match self {
+            Method::GetTransaction => "getTransaction",
+            Method::GetSignatures => "getSignaturesForAddress",
+        }
+    }
+}
+
 pub struct Budget {
     pub provider: Provider,
     min_interval: Duration,
@@ -53,6 +64,8 @@ pub struct Budget {
     last: Cell<Option<Instant>>,
     pub get_transaction: Cell<u64>,
     pub get_signatures: Cell<u64>,
+    /// Reintentos por 429 de esta ejecución (cada uno cuenta también como petición).
+    pub retries_429: Cell<u64>,
 }
 
 impl Budget {
@@ -65,6 +78,7 @@ impl Budget {
             last: Cell::new(None),
             get_transaction: Cell::new(0),
             get_signatures: Cell::new(0),
+            retries_429: Cell::new(0),
         }
     }
 
@@ -75,6 +89,11 @@ impl Budget {
     pub fn units(&self) -> u64 {
         self.get_transaction.get() * self.provider.cost_get_transaction
             + self.get_signatures.get() * self.provider.cost_get_signatures
+    }
+
+    /// Tope de peticiones de esta ejecución (`None`: sin tope).
+    pub fn max_requests(&self) -> Option<u64> {
+        self.max_requests
     }
 
     /// `true` si queda cupo para `n` peticiones más en esta ejecución.
@@ -104,6 +123,12 @@ impl Budget {
         Ok(())
     }
 
+    /// Línea de resumen de los reintentos por 429 (`None` si no hubo ninguno).
+    pub fn retry_summary(&self) -> Option<String> {
+        let n = self.retries_429.get();
+        (n > 0).then(|| format!("aviso: {n} reintentos por 429 ({}) en esta ejecución", self.provider.name))
+    }
+
     pub fn summary(&self) -> String {
         format!(
             "{}: {} getTransaction + {} getSignaturesForAddress = {} peticiones, {} unidades",
@@ -116,15 +141,22 @@ impl Budget {
     }
 }
 
+/// Reintentos por 429 como máximo en cada petición.
+const MAX_RETRIES: u32 = 4;
+
 /// Hace la petición con `acquire` y, si el proveedor responde 429, la
 /// reintenta hasta 4 veces con espera creciente (1, 2, 4, 8 s). Cada intento
-/// cuenta en el presupuesto: consume cuota igual.
-pub fn with_retry<T>(b: &Budget, m: Method, mut f: impl FnMut() -> Result<T>) -> Result<T> {
+/// cuenta en el presupuesto: consume cuota igual. Cada reintento se avisa en
+/// stderr (`what` = qué se pide: token, dirección o firma) y se cuenta en
+/// `b.retries_429`.
+pub fn with_retry<T>(b: &Budget, m: Method, what: &str, mut f: impl FnMut() -> Result<T>) -> Result<T> {
     let mut wait = Duration::from_secs(1);
     for attempt in 0.. {
         b.acquire(m)?;
         match f() {
-            Err(e) if attempt < 4 && is_rate_limited(&e) => {
+            Err(e) if attempt < MAX_RETRIES && is_rate_limited(&e) => {
+                b.retries_429.set(b.retries_429.get() + 1);
+                eprintln!("{}", retry_line(b.provider.name, m, what, attempt + 1, wait));
                 std::thread::sleep(wait);
                 wait *= 2;
             }
@@ -132,6 +164,16 @@ pub fn with_retry<T>(b: &Budget, m: Method, mut f: impl FnMut() -> Result<T>) ->
         }
     }
     unreachable!()
+}
+
+/// Aviso de un reintento por 429. Solo el nombre del proveedor, nunca la URL
+/// (lleva la clave).
+fn retry_line(provider: &str, m: Method, what: &str, n: u32, wait: Duration) -> String {
+    format!(
+        "reintento por 429 ({provider}, {} {what}): reintento {n} de {MAX_RETRIES}, espera {} s",
+        m.name(),
+        wait.as_secs()
+    )
 }
 
 fn is_rate_limited(e: &anyhow::Error) -> bool {
@@ -170,15 +212,37 @@ mod tests {
     fn reintenta_solo_los_429_y_cuenta_cada_intento() {
         let b = Budget::new(ALCHEMY, Some(1000.0), None);
         let mut n = 0;
-        let r = with_retry(&b, Method::GetTransaction, || {
+        assert!(b.retry_summary().is_none());
+        let r = with_retry(&b, Method::GetTransaction, "tx X", || {
             n += 1;
             if n < 2 { anyhow::bail!("HTTP status client error (429 Too Many Requests)") } else { Ok(n) }
         });
         assert_eq!(r.unwrap(), 2);
         assert_eq!(b.get_transaction.get(), 2);
-        let r: Result<()> = with_retry(&b, Method::GetTransaction, || anyhow::bail!("otro error"));
+        assert_eq!(b.retries_429.get(), 1);
+        let r: Result<()> = with_retry(&b, Method::GetTransaction, "tx Y", || anyhow::bail!("otro error"));
         assert!(r.is_err());
         assert_eq!(b.get_transaction.get(), 3, "un error que no es 429 no se reintenta");
+        assert_eq!(b.retries_429.get(), 1);
+        assert_eq!(b.retry_summary().unwrap(), "aviso: 1 reintentos por 429 (alchemy) en esta ejecución");
+    }
+
+    #[test]
+    fn aviso_de_reintento_dice_que_se_pide_el_intento_y_la_espera() {
+        let l = retry_line("alchemy", Method::GetSignatures, "mint M, firmas de la curva C", 2, Duration::from_secs(2));
+        assert_eq!(
+            l,
+            "reintento por 429 (alchemy, getSignaturesForAddress mint M, firmas de la curva C): reintento 2 de 4, espera 2 s"
+        );
+    }
+
+    #[test]
+    fn alchemy_por_defecto_bajo_500_cu_por_segundo() {
+        assert_eq!(ALCHEMY.max_rps, 12.0);
+        assert!(ALCHEMY.max_rps * ALCHEMY.cost_get_transaction as f64 <= 500.0);
+        // Sigue siendo configurable.
+        let b = Budget::new(ALCHEMY, Some(5.0), None);
+        assert_eq!(b.min_interval, Duration::from_millis(200));
     }
 
     #[test]

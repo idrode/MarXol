@@ -1,0 +1,42 @@
+CONSULTA TEMPRANA FRENTE A TARDÍA CON `marxol check` — 2026-10-21/22 (~22:20 UTC)
+Herramienta, no análisis. Binario con 12 req/s por defecto en Alchemy, aviso de reintentos 429 y el
+mensaje nuevo de NO EVALUABLE por tope.
+
+Método
+- `scan --address <mint-authority> --limit 8` → 7 creaciones de 0–15 s de edad (3 mayhem), 360 CU.
+- Temprana: `check --max-requests 25` al cumplir 30 s (T_entry2 suele caer a 13–16 s, así que
+  equivale a T_entry2 + 10–20 s). Regla de parada fijada antes: 4 veredictos o 2 000 CU.
+- Tardía: a ~120–145 s, sobre los tokens con veredicto, primero con un tope bajo (el mensaje nuevo
+  da el tamaño de la ventana y el coste) y después una consulta completa.
+
+Temprana (~30 s)
+  id     mint      mayhem  edad   ms   pet.  CU   resultado
+  L3_01  FthXRuPr  sí      30.9   911  11    440  SIN BANDERAS DE D2 (T_entry2 +12 s; 0/3 banderas)
+  L3_02  56E7wB6C  sí      -      129   2     80  NO EVALUABLE por tope: ventana de 35 tx, faltaban 12 pet., ≈ 1 400 CU
+  L3_03  7E2gaDqU  no      -      269   3    120  NO EVALUABLE por tope: 42 tx, faltaban 20 pet., ≈ 1 680 CU
+  L3_04  E84SB89D  no      30.5   415   5    200  NO EVALUABLE: aún sin T_entry2 (ventana abierta)
+  L3_05  3qCnCvfE  no      30.9   746   9    360  SIN BANDERAS DE D2 (T_entry2 +16 s; 0/3)
+  L3_06  DvGyVUCg  sí      -      158   2     80  NO EVALUABLE por tope: 27 tx, faltaban 4 pet., ≈ 1 080 CU
+  L3_07  JBsfLDGw  no      -      476   5    200  NO EVALUABLE por tope: 103 tx (4 páginas de firmas en 30 s), faltaban 83 pet., ≈ 4 120 CU
+
+Tardía (~120–145 s), mismos tokens con veredicto
+  L3_01  120 s: ventana de 9 tx (igual que a 30 s) → completarla = 11 pet., 440 CU (como la temprana).
+         Sondeo con tope 10: 80 CU.
+  L3_05  120 s: 12 tx; 136 s: 13 tx; consulta completa a 143 s: 15 pet., 600 CU, 1.23 s →
+         SIN BANDERAS DE D2, mismo T_entry2 (+16 s) y mismos campos que la temprana, salvo
+         window_trades (8 → 14).
+
+Lectura (4 de 7 casos con tamaño medido; muestra mínima)
+- El veredicto no cambia entre temprana y tardía (1 de 1 comprobado aquí; 12 de 12 frente a offline
+  el 2026-10-22). Es lo esperado: las banderas solo usan trades anteriores a T_entry2.
+- En los tokens tranquilos, consultar pronto ahorra poco: 360 frente a 600 CU (L3_05) e igual
+  (L3_01), y unos 0.5 s.
+- En los muy activos, consultar pronto NO basta: a los 30 s ya hay ventanas de 27–103 tx (3 de 4 son
+  mayhem o de 4 000 firmas en 30 s). Con 103 tx cuesta ≈ 4 200 CU incluso a esa edad. El coste sale
+  del volumen del token, no de la edad.
+- Comparado con la tanda de ayer a 60–180 s (resultados/check_en_vivo_2_2026-10-22.txt), 8 de 20
+  superaban 35 peticiones. Hoy a 30 s superan 25 peticiones 4 de 7.
+- 0 reintentos por 429 en las 11 consultas, a 12 req/s. Los tiempos van de 0.13 a 1.23 s, sin
+  ninguna anomalía como las de ayer a 20 req/s (2–37 s). La muestra es pequeña.
+
+Consumo: 2 680 CU (tope 3 000): scan 360; temprana 1 480; sondeos tardíos 80 + 80 + 80; tardía completa 600.

@@ -255,9 +255,10 @@ fn list_signatures(
         if pages == max_pages || !budget.has_room(1) {
             return Ok(Err(format!(
                 "listadas {} firmas en {pages} páginas ({} CU) sin llegar a la creación: el token es demasiado \
-                 antiguo o activo para el límite de {max_pages} páginas y {MAX_REQUESTS} peticiones",
+                 antiguo o activo para el límite de {max_pages} páginas y {} peticiones",
                 sigs.len(),
-                budget.units()
+                budget.units(),
+                budget.max_requests().unwrap_or(MAX_REQUESTS)
             )));
         }
         let before = sigs.last().map(|s| s.signature.clone());
@@ -269,6 +270,23 @@ fn list_signatures(
         }
     }
     Ok(Ok(sigs))
+}
+
+/// Motivo de NO EVALUABLE cuando la ventana temprana no cabe en el tope de
+/// peticiones: cuántas faltaban, lo que costaría completarla y la sugerencia
+/// de consultar antes (cerca de T_entry2 la ventana aún es pequeña).
+fn window_too_costly(window: usize, budget: &rpc::Budget) -> String {
+    let (max, used) = (budget.max_requests().unwrap_or(MAX_REQUESTS), budget.requests());
+    let missing = (used + window as u64).saturating_sub(max);
+    let cost = budget.provider.cost_get_transaction;
+    format!(
+        "la ventana temprana tiene {window} transacciones y ya se han usado {used} de {max} peticiones: faltaban \
+         {missing} peticiones; completarla costaría ≈ {} CU más ({window} getTransaction × {cost} CU en {}). \
+         Conviene consultar cerca de T_entry2 (10–20 s tras la creación), cuando la ventana aún es pequeña, \
+         o subir --max-requests (máximo {MAX_REQUESTS})",
+        window as u64 * cost,
+        budget.provider.name
+    )
 }
 
 /// Resultado de la descarga: la base en memoria con el token, o el motivo
@@ -285,17 +303,20 @@ pub enum Fetched {
 pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey, max_pages: usize) -> Result<Fetched> {
     let mint_s = mint.to_string();
     let curve = pump::bonding_curve_pda(mint).to_string();
+    let max = budget.max_requests().unwrap_or(MAX_REQUESTS);
     let too_costly = |what: &str| {
         Fetched::TooCostly(format!(
-            "{what}: el token es demasiado antiguo o activo para el tope de {} peticiones ({} CU en Alchemy)",
-            MAX_REQUESTS,
-            MAX_REQUESTS * rpc::ALCHEMY.cost_get_transaction
+            "{what}: el token es demasiado antiguo o activo para el tope de {max} peticiones ({} CU en {})",
+            max * budget.provider.cost_get_transaction,
+            budget.provider.name
         ))
     };
 
     // Firmas de la bonding curve, de la más nueva a la más antigua.
     let page = |before: Option<&str>| {
-        rpc::with_retry(budget, rpc::Method::GetSignatures, || tx::recent_signatures(rpc, &curve, 1000, before))
+        rpc::with_retry(budget, rpc::Method::GetSignatures, &format!("mint {mint_s}, firmas de la curva {curve}"), || {
+            tx::recent_signatures(rpc, &curve, 1000, before)
+        })
     };
     let sigs = match list_signatures(budget, max_pages, page)? {
         Ok(s) => s,
@@ -312,7 +333,8 @@ pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey, ma
         if !budget.has_room(1) {
             return Ok(too_costly("sin cupo para leer la creación"));
         }
-        let t = rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, &s.signature))?;
+        let what = format!("mint {mint_s}, creación {}", s.signature);
+        let t = rpc::with_retry(budget, rpc::Method::GetTransaction, &what, || tx::fetch_events(rpc, idl, &s.signature))?;
         if t.events.iter().any(|e| e.name == "CreateEvent" && e.str("mint") == Some(&mint_s)) {
             anyhow::ensure!(
                 t.decode_errors.is_empty(),
@@ -338,13 +360,12 @@ pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey, ma
         .map(|s| s.signature.as_str())
         .collect();
     if !budget.has_room(window.len() as u64) {
-        return Ok(too_costly(&format!(
-            "la ventana temprana tiene {} transacciones y ya se han usado {} peticiones",
-            window.len(),
-            budget.requests()
-        )));
+        return Ok(Fetched::TooCostly(window_too_costly(window.len(), budget)));
     }
-    let get = |sig: &str| rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig));
+    let get = |sig: &str| {
+        let what = format!("mint {mint_s}, tx {sig}");
+        rpc::with_retry(budget, rpc::Method::GetTransaction, &what, || tx::fetch_events(rpc, idl, sig))
+    };
     if let Some(why) = ingest_window(&mut st, budget, &window, get)? {
         return Ok(too_costly(&why));
     }
@@ -455,6 +476,23 @@ mod tests {
     }
 
     const G: u64 = 1_000_000_000_000; // 0.1 % del supply
+
+    #[test]
+    fn no_evaluable_por_tope_dice_lo_que_falta_y_lo_que_cuesta() {
+        // Como L2_01 (2026-10-22): 45 tx en la ventana, 2 peticiones usadas, tope 35.
+        let b = rpc::Budget::new(rpc::ALCHEMY, Some(1e6), Some(35));
+        b.acquire(rpc::Method::GetSignatures).unwrap();
+        b.acquire(rpc::Method::GetTransaction).unwrap();
+        let m = window_too_costly(45, &b);
+        assert!(m.contains("45 transacciones y ya se han usado 2 de 35 peticiones"), "{m}");
+        assert!(m.contains("faltaban 12 peticiones"), "{m}");
+        assert!(m.contains("≈ 1800 CU más (45 getTransaction × 40 CU en alchemy)"), "{m}");
+        assert!(m.contains("cerca de T_entry2") && m.contains("--max-requests (máximo 400)"), "{m}");
+        // Sin tope explícito se usa el del comando (400).
+        let b = rpc::Budget::new(rpc::HELIUS, Some(1e6), None);
+        let m = window_too_costly(450, &b);
+        assert!(m.contains("0 de 400 peticiones: faltaban 50 peticiones") && m.contains("≈ 4500 CU más"), "{m}");
+    }
 
     #[test]
     fn ventana_para_en_el_primer_evento_no_decodificable() {

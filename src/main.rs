@@ -47,8 +47,9 @@ struct RateArgs {
     /// auto (según la URL), public, alchemy, helius.
     #[arg(long, env = "MARXOL_PROVIDER", default_value = "auto")]
     provider: String,
-    /// Peticiones por segundo (por defecto, el del proveedor).
-    #[arg(long)]
+    /// Peticiones por segundo (por defecto, el del proveedor: 12 en Alchemy,
+    /// 8 en Helius, 4 en el RPC público).
+    #[arg(long, env = "MARXOL_MAX_RPS")]
     max_rps: Option<f64>,
     /// Tope de peticiones de esta ejecución; al alcanzarlo se para limpiamente.
     #[arg(long)]
@@ -423,7 +424,7 @@ fn index_tramo_until(
             if st.seen(sig)? {
                 continue;
             }
-            let t = rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig))
+            let t = rpc::with_retry(budget, rpc::Method::GetTransaction, &format!("tx {sig}"), || tx::fetch_events(rpc, idl, sig))
                 .with_context(|| format!("getTransaction {sig} (el slot {slot} queda incompleto; reanudable)"))?;
             fetched += 1;
             for e in &t.decode_errors {
@@ -479,7 +480,7 @@ fn index_tramo(
         let (mut sigs, mut before, mut pages) = (Vec::new(), None::<String>, 0);
         let mut oldest_before_from: Option<(u64, i64)> = None;
         while oldest_before_from.is_none() {
-            let page = rpc::with_retry(budget, rpc::Method::GetSignatures, || {
+            let page = rpc::with_retry(budget, rpc::Method::GetSignatures, &format!("firmas de {address}"), || {
                 tx::recent_signatures(rpc, &address, 1000, before.as_deref())
             })?;
             pages += 1;
@@ -524,7 +525,7 @@ fn index_tramo(
                 if st.seen(sig)? {
                     continue;
                 }
-                let t = rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig))
+                let t = rpc::with_retry(budget, rpc::Method::GetTransaction, &format!("tx {sig}"), || tx::fetch_events(rpc, idl, sig))
                     .with_context(|| format!("getTransaction {sig} (el slot {slot} queda incompleto; reanudable)"))?;
                 fetched += 1;
                 for e in &t.decode_errors {
@@ -584,7 +585,7 @@ fn check_cmd(
         // El consumo se registra también si la lectura falla.
         store::Store::open(db)?.record_rpc_usage("check", &budget, 1, now)?;
         eprintln!("consumo: {}", budget.summary());
-        if let Some(w) = tx::TRADE_EXTRA_BYTES.summary() {
+        for w in budget.retry_summary().into_iter().chain(tx::TRADE_EXTRA_BYTES.summary()) {
             eprintln!("{w}");
         }
         match fetched? {
@@ -627,7 +628,8 @@ fn curve_signatures(
     let mut out = Vec::new();
     let (mut before, mut pages) = (None::<String>, 0);
     while pages < max_pages {
-        let page = rpc::with_retry(budget, rpc::Method::GetSignatures, || {
+        let what = format!("firmas de la curva {bonding_curve}");
+        let page = rpc::with_retry(budget, rpc::Method::GetSignatures, &what, || {
             tx::recent_signatures(rpc, bonding_curve, 1000, before.as_deref())
         })?;
         pages += 1;
@@ -667,6 +669,7 @@ fn fetch_token_sigs<'a>(
     st: &mut store::Store,
     budget: &rpc::Budget,
     purpose: &str,
+    mint: &str,
     sigs: impl Iterator<Item = &'a str>,
     prices_horizon: Option<i64>,
 ) -> Result<Option<(usize, usize)>> {
@@ -678,7 +681,9 @@ fn fetch_token_sigs<'a>(
         if !budget.has_room(1) {
             return Ok(None);
         }
-        match rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig)) {
+        match rpc::with_retry(budget, rpc::Method::GetTransaction, &format!("mint {mint}, tx {sig}"), || {
+            tx::fetch_events(rpc, idl, sig)
+        }) {
             Ok(t) => {
                 errors += t.decode_errors.len();
                 let n = st.ingest(&t)?;
@@ -717,7 +722,7 @@ fn with_budget(
     let r = f(st, &mut tokens);
     st.record_rpc_usage(command, budget, tokens, unix_now())?;
     eprintln!("consumo de esta ejecución: {}", budget.summary());
-    if let Some(w) = tx::TRADE_EXTRA_BYTES.summary() {
+    for w in budget.retry_summary().into_iter().chain(tx::TRADE_EXTRA_BYTES.summary()) {
         eprintln!("{w}");
     }
     for (prov, gt, gs, units) in st.rpc_usage_totals()? {
@@ -755,7 +760,7 @@ fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_
                 continue;
             };
             let sigs = in_window.iter().filter(|s| !s.failed).map(|s| s.signature.as_str());
-            let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "window", sigs, None)? else {
+            let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "window", &w.mint, sigs, None)? else {
                 eprintln!("{}: tope de peticiones a mitad de token: queda pendiente (reanudable)", w.mint);
                 break;
             };
@@ -809,7 +814,7 @@ fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_p
             };
             let fetch = std::iter::once(w.signature.as_str())
                 .chain(sigs.iter().filter(|s| !s.failed).map(|s| s.signature.as_str()));
-            let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "prices", fetch, Some(horizon))? else {
+            let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "prices", &w.mint, fetch, Some(horizon))? else {
                 eprintln!("{}: tope de peticiones a mitad de token: queda pendiente (reanudable)", w.mint);
                 break;
             };

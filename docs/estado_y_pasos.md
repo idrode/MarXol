@@ -84,4 +84,16 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - **Online frente a offline**: los 12 baratos se incorporaron a una copia de `marxol.db` en el scratchpad con `index-tramo` + `windows`. Dan 12 de 12 veredictos, banderas y T_entry2 iguales; solo cambia `window_trades`, por los trades posteriores a la consulta.
    - Latencias anómalas (hasta 37.6 s con 16 peticiones), sin explicar. Una posibilidad es que fueran reintentos 429 no registrados: 20 req/s × 40 CU supera los 500 CU/s del free tier.
    - Consumo: ≈ 12 300 CU.
+   **Reintentos 429, ritmo de 12 req/s y consulta temprana (2026-10-22) — herramienta** (`resultados/check_temprano_2026-10-22.txt`):
+   - `rpc::with_retry` avisa en stderr de cada reintento por 429: proveedor, método, qué se pedía (mint, firma o curva), nº de reintento y espera. Nunca imprime la URL. Al final sale el total, junto al contador de bytes de más.
+   - El ritmo por defecto de Alchemy baja de 20 a **12 req/s** (480 CU/s < 500); se cambia con `--max-rps` / `MARXOL_MAX_RPS`.
+     - Una descarga de N tx tarda ahora ≥ N/12 s: las latencias medidas el 2026-10-21, ~50 ms por tx, eran a 20 req/s.
+   - `check` con NO EVALUABLE por tope dice cuántas peticiones faltaban y el coste en CU para completar la ventana, y sugiere consultar cerca de T_entry2. También corrige el texto, que citaba 400 aunque el tope fuera otro.
+   - 3 tests nuevos (72 en verde); las salidas de V1–V3 siguen idénticas byte a byte.
+   - Consulta a ~30 s frente a ~120–145 s (7 creaciones):
+     - Veredicto y T_entry2 iguales en 1 de 1 token comparado.
+     - En tokens tranquilos ahorra poco: 360 frente a 600 CU.
+     - En los muy activos no basta: a 30 s ya hay ventanas de 27–103 tx (hasta ≈ 4 200 CU). El coste depende del volumen, no de la edad.
+     - 0 reintentos 429 a 12 req/s.
+   - Consumo: 2 680 CU.
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.

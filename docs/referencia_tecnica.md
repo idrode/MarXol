@@ -301,9 +301,20 @@ address: pubkey, share_bps: u16
 | QuickNode | 10M créditos/mes | — | — | Streams como add-on de pago |
 | dRPC | 210M CU/mes | Solo contra nodos públicos compartidos | — | — |
 
+**Ritmo por defecto de marXol (`rpc::Provider`, desde 2026-10-22)**:
+- Alchemy **12 req/s** (× 40 CU = **480 CU/s**, bajo el límite de 500 CU/s). Antes eran 20 req/s = 800 CU/s, por encima del límite.
+- Helius 8 req/s (bajo sus 10 req/s) y RPC público 4 req/s.
+- Se cambia con `--max-rps` o con `MARXOL_MAX_RPS`.
+- El límite que manda en Alchemy es el de CU/s, no el de 25 req/s: con métodos de 40 CU, 25 req/s serían 1 000 CU/s.
+- Consecuencias:
+  - Una descarga secuencial de N `getTransaction` tarda al menos N / 12 s: ≈ 83 ms por tx, frente a los ≈ 50 ms de las mediciones del 2026-10-21, hechas a 20 req/s.
+  - En `check`, una ventana de 40 tx pasa de ~2 s a ~3.5 s.
+  - El tope de 400 peticiones (16 000 CU) lleva ≥ 33 s, frente a 20 s antes.
+- Cada reintento por 429 se avisa ahora en stderr (proveedor, método, qué se pedía, nº de reintento y espera; nunca la URL, que lleva la clave). Al final se imprime el total de reintentos, junto al contador de `TradeEvent` con bytes de más.
+
 ### Por qué el polling puro no escala aquí (a diferencia de Robinhood Chain)
 
-Volumen citado: 9,000–24,000 lanzamientos diarios solo en pump.fun en picos, sin contar trades. Con Alchemy (25 req/s, 40 CU por `getTransaction`), indexar vía `getSignaturesForAddress` + `getTransaction` por firma agota la cuota mensual antes de fin de mes y el rate limit deja el indexador sistemáticamente por detrás del chain en momentos de actividad alta (bloques cada ~400ms).
+Volumen citado: 9,000–24,000 lanzamientos diarios solo en pump.fun en picos, sin contar trades. Con Alchemy (25 req/s nominales, pero 500 CU/s = 12.5 `getTransaction` por segundo; marXol usa 12), indexar vía `getSignaturesForAddress` + `getTransaction` por firma agota la cuota mensual antes de fin de mes y el rate limit deja el indexador sistemáticamente por detrás del chain en momentos de actividad alta (bloques cada ~400ms).
 
 ### Decisión de arquitectura
 
@@ -342,6 +353,8 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
 - **Orden de ejecución dentro de un slot (2026-09-29)**: ni `getTransaction` ni el orden `(slot, timestamp, firma)` lo dan (la firma es un hash). Se reconstruye exacto encadenando reservas: `virtual_token_reserves` antes de un trade = después + `token_amount` (compra) o − `token_amount` (venta), y coincide con el después del trade anterior, empezando por el `CreateEvent`. Encadena 2 831 de 2 831 trades de la ventana temprana del piloto. Hace falta en todo lo que dependa del orden dentro del slot (primer trade que cruza un umbral, precio de cierre). H1 y H1c no dependen de él (ver sección 8). Ignorarlo produjo un falso positivo en H5 (p = 0.026 → 0.42 tras corregir).
 - **Tokens mayhem y comisiones (2026-09-29, validación)**: los 36 tokens con `fee_basis_points + creator_fee_basis_points = 0` en T_entry2 son todos mayhem (48 mayhem en total entre 251). En no-mayhem la comisión más común es 125 bps (169 tokens), con valores de 96 a 395 bps. Nunca suponer la comisión de `Global` (95 + 5): leerla del `TradeEvent`.
 - **Rate limit de Alchemy**: aparecen 429 esporádicos (8 en ~22 700 peticiones) incluso a ~5 req/s efectivas. Hay que reintentar siempre.
+  - En la prueba en vivo del 2026-10-22, a 20 req/s, hubo latencias de hasta 37.6 s con 16 peticiones, compatibles con esperas de reintento (1 + 2 + 4 + 8 s). No se pudieron confirmar porque los reintentos no se registraban.
+  - Desde el 2026-10-22 se registran, y el ritmo por defecto es de 12 req/s (ver tabla de proveedores).
 - Algunos mints no acaban en `pump` (p. ej. `zVbJ3eRj…phi`). No usar el sufijo como filtro.
 - Observado un `CreateEvent` con `creator_fee_bps = 0` mientras `Global.creator_fee_basis_points = 5`. Sin interpretar todavía: no está verificado cómo se combinan ambos campos.
 
