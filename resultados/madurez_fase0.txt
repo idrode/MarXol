@@ -1,0 +1,223 @@
+TOKENS MADUROS ('SEGUNDA VIDA'), FASE 0: VIABILIDAD DE DATOS — POST HOC, EXPLORATORIO, SIN PRE-REGISTRO
+Fuente: API pública de GeckoTerminal (sin clave). marxol.db solo en lectura. Sin Alchemy, sin CU.
+Llamadas reales: 131 de un tope de 600 (200: 104, 404: 0, 429: 19); ritmo 10/min.
+Referencia temporal: última llamada 2026-10-09T09:22:14Z.
+
+====================================================================================================
+A. UNIVERSO
+A1. Listados de pools
+  dex:h24_volume_usd_desc: 200 pools (10 páginas × 20 como máximo); creación más antigua 2025-02-24T03:59:53Z, más reciente 2026-10-09T07:34:25Z; intervalo 14211.58 h
+      DEX: {'pumpswap': 200}
+      edad (días): mediana 0.7, p10 0.2, p90 1.3
+  dex:h24_tx_count_desc: 200 pools (10 páginas × 20 como máximo); creación más antigua 2025-02-24T03:59:53Z, más reciente 2026-10-09T07:15:16Z; intervalo 14211.26 h
+      DEX: {'pumpswap': 200}
+      edad (días): mediana 0.7, p10 0.3, p90 1.6
+  new_pools: 110 pools (10 páginas × 20 como máximo); creación más antigua 2026-10-09T07:51:42Z, más reciente 2026-10-09T07:55:21Z; intervalo 0.06 h → ≈ 43,397 pools/día (todas las DEX)
+      DEX: {'pump-fun': 87, 'meteora-damm-v2': 10, 'pumpswap': 6, 'meteora-dbc': 5, 'fluxbeam': 1, 'raydium-clmm': 1}
+  new_pools solo PumpSwap: 6 pools en 0.0 h → ≈ 3703 graduaciones/día a PumpSwap
+  Historia de velas: con before_timestamp anterior a ~2026-03-14 la API gratuita responde 401 (B).
+  Conclusión A1: los dos endpoints de listado devuelven como mucho 200 pools (10 páginas). 'Top pools por DEX'
+  ordena por volumen o número de tx de las últimas 24 h, así que solo lista supervivientes activos. 'New pools'
+  solo cubre las últimas horas. No hay forma de listar los pools de un periodo pasado con la API pública.
+
+A2. Sesgo de supervivencia: los tokens de marxol.db que graduaron (migración a PumpSwap observada)
+  graduados en marxol.db: 16 (solo los que graduaron dentro de las ventanas de 65 min descargadas;
+  los que graduaron más tarde no se conocen sin RPC)
+   37Bho7wb… pool CJhDFm7x… graduó 2026-09-28T14:03:15Z quote N7Q5fY  en pools/multi: sí, liquidez $2,957, vol24 $0  velas 1 h: 69  token en tokens/multi: sí  en listados top/new: no
+   mMfBbHNs… pool 7KmRxnBr… graduó 2026-09-28T14:04:09Z quote SOL  en pools/multi: sí, liquidez $2,124, vol24 $0  velas 1 h: 3  token en tokens/multi: sí  en listados top/new: no
+   6xLdZjxV… pool DzgZV8Mq… graduó 2026-09-28T14:05:34Z quote SOL  en pools/multi: sí, liquidez $2,160, vol24 $0  velas 1 h: 6  token en tokens/multi: sí  en listados top/new: no
+   KdqpRKNL… pool CP2X1v3M… graduó 2026-09-28T14:07:24Z quote EPjFWd  en pools/multi: sí, liquidez $2,846, vol24 $0  velas 1 h: 7  token en tokens/multi: sí  en listados top/new: no
+   ArGL1WHL… pool 4pddieAR… graduó 2026-09-28T14:08:22Z quote SOL  en pools/multi: sí, liquidez $2,088, vol24 $0  velas 1 h: 5  token en tokens/multi: sí  en listados top/new: no
+   HpXRRsBW… pool 8Zxa1hLH… graduó 2026-09-28T14:11:16Z quote SOL  en pools/multi: sí, liquidez $27, vol24 $0  velas 1 h: 10  token en tokens/multi: sí  en listados top/new: no
+   5wXHg8Ed… pool Ebf8FUZo… graduó 2026-09-28T14:24:59Z quote N7Q5fY  en pools/multi: sí, liquidez $576, vol24 $0  velas 1 h: 0  token en tokens/multi: sí  en listados top/new: no
+   CnrPtHUe… pool KPsNmMmx… graduó 2026-09-30T01:01:12Z quote SOL  en pools/multi: sí, liquidez $3,869, vol24 $64  velas 1 h: 71  token en tokens/multi: sí  en listados top/new: no
+   ABt1FzdT… pool EniS6iqQ… graduó 2026-09-30T01:02:35Z quote SOL  en pools/multi: sí, liquidez $2,000, vol24 $0  velas 1 h: 4  token en tokens/multi: sí  en listados top/new: no
+   7z6A29WH… pool 5KkVQ2it… graduó 2026-09-30T01:05:36Z quote SOL  en pools/multi: sí, liquidez $45, vol24 $0  velas 1 h: 5  token en tokens/multi: sí  en listados top/new: no
+   ERSeKPur… pool 7gkEFmu2… graduó 2026-09-30T01:05:58Z quote SOL  en pools/multi: sí, liquidez $2,333, vol24 $0  velas 1 h: 9  token en tokens/multi: sí  en listados top/new: no
+   6kLYmGQs… pool E9G12odh… graduó 2026-09-30T01:22:48Z quote SOL  en pools/multi: sí, liquidez $634, vol24 $0  velas 1 h: 5  token en tokens/multi: sí  en listados top/new: no
+   GstiyCpG… pool J294iPFZ… graduó 2026-10-01T09:01:00Z quote SOL  en pools/multi: sí, liquidez $2,351, vol24 $0  velas 1 h: 16  token en tokens/multi: sí  en listados top/new: no
+   GbfUWmiD… pool 4dmjr19w… graduó 2026-10-01T09:02:33Z quote SOL  en pools/multi: sí, liquidez $2,210, vol24 $0  velas 1 h: 4  token en tokens/multi: sí  en listados top/new: no
+   5K5XTQcX… pool 9MgZMby7… graduó 2026-10-01T09:02:56Z quote SOL  en pools/multi: sí, liquidez $2,175, vol24 $0  velas 1 h: 2  token en tokens/multi: sí  en listados top/new: no
+   BsaissLq… pool 3Cpb9koj… graduó 2026-10-01T09:19:23Z quote SOL  en pools/multi: sí, liquidez $2,202, vol24 $0  velas 1 h: 48  token en tokens/multi: sí  en listados top/new: no
+  con pool en GeckoTerminal: 16/16; con alguna vela de 1 h: 15/16; en los listados: 0/16
+  pools con liquidez < $1 000 que siguen apareciendo por dirección: 4/16 (liquidez mediana $2,168)
+  en 'top pools por DEX': 155 de 400 con liquidez < $1 000
+
+A3. Otro camino para listar migraciones de un periodo (estimación escrita, NO ejecutada)
+  Camino on-chain (no ejecutado; sin coste real en esta fase):
+  - Cada graduación emite CompletePumpAmmMigrationEvent en la tx de `migrate` del programa pump (sección 4).
+    Una dirección que solo toquen las migraciones permitiría listar con getSignaturesForAddress (40 CU por página
+    de 1 000 firmas en Alchemy) y getTransaction (40 CU) solo para esas firmas. Candidatas, sin verificar: la
+    wallet que llama a `migrate` (si pump usa una propia) o una PDA de PumpSwap usada solo al crear pools. La
+    mint-authority sirvió así para las creaciones (sección 11).
+  - Volumen: con ~0.4–0.8 creaciones/s (35 000–70 000/día) y una graduación del orden del 1 % (16 de 1 015 en
+    marxol.db solo en la primera hora), serían unos 350–1 000 migraciones al día.
+  - Coste estimado para 30 días (10 000–30 000 migraciones): getTransaction 0.4–1.2 M CU, más el listado. Con una
+    dirección exclusiva, 10–30 páginas ≈ 400–1 200 CU. Si la dirección también tiene otro tráfico, se multiplica
+    por la proporción de ruido (con el programa pump entero sería inviable: ~117 tx/s).
+  - Total ≈ 0.4–1.3 M CU por mes de migraciones (1–4 % del free tier mensual), más las velas, que pueden seguir
+    saliendo de GeckoTerminal por dirección de pool (el pool viene en el propio evento).
+  - Alternativa sin RPC: indexadores públicos (p. ej. Dune) con tablas de migraciones. Fuera del alcance de esta fase.
+
+====================================================================================================
+B. VELAS DE 1 HORA (muestra de 50 pools)
+  muestra: graduados marxol.db 16, listados, edad <1 d 11, listados, edad 1–7 d 10, listados, edad 7–30 d 7, listados, edad >30 d 6 = 50 pools (semilla 20261009)
+  ATENCIÓN: los pools de listados salen de 'top por volumen 24 h' y 'new pools': son supervivientes por construcción.
+  La API omite las horas sin trades (include_empty_intervals=false), así que '%vol 0' es siempre 0 y la
+  ausencia de actividad se mide como hora sin vela.
+  horas = de la creación del pool a la última vela; %sin vela = 1 − velas/horas; %sin vela hoy = sobre las horas
+  desde la creación hasta la referencia temporal; '401' = la paginación llegó al límite de historia gratuita.
+  pool       grupo                 edad d  horas  velas %sin vela %sin hoy  %vol 0   liquidez $ llega a grad. págs
+  CJhDFm7x… graduados marxol.db     10.8    199     69     65.3%    73.6%    0.0%        2,957            sí 1
+  7KmRxnBr… graduados marxol.db     10.8    138      3     97.8%    98.9%    0.0%        2,124            sí 1
+  DzgZV8Mq… graduados marxol.db     10.8    138      6     95.7%    97.7%    0.0%        2,160            sí 1
+  CP2X1v3M… graduados marxol.db     10.8    140      7     95.0%    97.3%    0.0%        2,846            sí 1
+  4pddieAR… graduados marxol.db     10.8    182      5     97.3%    98.1%    0.0%        2,088            sí 1
+  8Zxa1hLH… graduados marxol.db     10.8     37     10     73.0%    96.2%    0.0%           27            sí 1
+  Ebf8FUZo… graduados marxol.db          sin velas (404 o vacío)
+  KPsNmMmx… graduados marxol.db      9.4    220     71     67.7%    68.6%    0.0%        3,869            sí 1
+  EniS6iqQ… graduados marxol.db      9.4    196      4     98.0%    98.2%    0.0%        2,000            sí 1
+  5KkVQ2it… graduados marxol.db      9.4     23      5     78.3%    97.8%    0.0%           45            sí 1
+  7gkEFmu2… graduados marxol.db      9.4    204      9     95.6%    96.0%    0.0%        2,333            sí 1
+  E9G12odh… graduados marxol.db      9.4    205      5     97.6%    97.8%    0.0%          634            sí 1
+  J294iPFZ… graduados marxol.db      8.1    121     16     86.8%    91.8%    0.0%        2,351            sí 1
+  4dmjr19w… graduados marxol.db      8.1     53      4     92.5%    97.9%    0.0%        2,210            sí 1
+  9MgZMby7… graduados marxol.db      8.1     50      2     96.0%    99.0%    0.0%        2,175            sí 1
+  3Cpb9koj… graduados marxol.db      8.0    169     48     71.6%    75.3%    0.0%        2,202            sí 1
+  8XRG8kf8… listados, edad <1 d      0.4      3      2     33.3%    81.8%    0.0%            0            sí 1
+  GoQMFYSW… listados, edad <1 d      0.7      6      5     16.7%    72.2%    0.0%            0            sí 1
+  6D22yTzw… listados, edad <1 d      0.7      3      2     33.3%    89.5%    0.0%        2,005            sí 1
+  Cbxm9jec… listados, edad <1 d      0.5     12     11      8.3%     8.3%    0.0%       15,871            sí 1
+  4y58AmpZ… listados, edad <1 d      0.8      5      4     20.0%    80.0%    0.0%            0            sí 1
+  8Je821St… listados, edad <1 d      1.0      6      5     16.7%    80.8%    0.0%            0            sí 1
+  nXPBprjN… listados, edad <1 d      0.5      3      2     33.3%    84.6%    0.0%        2,008            sí 1
+  9fRrnnwy… listados, edad <1 d      0.9     22     10     54.5%    56.5%    0.0%        1,955            sí 1
+  5MzgnHYS… listados, edad <1 d      0.9      3      2     33.3%    91.3%    0.0%        2,078            sí 1
+  azd4wrwP… listados, edad <1 d      0.8      4      3     25.0%    85.0%    0.0%            0            sí 1
+  AGyx6Cbw… listados, edad <1 d      0.9      7      5     28.6%    77.3%    0.0%            0            sí 1
+  BcStCqTJ… listados, edad 1–7 d     1.4     34     33      2.9%     2.9%    0.0%    2,212,376            sí 1
+  CR5dTgvT… listados, edad 1–7 d     1.4     34     33      2.9%     5.7%    0.0%        3,406            sí 1
+  HmqGW5CP… listados, edad 1–7 d     1.0      3      2     33.3%    92.3%    0.0%            0            sí 1
+  A7nWJWGU… listados, edad 1–7 d     1.6     40     39      2.5%     2.5%    0.0%       30,564            sí 1
+  745ATaSS… listados, edad 1–7 d     4.5    109    108      0.9%     0.9%    0.0%       80,266            sí 1
+  EqJEk1zN… listados, edad 1–7 d     1.1      8      3     62.5%    88.9%    0.0%        1,993            sí 1
+  ER8NYAjb… listados, edad 1–7 d     1.0     25     23      8.0%    11.5%    0.0%        3,770            sí 1
+  69fyvgoT… listados, edad 1–7 d     2.7     65     64      1.5%     1.5%    0.0%        8,626            sí 1
+  8zGU2Zkm… listados, edad 1–7 d     1.0     26     25      3.8%     3.8%    0.0%       24,980            sí 1
+  D2pVedgH… listados, edad 1–7 d     1.4     32     31      3.1%    11.4%    0.0%        2,484            sí 1
+  Apy5FShc… listados, edad 7–30 d    23.4    563    562      0.2%     0.2%    0.0%       50,547            sí 1
+  8ewuF2o8… listados, edad 7–30 d    11.0    266    265      0.4%     0.4%    0.0%      274,270            sí 1
+  867dKvaC… listados, edad 7–30 d    28.3    681    680      0.1%     0.1%    0.0%      181,143            sí 1
+  4JAnKFdd… listados, edad 7–30 d    13.5    326    325      0.3%     0.3%    0.0%      282,261            sí 1
+  4R8CiMnJ… listados, edad 7–30 d    19.6    472    471      0.2%     0.2%    0.0%      530,793            sí 1
+  CyJwKnLi… listados, edad 7–30 d     7.5    181    180      0.6%     0.6%    0.0%      358,975            sí 1
+  Cb7ZRgPL… listados, edad 7–30 d    29.6    711    710      0.1%     0.1%    0.0%      766,350            sí 1
+  Gf7sXMoP… listados, edad >30 d   592.2   5027   4991      0.7%     0.7%    0.0%    7,774,936            NO 6 401
+  HMzvsEEm… listados, edad >30 d    74.7   1795   1794      0.1%     0.1%    0.0%    2,686,132            sí 2
+  4qxSqMh6… listados, edad >30 d   361.4   5072   4992      1.6%     1.6%    0.0%      289,273            NO 6 401
+  2uF4Xh61… listados, edad >30 d   451.7   5019   4994      0.5%     0.5%    0.0%   26,452,989            NO 6 401
+  6QyYdc6j… listados, edad >30 d    39.8    955    952      0.3%     0.3%    0.0%      208,165            sí 1
+  6LtBM9Gx… listados, edad >30 d   486.7   5138   4992      2.8%     2.8%    0.0%      586,228            NO 6 401
+  Resumen por grupo (medianas):
+    graduados marxol.db  n 15  horas    140  %sin vela  95.0%  %sin hoy  97.7%  %vol 0   0.0%  liquidez $2,175  llegan a la graduación 15/15
+    listados, edad <1 d  n 11  horas      5  %sin vela  28.6%  %sin hoy  80.8%  %vol 0   0.0%  liquidez $0  llegan a la graduación 11/11
+    listados, edad 1–7 d n 10  horas     33  %sin vela   3.0%  %sin hoy   4.8%  %vol 0   0.0%  liquidez $6,198  llegan a la graduación 10/10
+    listados, edad 7–30 d n  7  horas    472  %sin vela   0.2%  %sin hoy   0.2%  %vol 0   0.0%  liquidez $282,261  llegan a la graduación 7/7
+    listados, edad >30 d n  6  horas   5023  %sin vela   0.6%  %sin hoy   0.6%  %vol 0   0.0%  liquidez $1,636,180  llegan a la graduación 2/6
+  pools con > 7 días: 28; con la historia cortada por el límite gratuito (401): 4
+
+B5. Coste de descargar 1 000 tokens
+  páginas de velas por pool en la muestra: media 1.42 (1 000 velas por página ≈ 41.7 días de historia)
+  1 000 tokens ≈ 1,453 llamadas (velas + pools/multi de 30 en 30), más el listado del universo, que esta API
+  no da (A1). A 10/min: 2.4 h; a 20/min: 1.2 h; a 30/min: 0.8 h.
+  Cada mes más de historia añade ~0.72 páginas por token.
+
+====================================================================================================
+C. TASA BASE DE 'SEGUNDA VIDA' (definiciones candidatas, sin elegir ninguna)
+  AVISO: la definición final se fijará después, SIN mirar indicadores. Esta tabla solo dice qué tasas base son
+  manejables. Ninguna combinación se elige por su resultado.
+  Celda: cumplen / evaluables (%), y n/e = historia insuficiente tras la caída. Velas high/low, precio en quote.
+
+  ### VELAS (high/low, definición candidata tal cual)
+
+  [toda la muestra] n con velas = 49
+    caída                 D=7 d                D=14 d                D=30 d   con caída
+    ≥50 %   35/ 41 (  85%) n/e  8   35/ 37 (  95%) n/e 12   35/ 37 (  95%) n/e 12   49/49
+    ≥70 %   33/ 40 (  82%) n/e  9   33/ 37 (  89%) n/e 12   33/ 37 (  89%) n/e 12   45/49
+    ≥90 %   28/ 39 (  72%) n/e 10   28/ 36 (  78%) n/e 13   28/ 36 (  78%) n/e 13   41/49
+
+  [graduados marxol.db (sin sesgo de supervivencia)] n con velas = 15
+    caída                 D=7 d                D=14 d                D=30 d   con caída
+    ≥50 %    6/  9 (  67%) n/e  6    6/  6 ( 100%) n/e  9    6/  6 ( 100%) n/e  9   15/15
+    ≥70 %    6/  9 (  67%) n/e  6    6/  6 ( 100%) n/e  9    6/  6 ( 100%) n/e  9   15/15
+    ≥90 %    6/  9 (  67%) n/e  6    6/  6 ( 100%) n/e  9    6/  6 ( 100%) n/e  9   15/15
+
+  [listados (supervivientes)] n con velas = 34
+    caída                 D=7 d                D=14 d                D=30 d   con caída
+    ≥50 %   29/ 32 (  91%) n/e  2   29/ 31 (  94%) n/e  3   29/ 31 (  94%) n/e  3   34/34
+    ≥70 %   27/ 31 (  87%) n/e  3   27/ 31 (  87%) n/e  3   27/ 31 (  87%) n/e  3   30/34
+    ≥90 %   22/ 30 (  73%) n/e  4   22/ 30 (  73%) n/e  4   22/ 30 (  73%) n/e  4   26/34
+
+  ### VARIANTE DESCRIPTIVA: solo cierres horarios (sin mechas; NO elegida, solo para ver el peso de las mechas)
+
+  [toda la muestra] n con velas = 49
+    caída                 D=7 d                D=14 d                D=30 d   con caída
+    ≥50 %   12/ 32 (  38%) n/e 17   12/ 29 (  41%) n/e 20   13/ 28 (  46%) n/e 21   35/49
+    ≥70 %   10/ 34 (  29%) n/e 15   10/ 32 (  31%) n/e 17   11/ 32 (  34%) n/e 17   28/49
+    ≥90 %    3/ 36 (   8%) n/e 13    3/ 35 (   9%) n/e 14    3/ 35 (   9%) n/e 14   18/49
+
+  [graduados marxol.db (sin sesgo de supervivencia)] n con velas = 15
+    caída                 D=7 d                D=14 d                D=30 d   con caída
+    ≥50 %    0/ 11 (   0%) n/e  4    0/  9 (   0%) n/e  6    0/  9 (   0%) n/e  6   6/15
+    ≥70 %    0/ 12 (   0%) n/e  3    0/ 10 (   0%) n/e  5    0/ 10 (   0%) n/e  5   5/15
+    ≥90 %    0/ 13 (   0%) n/e  2    0/ 12 (   0%) n/e  3    0/ 12 (   0%) n/e  3   3/15
+
+  [listados (supervivientes)] n con velas = 34
+    caída                 D=7 d                D=14 d                D=30 d   con caída
+    ≥50 %   12/ 21 (  57%) n/e 13   12/ 20 (  60%) n/e 14   13/ 19 (  68%) n/e 15   29/34
+    ≥70 %   10/ 22 (  45%) n/e 12   10/ 22 (  45%) n/e 12   11/ 22 (  50%) n/e 12   23/34
+    ≥90 %    3/ 23 (  13%) n/e 11    3/ 23 (  13%) n/e 11    3/ 23 (  13%) n/e 11   15/34
+
+====================================================================================================
+D. DATOS DE WHALES GRATIS (documentación + una respuesta de ejemplo; sin implementar)
+  trades, pool graduado de marxol.db: 0 trades; campos: 
+  trades, pool con más volumen 24 h: 300 trades, de 2026-10-09T08:17:56Z a 2026-10-09T08:21:15Z; campos: block_number, block_timestamp, from_token_address, from_token_amount, kind, price_from_in_currency_token, price_from_in_usd, price_to_in_currency_token, price_to_in_usd, to_token_address, to_token_amount, tx_from_address, tx_hash, volume_in_usd
+  token info: campos address, banner_image_url, categories, coingecko_coin_id, decimals, description, developer_address, developer_holding_percentage, discord_url, farcaster_url, freeze_authority, gt_category_ids, gt_score, gt_score_details, gt_verified, holders, image, image_url, is_honeypot, launchpad_details, mint_authority, name, symbol, telegram_handle, twitter_handle, websites, zora_url
+    holders: {"count": 4487, "distribution_percentage": {"top_10": "86.7652", "11_20": "1.9494", "21_40": "3.3659", "rest": "7.9195"}, "last_updated": "2026-10-09T08:48:58Z"}
+  Según la documentación pública (swagger v2, versión 20230203):
+  - /pools/{pool}/trades: "the last 300 trades in the past 24 hours". trading_period 7d/30d, cursor y per_page
+    son "Pro API only" (de pago). Gratis: como mucho 300 trades de las últimas 24 h por pool, sin paginar. Sirve
+    para un detector en vivo (sondear cada pool vigilado cada pocos minutos), no para historia. Con 10 llamadas
+    por minuto, vigilar N pools exige N/10 minutos por vuelta.
+  - Filtro trade_volume_in_usd_greater_than (gratis): permite pedir solo trades grandes del día.
+  - Holders: no hay LISTA de holders principales (direcciones) en la API pública. Lo que sí da gratis
+    /tokens/{address}/info (ver la respuesta de arriba) es el número de holders y la distribución agregada
+    (% del supply en el top 10, 11–20, 21–40 y resto), con su `last_updated`, además de
+    developer_holding_percentage, is_honeypot, mint_authority y freeze_authority. Es una foto del momento:
+    no hay historia, así que solo sirve si se pide periódicamente y se guarda. La lista de top holders con
+    direcciones es, según CoinGecko, de la API de pago (conocimiento previo, no verificado en esta sesión,
+    porque la red estaba limitada a GeckoTerminal).
+  - OHLCV gratis: solo agregados por hora o minuto, sin wallets.
+  - Profundidad real de los 300 trades: en el pool con más volumen cubrieron unos 3 min (ver arriba), y en un
+    pool muerto, 0 trades. En pools activos, "las últimas 24 h" son en la práctica los últimos minutos.
+  - Conclusión: gratis se pueden detectar los trades grandes de los últimos minutos u horas por pool, con su
+    wallet (tx_from_address), y la concentración agregada de holders del momento. No hay historia de trades,
+    ni direcciones de holders, ni historia de la concentración. Para historia de whales hace falta on-chain (RPC)
+    o un plan de pago.
+
+====================================================================================================
+LÍMITES
+- Post hoc y exploratorio: no confirma ni descarta nada y no cambia ningún veredicto ni definición.
+- Sesgo de supervivencia en los listados: 'top pools' ordena por actividad de 24 h y 'new pools' solo tiene
+  horas. Solo los graduados de marxol.db (n pequeño, seleccionados por graduar en la primera hora) no dependen
+  de la supervivencia, y solo representan a los graduados rápidos de tres franjas de 8 minutos.
+- Graduados lentos: marxol.db solo conoce las graduaciones dentro de las ventanas de 65 min descargadas.
+- Muestra pequeña (50) y no aleatoria del universo; las tasas de C son órdenes de magnitud, no estimaciones.
+- Velas de 1 h con huecos: una hora sin vela es una hora sin trades. High y low incluyen mechas de un solo trade,
+  que inflan las caídas y las subidas 2×.
+- Precio en unidades del quote (currency=token): sin la deriva SOL/USD; no comparable entre pools SOL y USDC.
+- Historia de velas gratuita limitada: pedir velas con before_timestamp anterior a ~2026-03-14 (unos 209 días)
+  devuelve HTTP 401. Los 4 pools más antiguos de la muestra quedan cortados ahí. Además, el script pagina
+  como mucho 6 páginas por pool.
+- Datos de GeckoTerminal no verificados on-chain (principio 1). La API está en beta y puede cambiar.
+- El límite real fue ~10 llamadas/min (documentado), no 30.
