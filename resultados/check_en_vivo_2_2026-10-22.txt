@@ -1,0 +1,88 @@
+PRUEBA EN VIVO 2 DE `marxol check` (IDL vigente, 2026-10-21/22 ~21:55–22:10 UTC)
+Herramienta, no análisis. Sin pre-registro nuevo. No cambia ninguna definición.
+
+Método
+- Binario del repo con el IDL actualizado (resultados/idl_actualizacion_2026-10-21.txt), el aviso de
+  TradeEvent con bytes de más y `verify` endurecido. Proveedor: Alchemy (20 req/s por defecto).
+- Descubrimiento: `scan --address <mint-authority> --limit 20 --events CreateEvent` = 20 creaciones
+  de [1792620075, 1792620112], 5 de ellas mayhem (840 CU).
+- Cada token se consultó al cumplir unos 60 s, en secuencia, con `--max-requests 35` (≤ 1 400 CU por
+  token) para no pasar el tope de 15 000. Las consultas lentas retrasaron las últimas hasta 3 min.
+- ms = tiempo de pared del proceso. Edad = inicio de la consulta − t0 del CreateEvent del scan.
+- El consumo de `check` se registró en una base del scratchpad, no en marxol.db.
+
+Resultados (Te2 = segundos de T_entry2 desde la creación; "=" = mismo veredicto y banderas offline)
+id    mint       mayhem  edad s     ms    CU  veredicto en vivo    H4p H6p H7p Te2 s  offline (copia)      motivo / nota
+L2_01 EGyHo1oJ       no    60.3    175    80  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 45 transacciones y ya se han usado 2 peticiones
+L2_02 Co1QPrLD       sí    62.5    135    80  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 130 transacciones y ya se han usado 2 peticiones
+L2_03 3y11AYPD       no    66.7    127    80  NO EVALUABLE           -   -   -     -  NO EVALUABLE =       sin T_entry2 aún (ventana abierta)
+L2_04 2QGpWv2a       sí    66.8   1535  1040  SIN BANDERAS DE D2    sí  no  no    10  SIN BANDERAS DE D2 = 
+L2_05 Hs8TALnQ       no    69.4   1359   960  EVITAR                sí  no  sí    23  EVITAR =             
+L2_06 BfFenTrf       sí    72.8    142    80  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 137 transacciones y ya se han usado 2 peticiones
+L2_07 3HPDCJBu       no    79.0    726   120  NO EVALUABLE           -   -   -     -  NO EVALUABLE =       sin T_entry2 aún (ventana abierta)
+L2_08 9D845JYY       no    79.8   1822   120  NO EVALUABLE           -   -   -     -  NO EVALUABLE =       sin T_entry2 aún (ventana abierta)
+L2_09 97o2QppV       no    81.6   2369   120  NO EVALUABLE           -   -   -     -  NO EVALUABLE =       sin T_entry2 aún (ventana abierta)
+L2_10 8GoVsZFh       no    84.0   1788   120  NO EVALUABLE           -   -   -     -  NO EVALUABLE =       sin T_entry2 aún (ventana abierta)
+L2_11 35fo5T4Q       no    85.9   2057   120  NO EVALUABLE           -   -   -     -  NO EVALUABLE =       sin T_entry2 aún (ventana abierta)
+L2_12 FhxqcVow       no    88.0   4670   120  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 360 transacciones y ya se han usado 3 peticiones
+L2_13 767sp6Ha       no    96.7   1765   120  SIN BANDERAS DE D2    no  no  no    10  SIN BANDERAS DE D2 = 
+L2_14 Cmi1CCMT       no   102.5   3614   120  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 89 transacciones y ya se han usado 3 peticiones
+L2_15 911kLUPr       sí   109.1  14845   200  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 176 transacciones y ya se han usado 5 peticiones
+L2_16 2ZpVMy32       no   129.0  37567   640  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 246 transacciones y ya se han usado 16 peticiones
+L2_17 7hs2v3NV       sí   167.6   1755    80  NO EVALUABLE           -   -   -     -  (no incorporado)     la ventana temprana tiene 93 transacciones y ya se han usado 2 peticiones
+L2_18 8aof5dM8       no   171.4   4762   360  EVITAR                no  sí  sí    50  EVITAR =             
+L2_19 8E1w3UKT       no   176.3   2013   280  SIN BANDERAS DE D2    no  no  no    19  SIN BANDERAS DE D2 = 
+L2_20 6PrZ9cdG       no   180.3    831   600  SIN BANDERAS DE D2    no  no  no    17  SIN BANDERAS DE D2 = 
+total check CU 5440
+
+Resumen
+- 20 consultas, 0 errores (ninguna sale con código 1). Ningún error de decodificación: los
+  SweepBondingCurveFeeEvent ya se decodifican.
+- 6 veredictos: 4 SIN BANDERAS DE D2 (1 mayhem) y 2 EVITAR (H4'+H7' y H6'+H7').
+- 6 NO EVALUABLE sin T_entry2 todavía, con la ventana abierta (2–3 trades en ~80 s).
+- 8 NO EVALUABLE por coste: ventanas de 45–360 tx a los 60–170 s de edad, por encima del tope de
+  35 peticiones. Cuestan solo 80–640 CU, porque check comprueba el tamaño de la ventana antes de pedirla.
+- Tiempo hasta el veredicto (los 6 con veredicto): 0.83–4.76 s, mediana ≈ 1.6 s.
+- Aviso de bytes de más: salta en todas las ejecuciones con trades, una sola vez, con la longitud
+  observada (382, 395, 397 o 450 bytes; siempre 8 más que el IDL), y el contador al final (1–25 por
+  ejecución). No afecta a ningún veredicto.
+
+Latencia anómala (sin explicar del todo)
+- Varias consultas de 3–5 peticiones tardaron 2.0–14.8 s (L2_09 2.4 s, L2_12 4.7 s, L2_15 14.8 s), y
+  L2_16 tardó 37.6 s con 15 getSignaturesForAddress. Una página de firmas de esa misma curva,
+  medida con curl justo después, respondió en 0.22 s con 1 000 firmas que cubrían 161 s.
+- Dos causas posibles, sin verificar: reintentos por 429 (rpc::with_retry espera 1, 2, 4 y 8 s y no
+  deja constancia del reintento), o respuestas lentas puntuales. Hay un indicio: 20 req/s × 40 CU =
+  800 CU/s, por encima del límite de 500 CU/s del free tier de Alchemy (referencia_tecnica §7), así
+  que el ritmo por defecto puede provocar 429 en ráfagas.
+- Recomendación (no aplicada): registrar en stderr cada reintento por 429 y bajar el ritmo por defecto
+  de Alchemy a ≤ 12 req/s para métodos de 40 CU.
+
+Comparación online / offline (tarea 5)
+- Ninguno de los 20 mints estaba en marxol.db.
+- Se incorporaron a una COPIA en el scratchpad con el camino normal de las validaciones:
+  1. Copia de marxol.db; se borran en la copia las 42 creaciones del margen de V3 sin ventana,
+     para que `windows` no las descargue.
+  2. `index-tramo --from 1792620075 --until 1792620112` → 20 creaciones (840 CU).
+  3. Se quitan de la copia los 8 tokens con ventana demasiado grande (~1 300 tx entre todos, ≈ 52 000 CU).
+  4. `windows` con la ventana ya cerrada → 12 ventanas completas, 0 errores, 91 trades (4 960 CU).
+  5. `check --offline --db <copia>`.
+- Resultado: 12 de 12 con el mismo veredicto, las mismas banderas y el mismo T_entry2 (segundo,
+  slot, trades previos, precio, comisión y fracciones), entre el vivo con la ventana abierta y
+  commitment `confirmed` y el offline con la ventana cerrada y descargada por `windows`.
+- La única diferencia es `window_trades` en 3 tokens (8→10, 4→5, 14→33): los trades posteriores a la
+  consulta en vivo. Es lo esperado: las banderas solo usan trades anteriores a T_entry2.
+- Los 6 sin T_entry2 siguen sin T_entry2 con la ventana cerrada.
+
+Conclusión
+- Con el IDL actualizado, check ya no falla con tokens activos: 0 errores en 20 consultas, frente a
+  5 de 18 el 2026-10-21.
+- Su veredicto en vivo coincide con el del circuito de las validaciones en 12 de 12 tokens.
+- Para tokens de ventana grande, el límite práctico es el coste. A ~60 s, 8 de 20 tokens ya tenían
+  más de 35 tx en la ventana. Consultar antes (cerca de T_entry2, 10–20 s) los haría baratos, porque
+  la ventana aún es pequeña.
+- La latencia, cuando no hay anomalías, sigue en 1–2 s.
+
+Consumo (Alchemy), ≈ 12 300 CU (tope 15 000):
+  scan 840; check 5 440 (20 ejecuciones); curl de diagnóstico 40; curve 1 getAccountInfo (≤ 40);
+  index-tramo 840; windows 4 960; verify ≤ 3 getAccountInfo (≤ 120).

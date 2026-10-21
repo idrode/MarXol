@@ -73,4 +73,15 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - En vivo: `4mekvGzn…`, que antes fallaba, da SIN BANDERAS DE D2 con la ventana completa.
    - Consumo: ≈ 3 300 CU (cota superior).
    - Fallo previo y ajeno: `scripts/cribado_posthoc.py` falla con los datos de V3 (pump-y-caída n/e), con los dos binarios.
+   **`verify` endurecido, aviso de bytes de más y prueba en vivo 2 (2026-10-22) — herramienta** (`resultados/check_en_vivo_2_2026-10-22.txt`):
+   - `verify` sale con error si `Global` tiene bytes sobrantes o le faltan campos (`global_exact`). Hoy pasa: 30 campos y 0 sobrantes.
+   - Los `TradeEvent` con más bytes que el IDL se cuentan (`tx::TRADE_EXTRA_BYTES`). Se avisa una sola vez por ejecución con la longitud observada, y `check`, `windows`, `prices` e `index-tramo` imprimen el contador al final. Hay 3 tests nuevos (69 en verde), y las salidas de V1–V3 siguen idénticas byte a byte (61 ficheros).
+   - `docs/referencia_tecnica.md` §6 actualizada con el IDL vigente y el procedimiento tras cada despliegue.
+   - Prueba en vivo con 20 creaciones a ~60–180 s, `--max-requests 35`: 0 errores.
+     - 6 veredictos (4 SIN BANDERAS, 2 EVITAR) en 0.8–4.8 s.
+     - 6 sin T_entry2 todavía.
+     - 8 NO EVALUABLE por coste (ventanas de 45–360 tx).
+   - **Online frente a offline**: los 12 baratos se incorporaron a una copia de `marxol.db` en el scratchpad con `index-tramo` + `windows`. Dan 12 de 12 veredictos, banderas y T_entry2 iguales; solo cambia `window_trades`, por los trades posteriores a la consulta.
+   - Latencias anómalas (hasta 37.6 s con 16 peticiones), sin explicar. Una posibilidad es que fueran reintentos 429 no registrados: 20 req/s × 40 CU supera los 500 CU/s del free tier.
+   - Consumo: ≈ 12 300 CU.
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.

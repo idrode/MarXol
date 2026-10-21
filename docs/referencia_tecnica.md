@@ -134,19 +134,38 @@ Desde `create_v2`, un token puede crearse con quote mint SOL (por defecto, `quot
 
 ## 6. Eventos del IDL — referencia de campos (confirmado directamente contra `idl/pump.json`)
 
-Fuente: IDL Anchor oficial descargado de `pump-fun/pump-public-docs`, parseado programáticamente (no prosa de terceros). Copia versionada en `idl/pump.json` (sha256 `ffe966c4…c8b56064b`, descargada 2026-09-28): **47 instrucciones, 7 cuentas** (`BondingCurve, FeeConfig, Global, GlobalVolumeAccumulator, QuoteControl, SharingConfig, UserVolumeAccumulator`), 28 eventos, 42 tipos. (Una versión anterior de este documento decía 25 instrucciones y 5 cuentas: el IDL ha crecido.)
-
-**Verificación contra chain**: la cuenta `Global` real (mainnet, 2026-09-28) decodifica con este IDL con los 29 campos y **0 bytes sobrantes**; un `CreateEvent` real de `create_v2` decodifica con todos sus campos. El IDL local está al día con el programa desplegado a esa fecha.
+**IDL vigente (actualizado 2026-10-21)**:
+- Fuente: IDL Anchor oficial de `pump-fun/pump-public-docs` (`idl/pump.json`), versión del commit del **2026-10-13** ("depth 2 pump coin quotes"). Tras el del 2026-10-07 ("v3 / v2 trades, multi-hop swap, pump coins as quote mints, fee sweeps") y el del 2026-10-08.
+- Copia versionada en `idl/pump.json` (sha256 `7616681e…88d980997207`): **56 instrucciones, 7 cuentas** (`BondingCurve, FeeConfig, Global, GlobalVolumeAccumulator, QuoteControl, SharingConfig, UserVolumeAccumulator`), 32 eventos y 47 tipos. Detalle del cambio: `resultados/idl_actualizacion_2026-10-21.txt`.
+- **La cuenta IDL on-chain no sirve como fuente**: `AYgC53tU5BbP2NAnv5nConJxAdpQZctvmZK88pu69xRs` (Anchor, `create_with_seed(find_program_address([], programa), "anchor:idl", programa)`) sigue con el IDL del 2026-09-28 y no se actualiza con los despliegues.
+- **Despliegues**: ProgramData `B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu`.
+  - 2026-09-30 21:13 UTC, slot 452 082 198 (entre V2 y V3).
+  - 2026-10-01 07:45 UTC, slot 452 224 060 (75 min antes de V3), y otros 6 entre las 15:55 y las 22:11 de ese día.
+  - 2026-10-02, 10-08, 10-13 y 10-18 (varios).
+  - **Último: 2026-10-19 17:47 UTC, slot 458 921 440.**
+  - V1–V3 no tienen ningún evento desconocido (todas sus ventanas están completas, con 0 errores).
+- **Verificación contra chain (2026-10-21)**:
+  - `Global` decodifica con 30 campos, 0 faltantes y **0 bytes sobrantes**. Con el IDL anterior: 29 campos y 1 sobrante (`max_curve_depth`).
+  - Una `BondingCurve` viva decodifica sus 19 campos.
+  - Los `SweepBondingCurveFeeEvent` reales decodifican sin errores.
+  - **Excepción conocida**: el `TradeEvent` real lleva **8 bytes más** de lo que describe este IDL (16 más que el anterior). Es un campo añadido por el despliegue del 18/19-10 que aún no está en el IDL público. Se ignora y se avisa (ver `TradeEvent`).
+- **Regla: revisar el IDL tras cada despliegue en ProgramData.**
+  - Comparar `idl/pump.json` con el de GitHub.
+  - Ejecutar `marxol verify`, que desde el 2026-10-22 **falla** si `Global` tiene bytes sobrantes o le faltan campos.
+  - Decodificar tx recientes con `marxol tx`. Son señales de desfase: un "evento con discriminador desconocido", el aviso de `TradeEvent` con bytes de más o un fallo de `verify`.
+  - Comprobar byte a byte que las salidas de V1–V3 no cambian (`cargo test` incluye fixtures de V1–V3 decodificados con los dos IDL).
+- Historial: la copia anterior (sha256 `ffe966c4…c8b56064b`, del 2026-09-28) tenía 47 instrucciones, 28 eventos y 42 tipos. Se conserva en `tests/fixtures/pump_idl_2026-09-28.json`.
 
 ### `CreateEvent`
 ```
 name, symbol, uri, mint, bonding_curve, user, creator, timestamp,
 virtual_token_reserves, virtual_sol_reserves, real_token_reserves,
 token_total_supply, token_program, is_mayhem_mode, is_cashback_enabled,
-quote_mint, virtual_quote_reserves, creator_fee_bps, is_holder_reward
+quote_mint, virtual_quote_reserves, creator_fee_bps, is_holder_reward,
+depth (u8, nuevo 2026-10: profundidad de la cadena de quotes cuando el quote es otro pump coin)
 ```
 
-### `TradeEvent` (32 campos — el más rico; ya trae `creator` embebido, no hace falta cruzar con `CreateEvent` por `mint`)
+### `TradeEvent` (35 campos en el IDL vigente — el más rico; ya trae `creator` embebido, no hace falta cruzar con `CreateEvent` por `mint`)
 ```
 mint, sol_amount, token_amount, is_buy, user, timestamp,
 virtual_sol_reserves, virtual_token_reserves, real_sol_reserves, real_token_reserves,
@@ -158,9 +177,14 @@ mayhem_mode, cashback_fee_basis_points, cashback,
 buyback_fee_basis_points, buyback_fee,
 shareholders (Vec<Shareholder>),
 quote_mint, quote_amount, virtual_quote_reserves, real_quote_reserves,
-holder_rewards_bps, holder_rewards
+holder_rewards_bps, holder_rewards,
+creator_fee_unclaimed (u64, nuevo 2026-10)
++ 8 bytes sin describir (despliegue 2026-10-18/19; no están en el IDL público del 2026-10-13)
 ```
-`ix_name` indica qué instrucción concreta generó el trade (`buy`, `buy_v2`, `buy_exact_quote_in_v2`, etc.) — útil para distinguir variantes.
+- `ix_name` **no distingue la versión** de la instrucción. En mainnet (2026-10-21), un `buy_v2` emite `ix_name = "buy"` y un `sell_v2` emite `"sell"`. La instrucción concreta se ve en `TxEvents.instructions`.
+- Con el IDL vigente, el `TradeEvent` real mide 382–383 bytes (según la longitud de `ix_name`), de los que 8 no están descritos.
+- Desde el 2026-10-22, la decodificación cuenta estos eventos con bytes de más y avisa una sola vez por ejecución, con la longitud observada (`tx::TRADE_EXTRA_BYTES`). `check`, `windows`, `prices` e `index-tramo` imprimen el contador al final. No es un error: el prefijo descrito se decodifica igual.
+- En los fixtures de V1–V3 no sobra ningún byte.
 
 ### `CompleteEvent` (bonding curve se llena)
 ```
@@ -201,7 +225,45 @@ enable_migrate, pool_migration_fee, creator_fee_basis_points, fee_recipients (ar
 timestamp, set_creator_authority, admin_set_creator_authority
 ```
 
-### Otros eventos del IDL (28 en total, no todos relevantes para el MVP)
+### `SweepBondingCurveFeeEvent` (nuevo 2026-10; discriminador `742b4dbd117a482b`) — **no es un trade**
+```
+timestamp, mint, bonding_curve, quote_mint, recipient, amount (u64), bucket (u8: 0 = protocolo, 1 = creador)
+```
+- Lo emiten `sweep_protocol_fee` y `sweep_creator_fee`, que barren hacia `recipient` las comisiones que ahora se acumulan en la propia curva (`BondingCurve.protocol_fees` / `creator_fee`).
+- Lo ejecuta un crank (p. ej. `FHpcNSe6…`, ~1 000 tx cada 2 min), a menudo varios tokens por tx, o lo hace antes de una migración a fee sharing.
+- Sin usuario, importes de token ni reservas: no sirve para precio ni volumen.
+- Con el IDL del 2026-09-28, era el "evento con discriminador desconocido" que hacía fallar `check` en vivo.
+
+### `PostCompleteBuyEvent` (nuevo 2026-10; `6fb06d8b316cd5fb`) — compra sobre una curva ya completada, **sin `TradeEvent`**
+```
+user, mint, bonding_curve, quote_mint, timestamp, base_out, quote_in, fee_basis_points, fee,
+creator_fee_basis_points, creator_fee, buyback_fee,
+pool_base_reserves_before, pool_quote_reserves_before, pool_base_reserves_after, pool_quote_reserves_after
+```
+- Las ventanas de marXol son n/e a partir del completado, así que no les afecta.
+- Un indexador de precio posterior al completado tendría que leerlo.
+- No observado aún en mainnet.
+
+### Otros eventos nuevos (2026-10)
+`SetQuoteControlMintReservesEvent` (`a943276d6686b6e8`), `SetQuoteControlReservesAdminEvent` (`43fbb3b6575ca921`): administración de `QuoteControl`.
+
+### Instrucciones nuevas (2026-10), con discriminador
+- Trades:
+  - `buy_v3` `07051dc4f5176550`
+  - `sell_v3` `1c92de7726c469d5`
+  - `buy_exact_quote_in_v3` `e1f7501ed5b38488`
+  - `multi_hop_curve_swap` `e19a7516d756f667` (swap encadenado entre curvas con pump coins como quote)
+- Comisiones:
+  - `sweep_creator_fee` `20f6bf3408c949ba`
+  - `sweep_protocol_fee` `0830be07b644b7e5`
+- Administración:
+  - `set_max_curve_depth` `209a98db8e6cdaa5`
+  - `set_quote_control_mint_reserves` `74dc6b53bf2c2049`
+  - `set_quote_control_reserves_admin` `a1c3dea5e165c03e`
+- `buy`, `buy_v2`, `buy_exact_sol_in` y `buy_exact_quote_in_v2` añaden el arg `partial_fill` al final (mismo discriminador y cuentas).
+- `buy_v3`, `sell_v3` y `multi_hop_curve_swap` no se han observado aún. No está verificado que emitan `TradeEvent`, aunque es lo esperable. El encadenado de reservas de `entry::execution_order` detectaría un trade que faltara en una ventana.
+
+### Otros eventos del IDL (28 hasta 2026-09, no todos relevantes para el MVP)
 `AddQuoteControlMintEvent, AdminCtoEvent, AdminSetIdlAuthorityEvent, AdminUpdateTokenIncentivesEvent, ClaimCashbackEvent, ClaimTokenIncentivesEvent, CloseUserVolumeAccumulatorEvent, ExtendAccountEvent, InitUserVolumeAccumulatorEvent, MinimumDistributableFeeEvent, RemoveQuoteControlMintEvent, ReservedFeeRecipientsEvent, SetMetaplexCreatorEvent, SetQuoteControlAdminEvent, SyncUserVolumeAccumulatorEvent, UpdateCreatorFeeConfigEvent, UpdateGlobalAuthorityEvent, UpdateMayhemVirtualParamsEvent`
 
 ### Structs de cuenta relevantes
@@ -210,10 +272,14 @@ timestamp, set_creator_authority, admin_set_creator_authority
 ```
 virtual_token_reserves, virtual_quote_reserves, real_token_reserves, real_quote_reserves,
 token_total_supply, complete, creator, is_mayhem_mode, is_cashback_coin,
-quote_mint, creator_fee_bps, can_edit_creator_fee, is_holder_reward
+quote_mint, creator_fee_bps, can_edit_creator_fee, is_holder_reward,
+creator_fee, protocol_fees, depth, initial_virtual_quote_reserves,
+post_complete_base_out, post_complete_quote_in   (los 6 últimos, nuevos 2026-10)
 ```
 
-**`Global`**: ver sección 4 ("Parámetros económicos").
+**`Global`**: ver sección 4 ("Parámetros económicos"). Nuevo en 2026-10: `max_curve_depth` (u8), al final.
+
+**`QuoteControl`**: en 2026-10 cambia el orden (`reserves_admin: pubkey` ocupa parte de `_reserved`). marXol no la decodifica.
 
 **`Shareholder`** (usado en `TradeEvent.shareholders` y `DistributeCreatorFeesEvent.shareholders`):
 ```
@@ -262,7 +328,7 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
 - ~~El umbral de graduación real actual~~ → **verificado 2026-09-28**: 85.0054 SOL reales (sección 4). Nota: `final_real_sol_reserves` no está en `Global`, solo en `SetParamsEvent`; el umbral se deriva de `initial_*`.
 - ~~Si Yellowstone gRPC de Alchemy está disponible en el plan free~~ → **no lo está** (2026-10-09): "only available to PAYG (Pay-As-You-Go) and Enterprise teams" (`yellowstone-grpc-quickstart`).
 - Qué tarifa por byte aplica Alchemy a los WebSocket de Solana (0.0002 o 0.04 CU/byte): mirarlo en el panel con el consumo del 2026-10-09 a las 08:15 UTC (3.56 MB).
-- Cualquier cambio reciente en el IDL no reflejado en la copia descargada (el repo está activo, con actualizaciones frecuentes — releer antes de asumir que esta sección sigue vigente si ha pasado tiempo desde la última actualización de este documento). Señales de desfase: `marxol verify` muestra campos ausentes o bytes sobrantes en `Global`, o aparecen "evento con discriminador desconocido" / "campos del IDL ausentes" al decodificar tx recientes.
+- Cualquier cambio reciente en el IDL no reflejado en la copia descargada (el repo está activo, con actualizaciones frecuentes — releer antes de asumir que esta sección sigue vigente si ha pasado tiempo desde la última actualización de este documento). Señales de desfase: `marxol verify` muestra campos ausentes o bytes sobrantes en `Global`, o aparecen "evento con discriminador desconocido" / "campos del IDL ausentes" al decodificar tx recientes. Desde el 2026-10-22, `verify` falla en ese caso y los `TradeEvent` con bytes de más se avisan. Procedimiento tras cada despliegue: sección 6.
 - Casos reales de `SetCreatorEvent` (no observados aún, ver 5.2). `MigrateBondingCurveCreatorEvent` ya observado (2026-09-28).
 
 ---

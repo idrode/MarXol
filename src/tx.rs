@@ -16,6 +16,47 @@ use solana_transaction_status_client_types::{
     EncodedConfirmedTransactionWithStatusMeta, EncodedTransaction, UiInstruction, UiMessage, UiTransactionEncoding,
 };
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+/// Cuenta los `TradeEvent` con más bytes de los que describe el IDL (campos
+/// añadidos al final por un despliegue posterior). No es un error: el prefijo
+/// se decodifica igual y lo que sobra se ignora. Se avisa una sola vez por
+/// ejecución, con la longitud observada.
+pub struct ExtraBytes {
+    count: AtomicU64,
+    warned: AtomicBool,
+}
+
+impl ExtraBytes {
+    pub const fn new() -> Self {
+        ExtraBytes { count: AtomicU64::new(0), warned: AtomicBool::new(false) }
+    }
+
+    /// Cuenta un evento de `len` bytes con `extra` sin describir; devuelve la
+    /// línea de aviso solo la primera vez.
+    pub fn observe(&self, len: usize, extra: usize) -> Option<String> {
+        self.count.fetch_add(1, Ordering::Relaxed);
+        (!self.warned.swap(true, Ordering::Relaxed)).then(|| {
+            format!(
+                "aviso: TradeEvent de {len} bytes, {extra} más de los {} que describe el IDL embebido; se ignoran \
+                 (campos añadidos por un despliegue posterior: revisar idl/pump.json). Se avisa una vez por ejecución",
+                len - extra
+            )
+        })
+    }
+
+    pub fn count(&self) -> u64 {
+        self.count.load(Ordering::Relaxed)
+    }
+
+    /// Línea de resumen para el final de la ejecución (`None` si no hubo ninguno).
+    pub fn summary(&self) -> Option<String> {
+        let n = self.count();
+        (n > 0).then(|| format!("aviso: {n} TradeEvent con bytes de más respecto al IDL embebido en esta ejecución"))
+    }
+}
+
+pub static TRADE_EXTRA_BYTES: ExtraBytes = ExtraBytes::new();
 
 #[derive(Debug)]
 pub struct TxEvents {
@@ -94,7 +135,16 @@ pub fn decode_events(idl: &Idl, sig: &str, tx: &EncodedConfirmedTransactionWithS
                 }
                 let data = bs58::decode(&c.data).into_vec().context("inner ix no es base58")?;
                 match idl.decode_event_cpi(&data) {
-                    Some(Ok(ev)) => events.push(ev),
+                    Some(Ok(ev)) => {
+                        if ev.name == "TradeEvent" && ev.trailing_bytes > 0 {
+                            // Datos de evento sin el prefijo de emit_cpi! ni el discriminador.
+                            let len = data.len().saturating_sub(16);
+                            if let Some(w) = TRADE_EXTRA_BYTES.observe(len, ev.trailing_bytes) {
+                                eprintln!("{w}");
+                            }
+                        }
+                        events.push(ev)
+                    }
                     Some(Err(e)) => decode_errors.push(format!("{e:#}")),
                     None => {}
                 }
@@ -294,6 +344,31 @@ pub mod tests {
         assert_eq!(d.len(), 1);
         assert!(d[0].starts_with("creator_changes") && d[0].contains("migrate_to_sharing"), "{d:?}");
         assert!(!decode(&old_idl(), SWEEP_AND_SHARING).decode_errors.is_empty());
+    }
+
+    #[test]
+    fn aviso_de_bytes_de_mas_una_vez_con_contador() {
+        let w = ExtraBytes::new();
+        assert!(w.summary().is_none());
+        let first = w.observe(383, 8).unwrap();
+        assert!(first.contains("383 bytes, 8 más de los 375"), "{first}");
+        assert!(w.observe(382, 8).is_none() && w.observe(383, 8).is_none());
+        assert_eq!(w.count(), 3);
+        assert!(w.summary().unwrap().contains("3 TradeEvent"));
+    }
+
+    #[test]
+    fn trade_event_con_bytes_de_mas_se_cuenta_sin_error() {
+        let before = TRADE_EXTRA_BYTES.count();
+        let t = decode(&Idl::pump().unwrap(), SELL_V2);
+        assert!(t.decode_errors.is_empty());
+        assert_eq!(t.events[0].trailing_bytes, 8);
+        // Otros tests pueden decodificar a la vez: solo se comprueba que sube.
+        assert!(TRADE_EXTRA_BYTES.count() > before);
+        // Los históricos de V1–V3 no tienen bytes de más.
+        for sig in HISTORICAL {
+            assert!(decode(&Idl::pump().unwrap(), sig).events.iter().all(|e| e.trailing_bytes == 0), "{sig}");
+        }
     }
 
     #[test]

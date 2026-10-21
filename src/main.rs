@@ -13,7 +13,7 @@ mod store;
 mod tx;
 mod v3;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use idl::{Decoded, Idl};
 use pump::{Graduation, LAMPORTS_PER_SOL};
@@ -584,6 +584,9 @@ fn check_cmd(
         // El consumo se registra también si la lectura falla.
         store::Store::open(db)?.record_rpc_usage("check", &budget, 1, now)?;
         eprintln!("consumo: {}", budget.summary());
+        if let Some(w) = tx::TRADE_EXTRA_BYTES.summary() {
+            eprintln!("{w}");
+        }
         match fetched? {
             check::Fetched::Data(st) => check::evaluate(&st, &mint, Some(now))?,
             check::Fetched::TooCostly(reason) => check::Report::not_evaluable(&mint, reason),
@@ -714,6 +717,9 @@ fn with_budget(
     let r = f(st, &mut tokens);
     st.record_rpc_usage(command, budget, tokens, unix_now())?;
     eprintln!("consumo de esta ejecución: {}", budget.summary());
+    if let Some(w) = tx::TRADE_EXTRA_BYTES.summary() {
+        eprintln!("{w}");
+    }
     for (prov, gt, gs, units) in st.rpc_usage_totals()? {
         eprintln!("acumulado {prov}: {gt} getTransaction, {gs} getSignaturesForAddress, {units} unidades");
     }
@@ -2327,14 +2333,35 @@ fn verify(rpc: &RpcClient, idl: &Idl) -> Result<()> {
     println!("      mint-authority PDA = {} (para `index --address`)", pump::mint_authority_pda());
 
     let g = read_account(rpc, idl, pump::GLOBAL_PDA)?;
+    let exact = global_exact(&g);
     println!(
         "[{}] Global decodificado ({} campos, faltan {:?}, {} bytes sobrantes)",
-        ok(g.missing.is_empty()),
+        ok(exact.is_ok()),
         g.fields.len(),
         g.missing,
         g.trailing_bytes
     );
     print_graduation(&Graduation::from_global(&g)?);
+    exact
+}
+
+/// `Global` tiene que decodificar exactamente con el IDL embebido. Si sobran
+/// bytes, el programa desplegado tiene campos que el IDL no describe (IDL
+/// desactualizado); si faltan campos, el IDL es más nuevo que la cuenta.
+fn global_exact(g: &Decoded) -> Result<()> {
+    if g.trailing_bytes > 0 {
+        bail!(
+            "Global tiene {} bytes que el IDL embebido no describe: el programa desplegado es más nuevo que \
+             idl/pump.json. Actualizar el IDL (y verificarlo) antes de fiarse de la decodificación",
+            g.trailing_bytes
+        );
+    }
+    if !g.missing.is_empty() {
+        bail!(
+            "a Global le faltan campos del IDL embebido {:?}: el IDL es más nuevo que la cuenta desplegada",
+            g.missing
+        );
+    }
     Ok(())
 }
 
@@ -2393,5 +2420,31 @@ fn print_tx(t: &tx::TxEvents, filter: Option<&[String]>, json: bool) {
     }
     for err in &t.decode_errors {
         println!("  ERROR decodificando evento: {err}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn global(trailing_bytes: usize, missing: &[&str]) -> Decoded {
+        let mut fields = serde_json::Map::new();
+        fields.insert("initialized".into(), true.into());
+        Decoded {
+            name: "Global".into(),
+            fields,
+            missing: missing.iter().map(|s| s.to_string()).collect(),
+            trailing_bytes,
+        }
+    }
+
+    #[test]
+    fn verify_exige_que_global_decodifique_exacto() {
+        assert!(global_exact(&global(0, &[])).is_ok());
+        // Lo que pasó con el IDL del 2026-09-28: 1 byte sobrante (max_curve_depth).
+        let e = format!("{:#}", global_exact(&global(1, &[])).unwrap_err());
+        assert!(e.contains("1 bytes que el IDL embebido no describe") && e.contains("idl/pump.json"), "{e}");
+        let e = format!("{:#}", global_exact(&global(0, &["max_curve_depth"])).unwrap_err());
+        assert!(e.contains("max_curve_depth"), "{e}");
     }
 }
