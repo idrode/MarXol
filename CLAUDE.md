@@ -1167,6 +1167,17 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
    **Cota superior de rentabilidad (2026-10-21) — post hoc, sin pre-registro, optimista a propósito** (`scripts/madurez_cota.py` → `resultados/madurez_cota.txt`; mismo universo y rejilla que `madurez_explora.py`). Reglas: entrada al cierre con 0 o 1 h de retraso, TP +50/+100 %, stop −20/−40 %/ninguno, 7 d, comisión 0.5/2.5 %; sin deslizamiento. 48 combinaciones en total.
    - **Las 48 medianas netas son negativas** (todas ≤ −17.1 %) y ningún IC de la mediana queda por encima de 0. La cota superior de la mediana es negativa. Tasa de acierto 20–45 %.
    - Medias netas de −7.6 % a +6.3 %. Solo 1 de 48 tiene el IC de la media por encima de 0 (≥ 5 000, 1 h, +50/−20 %, 0.5 %: +6.3 % [+0.7, +11.7]). Es compatible con comparaciones múltiples y depende de colas de pocos tokens. Sin liquidez histórica no se puede estimar el deslizamiento, así que no se da por válido.
+   **`marxol check <mint>` (2026-10-21) — herramienta, no análisis; sin pre-registro nuevo**. Aplica D2 a un token: T_entry2, H4', H6' y H7' con las funciones congeladas (`entry2::compute`, `v3::d2`), sin cambiarlas.
+   - **Verificado sin red**:
+     - Sobre los 933 tokens de V1, V2 y V3, el veredicto coincide con el D2 calculado como en `entry2`: 213 EVITAR, 479 SIN BANDERAS y 241 NO EVALUABLE (todos por no tener T_entry2), con mayhem incluidos.
+     - Reconstruyendo sus transacciones como fixtures y pasándolas por el mismo camino que la descarga, el resultado coincide campo a campo.
+     - Contra `entry2 --tramo validacion3 --check --json`: 158/158 iguales.
+     - Las salidas de `entry2` (V1, V2, V3 y piloto) siguen idénticas byte a byte.
+   - **Pendiente**: la descarga en vivo no se ha ejecutado contra la cadena. Hay que probarla con un token reciente antes de fiarse del coste y de la detección de la creación (la tx exitosa más antigua de la curva).
+   - **Casos que el pre-registro no cubre**:
+     - Evaluar con la ventana de 5 min aún abierta: se da veredicto si ya hay T_entry2, porque las banderas solo usan trades anteriores.
+     - Tokens antiguos o muy activos: el listado hasta la creación agota el tope y no hay veredicto.
+     - Datos a commitment `confirmed` en tiempo real, frente a descargas días después en las validaciones.
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.
 
 ---
@@ -1189,6 +1200,7 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
 | `marxol h1b [--variant v1\|h1c]` | Calcula H1b en 1 h (graduación, pump sostenido) y la cruza con la variante de H1: tablas 2×2, test exacto de Fisher, odds ratio con IC 95 %, pump-y-caída por grupo y criterio (a) de H1c |
 | `marxol entry` | T_entry (primer trade con precio ≥ 1.5× el inicial en 5 min, en orden de ejecución) e indicadores previos H4–H7, cruzados con pump-y-caída en 1 h: tablas 2×2 con y sin `CRHnzej9…`, veredicto del criterio pre-registrado y distribuciones. Sin RPC |
 | `marxol entry2 [--check] [--tramo validacion\|validacion2\|piloto] [--replica]` | Validación congelada (sección 8): T_entry2, H4', H5, H6', H7', H8 contra pump-y-caída en 1 h (Fisher, criterio congelado, sin el token de mayor peso) y retorno neto desde T_entry2 a +10/+30/+60 min (Mann-Whitney). `--check` solo cuenta grupos, sin resultado. Sin `--check`, se niega a usar el piloto. Con `--tramo validacion2` (o `--replica` sobre `validacion`, solo como comprobación), aplica el criterio de réplica de la validación 2: tres poblaciones, H4'–H8 y H10, retornos (a)/(b) y filtros A/B/C con bootstrap. Sin RPC |
+| `marxol check <mint\|URL> [--offline] [--provider P] [--max-rps R] [--max-requests K ≤ 400]` | Comprobación previa con D2 (validación 3). Lista la bonding curve hasta la creación, pide las tx de la ventana temprana y las ingiere en una base en memoria con `Store::ingest`, como `windows`. Calcula T_entry2, H4', H6' y H7' con `entry2::compute` y D2 con `v3::d2`, sin tocar las definiciones. Veredicto `EVITAR` / `SIN BANDERAS DE D2` / `NO EVALUABLE`, con aviso de mayhem y avisos fijos. Tope de 400 peticiones (16 000 CU), registradas en `rpc_usage`. Sale con 0 si hay veredicto, 3 si no es evaluable y 1 si falla la lectura. `--offline` evalúa con `--db` en solo lectura (`src/check.rs`) |
 | `marxol operator <creator>` | Informe de un operador sobre lo indexado |
 | `marxol stats` | Recuento de filas |
 

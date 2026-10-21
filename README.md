@@ -32,6 +32,31 @@ marxol stats                         # recuento de filas de la base local
 
 Añade `--json` para salida en JSON, o `--rpc <url>` para usar un proveedor propio (por defecto, RPC público de Solana).
 
+### Comprobación previa de un token: `marxol check`
+
+Aplica el filtro de descarte **D2** de la validación 3: ≥ 2 de H4' (el creador vendió), H6' (curva llenada ≥ 13.65 %) y H7' (≥ 1 wallet 1 compra + 1 venta), evaluadas con los trades anteriores a T_entry2 y con las definiciones congeladas de `CLAUDE.md` sección 8. Lee la cadena en solo lectura: la bonding curve hasta la creación y las transacciones de los 5 primeros minutos. Tiene un tope de 400 peticiones por llamada (16 000 CU en Alchemy); el consumo se guarda en `rpc_usage`.
+
+```
+marxol --rpc <url> check https://pump.fun/coin/<mint> --provider alchemy
+marxol check <mint> --offline        # sin red, con los datos ya descargados en marxol.db
+```
+
+```
+VEREDICTO: EVITAR  (D2: 2 de 3 banderas; descarta con 2 o más)
+  H4' el creador vendió:            SÍ  (0.48 % del supply vendido por identidades de creador)
+  H6' curva llenada ≥ 13.65 %:      no  (0.04 % de las reservas reales de token vendidas)
+  H7' wallets 1 compra + 1 venta ≥ 1: SÍ  (wallets ajenas al creador con 1 + 1: 1)
+```
+
+- **Veredictos**: `EVITAR` (D2 descarta), `SIN BANDERAS DE D2` (pasa) y `NO EVALUABLE`. Este último sale cuando no hay T_entry2, cuando el token es demasiado antiguo o activo para el tope, o cuando H6' es n/e y solo se cumple una de H4'/H7'.
+- **Código de salida**: 0 con veredicto, 3 si no es evaluable y 1 si falla la lectura.
+- **Avisos**:
+  - D2 solo descarta; no hay veredicto de compra.
+  - Los tokens que pasan D2 siguieron con retorno mediano negativo en las validaciones (−5.6 % a +30 min en la validación 3).
+  - En los tokens mayhem, D2 casi no actúa y su retorno medido es peor.
+  - Está validado en tres franjas de 8 minutos.
+  - No es consejo financiero.
+
 ## Configuración
 
 ```

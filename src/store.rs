@@ -225,6 +225,17 @@ pub struct Ingested {
 /// Ventana temprana de H1 en segundos (CLAUDE.md 8, valor [P]).
 pub const EARLY_WINDOW_SECS: i64 = crate::h1::PARAMS_V1.window_secs;
 
+/// Creación de un mint tal como la guarda `ingest` (`marxol check`).
+pub struct CreationInfo {
+    pub t0: i64,
+    pub slot: u64,
+    pub creator: String,
+    pub payer: String,
+    pub mayhem: bool,
+    pub bonding_curve: String,
+    pub quote_mint: Option<String>,
+}
+
 /// Todo lo que necesitan `entry2::compute` y el resultado primario de un
 /// token con ventana temprana completa.
 pub struct Entry2Input {
@@ -276,6 +287,19 @@ impl Store {
             }
         }
         Ok(Store { db })
+    }
+
+    /// Abre una base existente en solo lectura, sin crear ni migrar el
+    /// esquema (`check --offline` y los tests contra `marxol.db`).
+    pub fn open_readonly(path: &str) -> Result<Self> {
+        let db = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .with_context(|| format!("abriendo {path} en solo lectura"))?;
+        Ok(Store { db })
+    }
+
+    #[cfg(test)]
+    pub fn conn(&self) -> &Connection {
+        &self.db
     }
 
     /// Creaciones con slot en `[lo, hi]`, ordenadas por (slot, mint):
@@ -641,6 +665,52 @@ impl Store {
     /// `creator` original del `CreateEvent` (identidad de operador).
     pub fn creation_creator(&self, mint: &str) -> Result<String> {
         Ok(self.db.query_row("SELECT creator FROM creations WHERE mint = ?1", [mint], |r| r.get(0))?)
+    }
+
+    /// Datos de la creación que usa `marxol check`; `None` si el mint no está.
+    pub fn creation_info(&self, mint: &str) -> Result<Option<CreationInfo>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT timestamp, slot, creator, user, COALESCE(is_mayhem_mode, 0), bonding_curve, quote_mint
+                 FROM creations WHERE mint = ?1",
+                [mint],
+                |r| {
+                    Ok(CreationInfo {
+                        t0: r.get(0)?,
+                        slot: r.get::<_, i64>(1)? as u64,
+                        creator: r.get(2)?,
+                        payer: r.get(3)?,
+                        mayhem: r.get(4)?,
+                        bonding_curve: r.get(5)?,
+                        quote_mint: r.get(6)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
+    /// Reservas virtuales (quote, token) del `CreateEvent` (punto de precio
+    /// `create`), las mismas que usa `entry2_inputs`.
+    pub fn creation_initial(&self, mint: &str) -> Result<Option<(u64, u64)>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT quote_reserves, token_reserves FROM price_points WHERE mint = ?1 AND kind = 'create'
+                 ORDER BY timestamp, slot LIMIT 1",
+                [mint],
+                |r| Ok((r.get::<_, i64>(0)? as u64, r.get::<_, i64>(1)? as u64)),
+            )
+            .optional()?)
+    }
+
+    /// La ventana temprana del mint se descargó completa (`trade_windows`).
+    pub fn window_complete(&self, mint: &str) -> Result<bool> {
+        Ok(self
+            .db
+            .query_row("SELECT complete FROM trade_windows WHERE mint = ?1", [mint], |r| r.get::<_, bool>(0))
+            .optional()?
+            .unwrap_or(false))
     }
 
     pub fn creation_slot(&self, mint: &str) -> Result<u64> {

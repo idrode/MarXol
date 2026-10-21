@@ -1,5 +1,6 @@
 //! marXol — CLI de búsqueda y análisis on-chain de operadores de pump.fun.
 
+mod check;
 mod entry;
 mod entry2;
 mod h1;
@@ -183,6 +184,20 @@ enum Cmd {
         #[arg(long)]
         d2_prueba: bool,
     },
+    /// Comprobación previa de un token con el filtro de descarte D2
+    /// (validación 3): T_entry2, H4', H6', H7' con las definiciones congeladas.
+    /// Lee la cadena (solo lectura), con un tope de 400 peticiones. Salida 0
+    /// con veredicto, 3 si no es evaluable, 1 si falla la lectura.
+    Check {
+        /// Dirección del mint o URL de pump.fun que la contenga.
+        mint: String,
+        /// No usa la red: evalúa con los datos ya descargados en --db
+        /// (ventana temprana completa), en solo lectura.
+        #[arg(long)]
+        offline: bool,
+        #[command(flatten)]
+        rate: RateArgs,
+    },
     /// Informe de un operador (identidad = campo `creator`, no el payer).
     Operator { creator: String },
     /// Recuento de filas de la base local.
@@ -261,6 +276,7 @@ fn main() -> Result<()> {
             }
             entry2_report(&st, cli.json, check, &tramo, replica)
         }
+        Cmd::Check { mint, offline, rate } => check_cmd(&rpc, &idl, &cli.db, &cli.rpc, &mint, offline, &rate, cli.json),
         Cmd::Operator { creator } => {
             let st = store::Store::open(&cli.db)?;
             let r = st.operator_report(&creator)?;
@@ -530,6 +546,51 @@ fn index_tramo(
         );
         Ok(())
     })
+}
+
+/// `marxol check`: imprime el informe y sale con 3 si no hay veredicto.
+#[allow(clippy::too_many_arguments)]
+fn check_cmd(
+    rpc: &RpcClient,
+    idl: &Idl,
+    db: &str,
+    rpc_url: &str,
+    mint: &str,
+    offline: bool,
+    rate: &RateArgs,
+    json: bool,
+) -> Result<()> {
+    let mint = check::parse_mint(mint)?.to_string();
+    let report = if offline {
+        let st = store::Store::open_readonly(db)?;
+        anyhow::ensure!(
+            st.window_complete(&mint)?,
+            "{mint}: sin ventana temprana completa en {db} (--offline solo usa datos ya descargados)"
+        );
+        check::evaluate(&st, &mint, None)?
+    } else {
+        let max = rate.max_requests.unwrap_or(check::MAX_REQUESTS);
+        anyhow::ensure!(max <= check::MAX_REQUESTS, "--max-requests no puede pasar de {}", check::MAX_REQUESTS);
+        let budget = rpc::Budget::new(rpc::Provider::parse(&rate.provider, rpc_url)?, rate.max_rps, Some(max));
+        let now = unix_now();
+        let fetched = check::fetch(rpc, idl, &budget, &Pubkey::from_str(&mint)?);
+        // El consumo se registra también si la lectura falla.
+        store::Store::open(db)?.record_rpc_usage("check", &budget, 1, now)?;
+        eprintln!("consumo: {}", budget.summary());
+        match fetched? {
+            check::Fetched::Data(st) => check::evaluate(&st, &mint, Some(now))?,
+            check::Fetched::TooCostly(reason) => check::Report::not_evaluable(&mint, reason),
+        }
+    };
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        print!("{}", check::render(&report));
+    }
+    if report.verdict == check::NO_EVALUABLE {
+        std::process::exit(3);
+    }
+    Ok(())
 }
 
 fn unix_now() -> i64 {
