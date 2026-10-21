@@ -1173,7 +1173,15 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
      - Reconstruyendo sus transacciones como fixtures y pasándolas por el mismo camino que la descarga, el resultado coincide campo a campo.
      - Contra `entry2 --tramo validacion3 --check --json`: 158/158 iguales.
      - Las salidas de `entry2` (V1, V2, V3 y piloto) siguen idénticas byte a byte.
-   - **Pendiente**: la descarga en vivo no se ha ejecutado contra la cadena. Hay que probarla con un token reciente antes de fiarse del coste y de la detección de la creación (la tx exitosa más antigua de la curva).
+   - **Prueba en vivo (2026-10-21, Alchemy)**: 6 tokens de V3 inactivos (2 EVITAR, 2 SIN BANDERAS, 1 mayhem y 1 sin T_entry2, este con 1 firma fallida en la curva).
+     - El veredicto y el informe JSON coinciden **campo a campo** con `--offline`, 20 días después de la creación.
+     - La creación se detectó bien en los 6.
+     - Coste: 120–760 CU por token, media 333.
+     - El graduado más activo de V3 (`BsaissLq…`) llega a la creación en 10 páginas, pero su ventana tiene 1 659 tx. Da NO EVALUABLE por coste sin pedirlas: 440 CU.
+     - Con `--max-pages 5` corta en 5 páginas (200 CU).
+     - Tras la prueba se añadió `--max-pages` (25 por defecto): antes, el listado podía gastar las 400 peticiones antes de rendirse.
+     - Total de la prueba: 3 000 CU, sondeo incluido.
+   - **Pendiente**: un token recién creado (ventana abierta, commitment `confirmed`) sigue sin probarse.
    - **Casos que el pre-registro no cubre**:
      - Evaluar con la ventana de 5 min aún abierta: se da veredicto si ya hay T_entry2, porque las banderas solo usan trades anteriores.
      - Tokens antiguos o muy activos: el listado hasta la creación agota el tope y no hay veredicto.

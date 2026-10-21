@@ -195,6 +195,10 @@ enum Cmd {
         /// (ventana temprana completa), en solo lectura.
         #[arg(long)]
         offline: bool,
+        /// Páginas de 1 000 firmas que se listan como máximo para llegar a la
+        /// creación; si no bastan, NO EVALUABLE.
+        #[arg(long, default_value_t = check::MAX_SIG_PAGES)]
+        max_pages: usize,
         #[command(flatten)]
         rate: RateArgs,
     },
@@ -276,7 +280,9 @@ fn main() -> Result<()> {
             }
             entry2_report(&st, cli.json, check, &tramo, replica)
         }
-        Cmd::Check { mint, offline, rate } => check_cmd(&rpc, &idl, &cli.db, &cli.rpc, &mint, offline, &rate, cli.json),
+        Cmd::Check { mint, offline, max_pages, rate } => {
+            check_cmd(&rpc, &idl, &cli.db, &cli.rpc, &mint, offline, max_pages, &rate, cli.json)
+        }
         Cmd::Operator { creator } => {
             let st = store::Store::open(&cli.db)?;
             let r = st.operator_report(&creator)?;
@@ -557,6 +563,7 @@ fn check_cmd(
     rpc_url: &str,
     mint: &str,
     offline: bool,
+    max_pages: usize,
     rate: &RateArgs,
     json: bool,
 ) -> Result<()> {
@@ -573,7 +580,7 @@ fn check_cmd(
         anyhow::ensure!(max <= check::MAX_REQUESTS, "--max-requests no puede pasar de {}", check::MAX_REQUESTS);
         let budget = rpc::Budget::new(rpc::Provider::parse(&rate.provider, rpc_url)?, rate.max_rps, Some(max));
         let now = unix_now();
-        let fetched = check::fetch(rpc, idl, &budget, &Pubkey::from_str(&mint)?);
+        let fetched = check::fetch(rpc, idl, &budget, &Pubkey::from_str(&mint)?, max_pages);
         // El consumo se registra también si la lectura falla.
         store::Store::open(db)?.record_rpc_usage("check", &budget, 1, now)?;
         eprintln!("consumo: {}", budget.summary());

@@ -238,6 +238,39 @@ pub fn render(r: &Report) -> String {
     o
 }
 
+/// Páginas de 1 000 firmas que se listan como máximo para llegar a la
+/// creación (`--max-pages`): un token más antiguo o activo no es evaluable.
+pub const MAX_SIG_PAGES: usize = 25;
+
+/// Lista las firmas de la bonding curve página a página (`page(before)`)
+/// hasta llegar a la primera. `Err(motivo)` si pasaría de `max_pages` o del
+/// tope de peticiones: el token no es evaluable y no se gasta más.
+fn list_signatures(
+    budget: &rpc::Budget,
+    max_pages: usize,
+    mut page: impl FnMut(Option<&str>) -> Result<Vec<tx::SigInfo>>,
+) -> Result<std::result::Result<Vec<tx::SigInfo>, String>> {
+    let mut sigs: Vec<tx::SigInfo> = Vec::new();
+    for pages in 0.. {
+        if pages == max_pages || !budget.has_room(1) {
+            return Ok(Err(format!(
+                "listadas {} firmas en {pages} páginas ({} CU) sin llegar a la creación: el token es demasiado \
+                 antiguo o activo para el límite de {max_pages} páginas y {MAX_REQUESTS} peticiones",
+                sigs.len(),
+                budget.units()
+            )));
+        }
+        let before = sigs.last().map(|s| s.signature.clone());
+        let p = page(before.as_deref())?;
+        let last = p.len() < 1000;
+        sigs.extend(p);
+        if last {
+            break;
+        }
+    }
+    Ok(Ok(sigs))
+}
+
 /// Resultado de la descarga: la base en memoria con el token, o el motivo
 /// por el que no se puede evaluar dentro del tope de coste.
 pub enum Fetched {
@@ -249,7 +282,7 @@ pub enum Fetched {
 /// bonding curve hasta la creación y las transacciones de la ventana
 /// temprana (como `windows`). No pasa de `budget`; antes de pedir las
 /// transacciones comprueba que caben.
-pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey) -> Result<Fetched> {
+pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey, max_pages: usize) -> Result<Fetched> {
     let mint_s = mint.to_string();
     let curve = pump::bonding_curve_pda(mint).to_string();
     let too_costly = |what: &str| {
@@ -261,21 +294,13 @@ pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey) ->
     };
 
     // Firmas de la bonding curve, de la más nueva a la más antigua.
-    let mut sigs: Vec<tx::SigInfo> = Vec::new();
-    loop {
-        if !budget.has_room(1) {
-            return Ok(too_costly(&format!("listadas {} firmas sin llegar a la creación", sigs.len())));
-        }
-        let before = sigs.last().map(|s| s.signature.clone());
-        let page = rpc::with_retry(budget, rpc::Method::GetSignatures, || {
-            tx::recent_signatures(rpc, &curve, 1000, before.as_deref())
-        })?;
-        let last = page.len() < 1000;
-        sigs.extend(page);
-        if last {
-            break;
-        }
-    }
+    let page = |before: Option<&str>| {
+        rpc::with_retry(budget, rpc::Method::GetSignatures, || tx::recent_signatures(rpc, &curve, 1000, before))
+    };
+    let sigs = match list_signatures(budget, max_pages, page)? {
+        Ok(s) => s,
+        Err(why) => return Ok(Fetched::TooCostly(why)),
+    };
     if sigs.is_empty() {
         bail!("{mint_s}: la bonding curve {curve} no tiene firmas (¿es un token de pump.fun?)");
     }
@@ -457,6 +482,31 @@ mod tests {
         let r = evaluate(&st, "M", None).unwrap();
         assert_eq!((r.verdict, r.h6, r.mayhem), (NO_EVALUABLE, None, Some(true)));
         assert!(render(&r).contains("TOKEN MAYHEM"));
+    }
+
+    #[test]
+    fn listado_para_al_limite_de_paginas_sin_gastar_mas() {
+        let b = rpc::Budget::new(rpc::ALCHEMY, Some(1000.0), Some(MAX_REQUESTS));
+        let full = |before: Option<&str>| {
+            b.acquire(rpc::Method::GetSignatures)?;
+            let k = before.map_or(0, |s| s[1..].parse::<usize>().unwrap() + 1);
+            Ok((k..k + 1000)
+                .map(|i| tx::SigInfo { signature: format!("s{i}"), failed: false, slot: 0, block_time: None })
+                .collect())
+        };
+        let Err(why) = list_signatures(&b, 3, full).unwrap() else { panic!("debía parar") };
+        assert_eq!(b.get_signatures.get(), 3, "no pide la cuarta página");
+        assert!(why.contains("listadas 3000 firmas en 3 páginas (120 CU)"), "{why}");
+
+        let b = rpc::Budget::new(rpc::ALCHEMY, Some(1000.0), Some(MAX_REQUESTS));
+        let mut n = 0;
+        let short = |_: Option<&str>| {
+            n += 1;
+            let len = if n < 3 { 1000 } else { 7 };
+            Ok((0..len).map(|i| tx::SigInfo { signature: format!("s{n}-{i}"), failed: false, slot: 0, block_time: None }).collect())
+        };
+        let Ok(all) = list_signatures(&b, 3, short).unwrap() else { panic!("la tercera página llega a la creación") };
+        assert_eq!(all.len(), 2007);
     }
 
     #[test]
