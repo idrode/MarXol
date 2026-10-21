@@ -44,4 +44,33 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
      - Evaluar con la ventana de 5 min aún abierta: se da veredicto si ya hay T_entry2, porque las banderas solo usan trades anteriores.
      - Tokens antiguos o muy activos: el listado hasta la creación agota el tope y no hay veredicto.
      - Datos a commitment `confirmed` en tiempo real, frente a descargas días después en las validaciones.
+   **`marxol check` en vivo con tokens recién creados (2026-10-21, Alchemy) — herramienta, sin pre-registro** (`resultados/check_en_vivo_2026-10-21.txt`):
+   - 13 tokens descubiertos con `scan --address <mint-authority>` (~40 CU por creación) y 18 consultas a 22 s, ~1 min, ~5.5 min y ~30 min de edad. Tiempos medidos con una copia instrumentada en el scratchpad; el código del repo no se tocó.
+   - **Latencia**: con veredicto, 0.15–2.3 s, lineal en las tx de la ventana (~50 ms por tx, el ritmo de 20 req/s; red ~32 ms, decodificación ≤ 16 ms, evaluación 0 ms). Basta como aviso si se consulta en cuanto hay T_entry2.
+   - **Ventana abierta**: E9 (`692WB76e…`) dio EVITAR a los 62 s, a los 5.5 min y a los 29 min, con los mismos 42 trades (1 de 1 token activo legible en las tres edades).
+   - **Bloqueante — IDL desactualizado**: 5 de 18 consultas (5 de 8 tokens activos) fallan con un evento de discriminador desconocido `74 2b 4d bd 11 7a 48 2b`, que emiten instrucciones pump.fun que el IDL no conoce (en una tx hay 6 sin ningún `TradeEvent`). Podría ser una variante nueva de trade (sin verificar). `check` se niega a dar veredicto, pero gasta la cuota antes (hasta 4 400 CU). No se ha cambiado ni el IDL ni el código.
+   - `--offline`: ninguno de los 13 mints está en `marxol.db`.
+   - Consumo: **18 080 CU** (check 17 120, scan 800, tx 160).
+   **Señal de creador repetido (2026-10-21) — EXPLORACIÓN POST HOC, SIN PRE-REGISTRO, SIN VEREDICTO** (`scripts/creador_senal_explora.py` → `resultados/creador_senal_explora.txt`, sin red, sobre una copia de `marxol.db`):
+   - Señal S = otra creación del mismo `creator` en la franja con slot < slot de T_entry2. Con un token por creator es degenerada (S_t0 = 0 por construcción), así que se usan todos los tokens con bootstrap por clúster.
+   - Cobertura: S en 84 de 503 comparables sin mayhem (V1 18, V2 57, V3 9; en V3, los 5 que pasan D2 con S son de un solo creator).
+   - Juntas, dentro de los que pasan D2: +1.5 pts (MW unilateral p = 0.11, IC clúster [−1.5, +2.8]). Dentro de los descartados: +8.5 pts (p = 0.08, IC [−6.8, +23.2]). Ningún grupo con mediana positiva; 0 % de los tokens con S tiene retorno > 0 a +30 min.
+   - Lectura: no separa grupos dentro de D2 y no cambia qué token se evita. El informe incluye un borrador de H11-D2, no congelado, con la estimación de coste del historial (≈ 7 000–15 000 CU por franja con firmas del payer ∩ mint-authority).
+   **IDL de pump.fun actualizado (2026-10-21) — herramienta, sin cambio de definiciones** (`resultados/idl_actualizacion_2026-10-21.txt`):
+   - El discriminador `74 2b 4d bd 11 7a 48 2b` es `SweepBondingCurveFeeEvent`, que emiten las instrucciones nuevas `sweep_protocol_fee` y `sweep_creator_fee` al barrer comisiones acumuladas en la curva. **No es un trade**: trae `timestamp, mint, bonding_curve, quote_mint, recipient, amount, bucket`, sin usuario ni reservas.
+   - La cuenta IDL on-chain (`AYgC53tU…`) no se actualiza y es igual al IDL viejo. El vigente es el de GitHub (commit 2026-10-13, sha256 `7616681e…`): 56 instrucciones (9 nuevas, entre ellas `buy_v3`, `sell_v3`, `multi_hop_curve_swap` y los dos `sweep_*`), 32 eventos (4 nuevos, entre ellos `PostCompleteBuyEvent`, una compra sobre una curva completada que no emite `TradeEvent`) y campos añadidos al final en `TradeEvent`, `CreateEvent`, `BondingCurve` y `Global`.
+   - El último despliegue es del 2026-10-19 17:47 UTC (slot 458 921 440). Hubo despliegues el 30-09 21:13 y el 01-10 07:45 UTC, antes de V3. No se ha localizado la primera tx con el evento.
+   - El `TradeEvent` real de hoy lleva 8 bytes más que el IDL de GitHub: un campo sin documentar del despliegue del 18/19-10. Se tolera como bytes sobrantes.
+   - **Impacto en V1–V3: ninguno**:
+     - Las 973 ventanas tempranas y de precio tienen `complete = 1` y `fetch_errors = 0`, y un evento desconocido las habría marcado incompletas.
+     - El encadenado de reservas se completa en 718 de 720 tokens con T_entry2; las 2 roturas son bucles compra/venta del mismo importe, no huecos.
+   - Cambios:
+     - `idl/pump.json` ← GitHub. `verify`: `Global` con 30 campos y 0 bytes sobrantes; antes, 1 sobrante.
+     - `tx::decode_events` separado de `fetch_events`.
+     - `check` lee la ventana con `ingest_window`: para en la primera tx no decodificable y el error dice el discriminador.
+     - 6 tests nuevos con 22 tx reales en `tests/fixtures/` (66 en verde).
+   - Salidas de `entry2`, `entry`, `h1`, `h1b`, `check --offline` (973 tokens) y scripts post hoc: **idénticas byte a byte** antes y después (61 ficheros).
+   - En vivo: `4mekvGzn…`, que antes fallaba, da SIN BANDERAS DE D2 con la ventana completa.
+   - Consumo: ≈ 3 300 CU (cota superior).
+   - Fallo previo y ajeno: `scripts/cribado_posthoc.py` falla con los datos de V3 (pump-y-caída n/e), con los dos binarios.
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.

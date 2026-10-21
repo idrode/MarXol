@@ -314,7 +314,12 @@ pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey, ma
         }
         let t = rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, &s.signature))?;
         if t.events.iter().any(|e| e.name == "CreateEvent" && e.str("mint") == Some(&mint_s)) {
-            anyhow::ensure!(t.decode_errors.is_empty(), "{}: errores de decodificación en la creación", s.signature);
+            anyhow::ensure!(
+                t.decode_errors.is_empty(),
+                "{}: errores de decodificación en la creación: {}",
+                s.signature,
+                t.decode_errors.join("; ")
+            );
             st.ingest(&t)?;
             st.ingest_prices(&t, store::EARLY_WINDOW_SECS)?;
             creation = Some(s.signature.clone());
@@ -339,17 +344,43 @@ pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey, ma
             budget.requests()
         )));
     }
-    for sig in window {
-        let t = match rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig)) {
+    let get = |sig: &str| rpc::with_retry(budget, rpc::Method::GetTransaction, || tx::fetch_events(rpc, idl, sig));
+    if let Some(why) = ingest_window(&mut st, budget, &window, get)? {
+        return Ok(too_costly(&why));
+    }
+    Ok(Fetched::Data(st))
+}
+
+/// Pide e ingiere las transacciones de la ventana temprana con `get`, en el
+/// orden de `window`. Para en la primera con eventos que el IDL no decodifica
+/// (sin pedir ninguna más) y devuelve el error con sus discriminadores: un
+/// evento desconocido podría ser un trade, y sin él la lectura no es completa.
+/// `Some(motivo)` si se agota el tope de peticiones con reintentos.
+fn ingest_window(
+    st: &mut Store,
+    budget: &rpc::Budget,
+    window: &[&str],
+    mut get: impl FnMut(&str) -> Result<tx::TxEvents>,
+) -> Result<Option<String>> {
+    for (i, &sig) in window.iter().enumerate() {
+        let t = match get(sig) {
             Ok(t) => t,
-            Err(e) if !budget.has_room(1) => return Ok(too_costly(&format!("tope alcanzado con reintentos ({e:#})"))),
+            Err(e) if !budget.has_room(1) => return Ok(Some(format!("tope alcanzado con reintentos ({e:#})"))),
             Err(e) => return Err(e),
         };
-        anyhow::ensure!(t.decode_errors.is_empty(), "{sig}: errores de decodificación: lectura incompleta");
+        if !t.decode_errors.is_empty() {
+            bail!(
+                "{sig}: lectura incompleta, se para sin pedir las {} transacciones restantes de la ventana \
+                 ({} peticiones usadas): {}",
+                window.len() - i - 1,
+                budget.requests(),
+                t.decode_errors.join("; ")
+            );
+        }
         st.ingest(&t)?;
         st.ingest_prices(&t, store::EARLY_WINDOW_SECS)?;
     }
-    Ok(Fetched::Data(st))
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -424,6 +455,31 @@ mod tests {
     }
 
     const G: u64 = 1_000_000_000_000; // 0.1 % del supply
+
+    #[test]
+    fn ventana_para_en_el_primer_evento_no_decodificable() {
+        use crate::tx::tests::{decode, old_idl, BUY_V2, SELL_V2, SWEEPS};
+        let window = [BUY_V2, SWEEPS, SELL_V2];
+        let budget = rpc::Budget::new(rpc::ALCHEMY, Some(1e6), Some(MAX_REQUESTS));
+        for (idl, decodes) in [(old_idl(), false), (Idl::pump().unwrap(), true)] {
+            let mut st = Store::open(":memory:").unwrap();
+            let mut asked = Vec::new();
+            let r = ingest_window(&mut st, &budget, &window, |sig| {
+                asked.push(sig.to_string());
+                Ok(decode(&idl, sig))
+            });
+            if decodes {
+                assert!(r.unwrap().is_none());
+                assert_eq!(asked, window);
+            } else {
+                // Con el IDL anterior, el barrido no se decodifica: para ahí y no pide el sell.
+                let e = format!("{:#}", r.unwrap_err());
+                assert_eq!(asked, [BUY_V2, SWEEPS]);
+                assert!(e.starts_with(SWEEPS) && e.contains("1 transacciones restantes"), "{e}");
+                assert!(e.contains("[74, 2b, 4d, bd, 11, 7a, 48, 2b]"), "{e}");
+            }
+        }
+    }
 
     #[test]
     fn acepta_mint_y_url() {

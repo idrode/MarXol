@@ -1,0 +1,181 @@
+ACTUALIZACIÓN DEL IDL DE PUMP.FUN — 2026-10-21
+Herramienta, no análisis. No cambia ninguna definición congelada ni ningún resultado de V1/V2/V3.
+Motivo: en la prueba en vivo de `marxol check` (resultados/check_en_vivo_2026-10-21.txt), 5 de 18
+consultas fallaron por un evento con discriminador 74 2b 4d bd 11 7a 48 2b desconocido para el IDL.
+
+====================================================================================================
+1. DIAGNÓSTICO
+====================================================================================================
+
+a) Fuentes del IDL
+- Cuenta IDL de Anchor on-chain: AYgC53tU5BbP2NAnv5nConJxAdpQZctvmZK88pu69xRs
+  (create_with_seed(find_program_address([], programa), "anchor:idl", programa)), 18 938 bytes,
+  12 801 de datos zlib. Descomprimida es IGUAL como JSON a idl/pump.json anterior (47 instrucciones,
+  28 eventos, 42 tipos). La cuenta IDL on-chain NO se actualiza con los despliegues: no sirve como
+  fuente vigente.
+- IDL oficial de GitHub (pump-fun/pump-public-docs, idl/pump.json, descargado 2026-10-21):
+  sha256 7616681e…88d980997207, 56 instrucciones, 7 cuentas, 32 eventos, 47 tipos. Commits que
+  tocan el archivo después de la copia local (sha256 ffe966c4…c8b56064b, descargada 2026-09-28):
+  2026-10-07 "v3 / v2 trades, multi-hop swap, pump coins as quote mints, fee sweeps", 2026-10-08,
+  2026-10-13 "depth 2 pump coin quotes".
+- Todos los discriminadores de eventos cumplen sha256("event:<Nombre>")[..8].
+
+Cambios del IDL local (2026-09-28) al de GitHub (2026-10-13):
+- Instrucciones nuevas (9), con discriminador:
+    buy_v3                           07051dc4f5176550   (args: amount, max_sol_cost, partial_fill)
+    sell_v3                          1c92de7726c469d5   (amount, min_sol_output)
+    buy_exact_quote_in_v3            e1f7501ed5b38488   (spendable_quote_in, min_tokens_out, partial_fill)
+    multi_hop_curve_swap             e19a7516d756f667   (amount_in, hop_fees)
+    sweep_creator_fee                20f6bf3408c949ba
+    sweep_protocol_fee               0830be07b644b7e5
+    set_max_curve_depth              209a98db8e6cdaa5
+    set_quote_control_mint_reserves  74dc6b53bf2c2049
+    set_quote_control_reserves_admin a1c3dea5e165c03e
+- Instrucciones cambiadas (mismo discriminador y cuentas, arg nuevo `partial_fill` al final):
+  buy, buy_v2, buy_exact_sol_in, buy_exact_quote_in_v2. create_v2: solo docs/metadatos.
+- Eventos nuevos (4):
+    SweepBondingCurveFeeEvent         742b4dbd117a482b
+    PostCompleteBuyEvent              6fb06d8b316cd5fb
+    SetQuoteControlMintReservesEvent  a943276d6686b6e8
+    SetQuoteControlReservesAdminEvent 43fbb3b6575ca921
+- Tipos cambiados: todos con campos añadidos AL FINAL (prefijo idéntico), salvo QuoteControl:
+    TradeEvent   +creator_fee_unclaimed (u64)
+    CreateEvent  +depth (u8)
+    BondingCurve +creator_fee, protocol_fees, depth, initial_virtual_quote_reserves,
+                  post_complete_base_out, post_complete_quote_in
+    Global       +max_curve_depth (u8)
+    QuoteControl reordena: reserves_admin (pubkey) sustituye a parte de _reserved. marXol no lo usa.
+- 16 errores nuevos (multi-hop, quote chains, CreatorFeesNotSwept…).
+
+b) El evento 74 2b 4d bd 11 7a 48 2b = SweepBondingCurveFeeEvent. NO es un trade.
+- Lo emiten las instrucciones nuevas sweep_protocol_fee (bucket 0) y sweep_creator_fee (bucket 1):
+  barren hacia un destinatario las comisiones que ahora se acumulan en la propia bonding curve
+  (campos nuevos BondingCurve.creator_fee / protocol_fees).
+- Campos: timestamp (i64), mint, bonding_curve, quote_mint, recipient (pubkey), amount (u64), bucket (u8).
+  No trae usuario, importes de token ni reservas: no permite calcular precio ni volumen.
+- Tx de ejemplo 4jWiadyg…z7jw (slot 459 767 093, 2026-10-21 20:38:33 UTC, firmante
+  FHpcNSe6…, un crank que firma ~1 000 tx cada 2 min): 6 instrucciones, 3 tokens × (protocolo +
+  creador), sin ningún TradeEvent. Por ejemplo, mint 4mekvGzn…: protocolo 20 185 443 lamports
+  → 9rPYyANs…, creador 536 530 → 37qozS94….
+- Otra tx (3C3JbTdW…, token ADMJhN7N…): sweep_creator_fee seguido de la migración a fee sharing
+  (MigrateBondingCurveCreatorEvent) y DistributeCreatorFeesEvent, vía el programa pfeeUxB6….
+- Ojo con PostCompleteBuyEvent: es una compra sobre una curva ya completada que NO emite
+  TradeEvent (trae base_out, quote_in, comisiones y reservas de pool antes/después). No afecta a
+  las ventanas, que son n/e a partir del completado, pero un indexador de precio posterior al
+  completado tendría que leerlo. No se ha observado en la muestra.
+- buy_v3, sell_v3 y multi_hop_curve_swap no aparecen en la muestra (6 tx de un token activo de
+  hoy: buy_v2 y sell_v2 con TradeEvent, collect_creator_fee_v2, routers externos). No está
+  verificado que emitan TradeEvent, aunque es lo esperable.
+
+c) Fechas
+- ProgramData B5MvUwXd…2BQu: último despliegue en el slot 458 921 440 (2026-10-19 17:47 UTC).
+  Historial de firmas sobre ProgramData (despliegues y operaciones del loader), alrededor de las franjas:
+    2026-09-23 14:45  slot 449 734 335
+    2026-09-30 21:13  slot 452 082 198   ← entre V2 y V3
+    2026-10-01 07:45  slot 452 224 060   ← 75 min antes de V3 (slot 452 240 867)
+    2026-10-01 15:55–22:11 (6 más)        ← después de la ventana de precios de V3 (≤ 10:10 UTC)
+    2026-10-02 15:47, 10-08 16:20, 10-13 15:40, 10-18 (26, varias fallidas), 10-19 15:46 y 17:47
+- Primera tx con el discriminador: NO localizada. Buscarla exige recorrer el historial del crank
+  (~1 000 firmas cada 2 min) o de muchas curvas. Cotas: no aparece en ninguna tx de V1–V3 (punto 2);
+  sí aparece el 2026-10-21. La documentación pública de los barridos es del 2026-10-07, así que lo
+  probable es que llegara en uno de los despliegues del 2026-10-08 o posteriores (sin verificar).
+- Franjas:
+    V1 (+ piloto)  2026-09-28 14:03–14:11 UTC, slots 451 340 255–451 342 089
+    V2             2026-09-30 01:00–01:07,     slots 451 810 013–451 811 800
+    V3 (+ margen)  2026-10-01 09:00–09:09,     slots 452 240 867–452 243 116
+    madurez (fase 0b)  migraciones del 2026-08-20, slots 440 364 891–440 572 500. Las velas de
+                   GeckoTerminal y los saldos de pools de PumpSwap (slot ~459.4 M) no se decodifican
+                   con el IDL de pump: no les afecta.
+- Hallazgo adicional: el TradeEvent real del 2026-10-21 tiene 8 bytes más que el IDL de GitHub
+  (16 con el IDL anterior). El despliegue del 18/19-10 añadió otro campo que todavía no está
+  documentado. El decodificador lo tolera como bytes sobrantes, igual que antes con
+  creator_fee_unclaimed: no se lee ni se inventa su nombre.
+
+====================================================================================================
+2. IMPACTO EN V1–V3 — CONCLUSIÓN: NO. Las validaciones V1–V3 no pudieron perder trades por esto.
+====================================================================================================
+Las tx crudas no se guardan (solo los eventos ya decodificados), pero la evidencia es directa:
+1. Cualquier evento con discriminador desconocido produce decode_errors, y en `windows`/`prices`
+   eso cuenta como error: la ventana queda con complete = 0 y la firma no se marca en
+   fetched_sigs. En marxol.db (solo lectura), las 973 ventanas tempranas de V1 (+piloto), V2 y V3
+   y sus 973 ventanas de precio tienen complete = 1 y fetch_errors = 0 (60 425 + 169 283 + 41 012
+   firmas en ventana; descargas hasta el 2026-10-08, ya con el IDL viejo). Ninguna tx de esas
+   franjas trajo un evento desconocido.
+2. El evento nuevo ni siquiera es un trade (punto 1b).
+3. Comprobación independiente de trades sin evento: el orden reconstruido encadenando reservas
+   (entry::execution_order) se completa en 718 de 720 tokens con T_entry2 (piloto 28, V1 251,
+   V2 283 y V3 158).
+   Si faltara un trade, la cadena se rompería. Las 2 roturas (DWJzFDAx…, V2 mayhem; DEw2J9mT…,
+   V3) son bucles de compra y venta del mismo importe que devuelven las reservas a un estado ya
+   visto: el encadenado voraz toma la otra rama. No hay ningún hueco de reservas.
+4. Los despliegues del 30-09 21:13 y del 01-10 07:45 son anteriores a V3, pero en sus datos no
+   aparece ningún evento desconocido (punto 1).
+Riesgo residual: un trade de una instrucción que no emitiera ningún evento sería invisible por
+diseño (también antes). Para las ventanas lo cubre el punto 3.
+
+====================================================================================================
+3. CORRECCIÓN
+====================================================================================================
+- idl/pump.json ← IDL oficial de GitHub del 2026-10-13 (sha256 7616681e…). Verificado contra la
+  cadena: `marxol verify` decodifica Global con 30 campos, 0 faltantes y 0 bytes sobrantes (con el
+  IDL anterior: 29 campos y 1 byte sobrante, que verify daba por OK). Una BondingCurve viva
+  (692WB76e…) decodifica sus 19 campos sin faltantes ni sobrantes. Las tx de ejemplo decodifican
+  sin errores. Única diferencia conocida con lo desplegado: los 8 bytes finales del TradeEvent
+  (punto 1c).
+- El decodificador es genérico, así que el evento nuevo se decodifica sin escribir código para él.
+- src/tx.rs: `decode_events` separado de `fetch_events` (misma lógica) para probar con
+  transacciones guardadas.
+- src/check.rs: la ventana se lee con `ingest_window`. Para en la primera tx con un evento no
+  decodificable sin pedir ninguna más, y el mensaje dice la firma, cuántas tx quedaban, las
+  peticiones usadas y el discriminador
+  ("evento con discriminador desconocido [74, 2b, 4d, bd, 11, 7a, 48, 2b] (¿IDL desactualizado?)").
+  La creación también incluye el detalle. Antes ya paraba en la primera tx con error, pero sin
+  decir el discriminador. Lo que no se puede evitar es pagar las tx anteriores a la que falla
+  (E2 gastó 107): el error solo se conoce al leer la tx.
+- Tests (cargo test): 66 en verde (los 60 anteriores + 6). Fixtures en tests/fixtures/: el IDL
+  anterior y 22 tx reales (`result` de getTransaction):
+    · fixtures_existen_y_coinciden_con_su_firma
+    · idl_nuevo_decodifica_v1_v2_v3_igual_que_el_anterior: 18 tx de V1, V2 y V3 (creación, buy,
+      buy_exact_sol_in, buy_exact_quote_in, sell, migrate_to_sharing y completado de cada tramo),
+      mismos eventos, campos y bytes sobrantes con los dos IDL, y mismas filas al ingerirlas en SQLite.
+    · sweep_bonding_curve_fee_event_no_es_un_trade: 6 errores con el IDL viejo; 6 barridos con el
+      nuevo, campos y valores, ninguna fila ingerida.
+    · barrido_con_migracion_a_fee_sharing
+    · trade_event_actual_trae_creator_fee_unclaimed (buy_v2 y sell_v2 de hoy)
+    · ventana_para_en_el_primer_evento_no_decodificable (check: con el IDL viejo pide 2 de 3 tx y
+      para; con el nuevo, las 3)
+- Comprobación byte a byte (binario anterior frente a nuevo, cada uno sobre su copia limpia de
+  marxol.db): 61 salidas idénticas, sin ninguna diferencia, incluidos los stderr:
+  stats; entry2 --check (texto y JSON) de piloto, validacion, validacion2 y validacion3; entry2 de
+  validacion (texto, JSON, --replica), validacion2 (texto, JSON, --d2-prueba) y validacion3 (texto
+  y JSON); entry; h1 v1 y h1c; h1b; check --offline JSON de los 973 tokens con ventana completa; y
+  los scripts robustez_posthoc, curva_retorno_posthoc, cribado_posthoc, cribado_posthoc2,
+  etapa0_latencia, salidas_posthoc, verificar_replica, verificar_d2_v2 y creador_senal_explora.
+  Además coinciden byte a byte con lo guardado: resultados/validacion2_replica.txt,
+  validacion3_d2.txt, cribado_posthoc2.txt, etapa0_latencia.txt, salidas_posthoc.txt y
+  creador_senal_explora.txt (sin el anexo).
+  Aviso previo, no causado por este cambio: scripts/cribado_posthoc.py falla igual con los dos
+  binarios (TypeError en la línea 237: el pump-y-caída n/e de los tokens de V3, posteriores al
+  script). No se ha tocado.
+- Prueba en vivo con el binario nuevo: 4mekvGzn… (E3, que antes fallaba por la tx de barridos)
+  → SIN BANDERAS DE D2 (solo H7'), el mismo veredicto que a 1 min de edad, ahora con la ventana
+  completa (39 tx), en 2.2 s y 1 640 CU. Un primer intento con --max-requests 40 dio NO EVALUABLE
+  por coste (80 CU). Su mensaje dice "tope de 400 peticiones" aunque el tope era 40: es una
+  imprecisión previa del texto, sin corregir.
+
+Pendiente o sin verificar
+- docs/referencia_tecnica.md §6 (47 instrucciones, 28 eventos, sha256 ffe966c4…) ha quedado
+  desfasado; no se ha tocado.
+- Nombre y significado de los 8 bytes finales del TradeEvent actual: hay que esperar a que el IDL
+  público se actualice.
+- buy_v3 / sell_v3 / multi_hop_curve_swap / PostCompleteBuyEvent sin observar en mainnet.
+- Fecha exacta de la primera tx con SweepBondingCurveFeeEvent.
+- Tokens con un pump coin como quote (p. ej. 9oiJMdtj…, quote CARDSccU…, depth): el precio queda
+  en unidades de otro token; las definiciones congeladas no lo contemplan. Solo es una observación.
+
+Consumo (Alchemy): ≈ 3 300 CU, cota superior (tope 5 000):
+  getTransaction 26 × 40 = 1 040 (2 de ejemplo, 18 históricas y 6 de un token activo); getSignaturesForAddress
+  5 × 40 = 200 (2 de ProgramData, 1 petición mal formada que se cuenta igual, el crank y la curva de E9);
+  getAccountInfo ≈ 9 (cuenta IDL, ProgramData, 2 × verify, 1 curve), contadas a 40 CU = 360 como cota;
+  check en vivo 80 + 1 640 = 1 720 (registrado en rpc_usage de la base del scratchpad).
+  GitHub: 0 CU.

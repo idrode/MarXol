@@ -1,0 +1,89 @@
+PRUEBA EN VIVO DE `marxol check` CON TOKENS RECIÉN CREADOS — 2026-10-21 (18:54–19:25 UTC aprox.)
+Herramienta, no análisis. Sin pre-registro nuevo. No cambia ninguna definición.
+
+Método
+- Proveedor: Alchemy (20 req/s por defecto, 40 CU por getTransaction y por getSignaturesForAddress).
+- Descubrimiento: `marxol scan --address TSLvdd1p… (PDA mint-authority) --limit N --events CreateEvent`.
+  Es lo más barato que existe ahora: 1 getSignaturesForAddress + 1 getTransaction por creación
+  (6 creaciones = 280 CU; 11 = 520 CU). Devuelve creaciones de hace 0–20 s. Para ~30 min se espera.
+- Medición: binario `check` idéntico al del repo más cronómetros a stderr (copia instrumentada en el
+  scratchpad; el código del repo no se tocó). Se comprobó que, con `--offline`, da salidas JSON
+  idénticas byte a byte al binario del repo en 5 tokens de V3. El consumo se registró en una base
+  aparte del scratchpad, no en marxol.db.
+- ms = tiempo de pared del proceso completo. Fases: list = listado de firmas de la bonding curve;
+  vent = descarga de la ventana temprana (getTransaction secuencial), y dentro de ella red (espera de
+  respuestas HTTP) y dec (decodificación Borsh); el resto de vent es la espera del limitador de ritmo
+  (50 ms entre peticiones) y la ingesta en SQLite en memoria (≤ 13 ms). La evaluación (D2) tarda 0 ms.
+- Edad = momento de la consulta − t0 del CreateEvent. "vent." = ventana de 5 min aún abierta.
+- Las comprobaciones de los 5 y los 30 min llevaron `--max-requests 60/100` para acotar el gasto.
+
+Resultados
+id       mint          edad    ms    CU  veredicto            H4p H6p H7p vent.  Te2   list  vent   red  dec  nota
+D_fresh  Hhq8cuec      22.1   188    80  NO EVALUABLE           -   -   -    sí    -    124     0     0    0 sin T_entry2 aún 1 firmas
+A_1min   HF1mPWG8      60.3   210    80  NO EVALUABLE           -   -   -    sí    -    145     0     0    0 sin T_entry2 aún 1 firmas
+E1_1min  8uWr1LaC      44.5   168    80  NO EVALUABLE           -   -   -    sí    -    109     0     0    0 sin T_entry2 aún 1 firmas
+E2_1min  ADMJhN7N      46.8  5676  4400  FALLO (IDL)            -   -   -     -    -    283     -     -    -  2507 firmas
+E3_1min  4mekvGzn      52.5  1526  1120  SIN BANDERAS DE D2    no  no  sí    sí   15    174  1306   834    6  871 firmas
+E4_1min  7537aTxt      55.1  1400  1000  SIN BANDERAS DE D2    no  no  sí    sí   25    126  1222   833    8  498 firmas
+E5_1min  3HeymLZA      56.6   157    80  NO EVALUABLE           -   -   -    sí    -    101     0     0    0 sin T_entry2 aún 3 firmas
+E6_1min  9oiJMdtj      56.8   476   320  NO EVALUABLE           -   -   -    sí    -    116   307   198    1 sin T_entry2 aún 200 firmas
+E7_1min  GUpe5JvW      58.3   145    80  NO EVALUABLE           -   -   -    sí    -     91     0     0    0 sin T_entry2 aún 1 firmas
+E8_1min  Bib4gihp      58.5  2062  1600  FALLO (IDL)            -   -   -     -    -     93     -     -    -  65 firmas
+E9_1min  692WB76e      61.7  2237  1720  EVITAR                sí  sí  no    sí   10    128  2062  1320   15  418 firmas
+E9_5min  692WB76e     332.5  2329  1720  EVITAR                sí  sí  no    no   10    202  2074  1455   16  418 firmas
+E3_5min  4mekvGzn     331.9   654   360  FALLO (IDL)            -   -   -     -    -    259     -     -    -  884 firmas
+E4_5min  7537aTxt     333.6  1456  1000  FALLO (IDL)            -   -   -     -    -    241     -     -    -  523 firmas
+B_5min   76SrxkqL     409.1   296   200  SIN BANDERAS DE D2    no  no  no    no   72     89   153   109    1  8 firmas
+E6_5min  9oiJMdtj     335.5   523   360  SIN BANDERAS DE D2    sí  no  no    no   64    124   344   230    1  201 firmas
+C_30min  Y2KD6oQt    1800.6  1681  1200  FALLO (IDL)            -   -   -     -    -    217     -     -    -  808 firmas
+E9_30min 692WB76e    1729.3  2272  1720  EVITAR                sí  sí  no    no   10    158  2071  1373   16  423 firmas
+total check CU: 17120 ejecuciones: 18
+
+  (FALLO (IDL) = `check` sale con error 1: "errores de decodificación: lectura incompleta". La edad de
+  las filas de fallo se calcula con el t0 del scan.)
+
+Repetición con --offline: NINGUNO de los 13 mints está en marxol.db ("sin ventana temprana completa");
+--offline no se puede comparar. Era de esperar: la base solo tiene los tramos V1–V3. La coincidencia
+vivo/offline ya estaba verificada con 6 tokens de V3 (estado_y_pasos.md).
+
+Hallazgos
+1. Latencia: cuando hay veredicto, llega en 0.15–2.3 s. El tiempo crece de forma lineal con las tx de
+   la ventana: ~50 ms por tx (el ritmo de 20 req/s; la red responde en ~32 ms de media). Listado:
+   0.1–0.3 s por página. Creación: ~45 ms. Decodificación: ≤ 16 ms. Evaluación: 0 ms.
+   El tope de 400 peticiones pone el techo en ~20 s. El token más activo visto (E2, 2 507 firmas en
+   47 s) gastó 110 peticiones (4 400 CU) en 5.7 s antes de fallar.
+2. CONSISTENCIA ventana abierta/cerrada: E9 dio EVITAR (H4' y H6') a los 62 s, a los 5.5 min y a los
+   29 min, con los mismos 42 trades. Primera prueba con ventana abierta y commitment `confirmed`.
+   Coincide en 1 de 1 token activo legible en las tres edades. E3 y E4 no se pudieron repetir (punto 3).
+3. BLOQUEANTE: el IDL embebido está desactualizado. 5 de las 18 consultas, y 5 de los 8 tokens
+   activos en alguna consulta (E2, E8, C siempre; E3 y E4 a los 5 min), fallan por un evento con
+   discriminador desconocido [74 2b 4d bd 11 7a 48 2b]. Va acompañado de instrucciones pump.fun
+   desconocidas para el IDL y aparece junto a collect_creator_fee_v2,
+   MigrateBondingCurveCreatorEvent y DistributeCreatorFeesEvent. En la tx de E3, 6 instrucciones
+   desconocidas emiten solo ese evento, sin ningún TradeEvent. Sin verificar: podría ser una
+   variante nueva de trade (p. ej. de un buy/sell v2 o de lotes). Si lo es, hay trades que marXol no
+   ve, y D2 se calcularía con datos incompletos si se ignorara el error.
+   `check` hace lo correcto al negarse a dar veredicto, pero gasta la cuota antes (hasta 4 400 CU).
+   No se ha cambiado el IDL ni el código.
+4. Muchos tokens nuevos casi no operan: de los 13 consultados (sin mayhem), 4 no tenían más firma
+   que la creación (80 CU cada uno), E5 tenía 3 y B tenía 8 a los 7 min. Hay 8 tokens activos.
+5. Consultas de ≤ 1 min de edad (11: D, A, E1–E9): 3 veredictos (E3 y E4 SIN BANDERAS, E9 EVITAR),
+   6 NO EVALUABLE porque aún no hay T_entry2 (con la ventana abierta) y 2 fallos del IDL.
+
+Conclusión
+- Velocidad: SÍ, es suficiente como aviso, siempre que se consulte en cuanto exista T_entry2
+  (mediana 13–16 s tras la creación). El veredicto llega en ~2 s, frente a un margen de 10–16 s.
+  El cuello de botella del propio check es el ritmo de getTransaction (~50 ms por tx de la ventana),
+  no la red, el listado ni la decodificación. Con más req/s o con getTransaction en paralelo se
+  dividiría.
+- La latencia no es el problema principal. Hay dos que pesan más:
+  (a) el IDL: hoy check NO es fiable para tokens activos;
+  (b) el descubrimiento: hay que saber del token a tiempo. `scan` sobre mint-authority cuesta
+      ~40 CU por creación y no es un stream, y consultar cada token nuevo cuesta ≥ 80 CU aunque esté muerto.
+- Antes de usar check en vivo habría que actualizar idl/pump.json (verificando on-chain el IDL
+  vigente y que los indicadores congelados no cambian sobre V1–V3, byte a byte) y que check aborte
+  en cuanto vea el primer error de decodificación, antes de pedir el resto de la ventana. Decisión de Roi.
+
+Consumo (Alchemy): check 17 120 CU en 18 ejecuciones (registrado en rpc_usage de la base del
+scratchpad); scan 800 CU; `marxol tx` de 4 firmas fallidas 160 CU. TOTAL 18 080 CU (tope 30 000).
+Las 4 comprobaciones previstas a los 30 min de A y D (tokens muertos) se cancelaron para no gastar.

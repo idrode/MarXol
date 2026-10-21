@@ -1,0 +1,211 @@
+SEÑAL DE CREADOR REPETIDO — EXPLORACIÓN POST HOC, SIN PRE-REGISTRO, SIN VEREDICTO
+V1, V2 y V3 ya se han visto: ningún p-valor ni intervalo de aquí confirma ni descarta nada.
+controles: entry2 --json V1 = 251 filas; p&c distinto: 0; retorno +10/+30/+60 distinto: 0; D2 de V3 distinto de entry2 --tramo validacion3: 0
+reproducción de V3 (población congelada): pasan 46, descartados 28, dif. medianas +19.0 pts (registrado en resultados/validacion3_d2.txt: comparación 46 / 28 / +19.0)
+tokens con otra creación del mismo creator en el mismo slot de creación (orden no resuelto, cuentan como sin S_t0): 4
+
+====================================================================================================
+1. VIABILIDAD: cobertura de la señal (solo se ve la actividad del creator dentro de la franja)
+====================================================================================================
+
+V1: 337 creaciones; 238 creators, 24 con > 1 lanzamiento visible en la franja (123 tokens)
+  con T_entry2: 203 sin mayhem (+ 48 mayhem, aparte); comparables (D2 definido y retorno +30 min): 202
+  S       pasan D2: con  16 / sin 104;  descartados: con   2 / sin  80
+  S_t0    pasan D2: con  14 / sin 106;  descartados: con   2 / sin  80
+  S_user  pasan D2: con  28 / sin  92;  descartados: con  13 / sin  69
+  S con mismo símbolo que un lanzamiento previo: 10 de 18; creators distintos con S: 14; mayor creator con S: 2 tokens
+  con un token por creator (regla de V3): 193 tokens, S_t0 = 6, S = 8
+
+V2: 400 creaciones; 225 creators, 37 con > 1 lanzamiento visible en la franja (212 tokens)
+  con T_entry2: 220 sin mayhem (+ 63 mayhem, aparte); comparables (D2 definido y retorno +30 min): 219
+  S       pasan D2: con  39 / sin  91;  descartados: con  18 / sin  71
+  S_t0    pasan D2: con  34 / sin  96;  descartados: con  16 / sin  73
+  S_user  pasan D2: con  48 / sin  82;  descartados: con  29 / sin  60
+  S con mismo símbolo que un lanzamiento previo: 21 de 57; creators distintos con S: 23; mayor creator con S: 21 tokens
+  con un token por creator (regla de V3): 174 tokens, S_t0 = 5, S = 11
+
+V3: 196 creaciones; 113 creators, 19 con > 1 lanzamiento visible en la franja (102 tokens)
+  con T_entry2: 83 sin mayhem (+ 75 mayhem, aparte); comparables (D2 definido y retorno +30 min): 82
+  S       pasan D2: con   5 / sin  45;  descartados: con   4 / sin  28
+  S_t0    pasan D2: con   4 / sin  46;  descartados: con   4 / sin  28
+  S_user  pasan D2: con   5 / sin  45;  descartados: con   7 / sin  25
+  S con mismo símbolo que un lanzamiento previo: 5 de 9; creators distintos con S: 3; mayor creator con S: 5 tokens
+  con un token por creator (regla de V3): 75 tokens, S_t0 = 0, S = 1
+
+====================================================================================================
+2. RETORNO NETO (a) A +30 MIN DESDE T_entry2: con señal frente a sin señal (sin mayhem, todos los tokens)
+====================================================================================================
+
+--- V1 (202 tokens; D2 pasan 120, descartados 82) ---
+ pasan D2:
+  S                                  con  16 (med -5.8 %, cr. 12)  sin 104 (med -8.6 %)
+      dif. medianas +2.8 pts; MW unilateral p(con > sin) = 0.1323, p(con < sin) = 0.8693
+      IC 95 % clúster [-3.0, +5.3] (desc. 0); simple [-2.7, +4.8] (desc. 0)  BAJA POTENCIA (< 20)
+  S_t0                               con  14 (med -5.8 %, cr. 10)  sin 106 (med -8.6 %)
+      dif. medianas +2.8 pts; MW unilateral p(con > sin) = 0.1358, p(con < sin) = 0.8660
+      IC 95 % clúster [-3.1, +5.8] (desc. 0); simple [-2.7, +5.3] (desc. 0)  BAJA POTENCIA (< 20)
+  S_user                             con  28 (med -8.9 %, cr. 24)  sin  92 (med -8.2 %)
+      dif. medianas -0.7 pts; MW unilateral p(con > sin) = 0.6623, p(con < sin) = 0.3399
+      IC 95 % clúster [-3.7, +2.8] (desc. 0); simple [-3.6, +2.8] (desc. 0)
+ descartados por D2:
+  S                                  con   2 (med -9.1 %, cr. 2)  sin  80 (med -28.2 %)  -> < 3 en un grupo: no se calcula
+  S_t0                               con   2 (med -9.1 %, cr. 2)  sin  80 (med -28.2 %)  -> < 3 en un grupo: no se calcula
+  S_user                             con  13 (med -23.7 %, cr. 13)  sin  69 (med -28.3 %)
+      dif. medianas +4.7 pts; MW unilateral p(con > sin) = 0.3707, p(con < sin) = 0.6341
+      IC 95 % clúster [-13.6, +19.8] (desc. 0); simple [-15.1, +19.4] (desc. 0)  BAJA POTENCIA (< 20)
+
+--- V2 (219 tokens; D2 pasan 130, descartados 89) ---
+ pasan D2:
+  S                                  con  39 (med -5.6 %, cr. 16)  sin  91 (med -5.9 %)
+      dif. medianas +0.3 pts; MW unilateral p(con > sin) = 0.2094, p(con < sin) = 0.7920
+      IC 95 % clúster [-1.8, +3.0] (desc. 0); simple [-0.0, +2.1] (desc. 0)
+  S_t0                               con  34 (med -5.6 %, cr. 12)  sin  96 (med -5.8 %)
+      dif. medianas +0.2 pts; MW unilateral p(con > sin) = 0.4379, p(con < sin) = 0.5642
+      IC 95 % clúster [-6.0, +2.9] (desc. 0); simple [-0.0, +1.8] (desc. 0)
+  S_user                             con  48 (med -5.6 %, cr. 25)  sin  82 (med -6.0 %)
+      dif. medianas +0.3 pts; MW unilateral p(con > sin) = 0.1403, p(con < sin) = 0.8608
+      IC 95 % clúster [-1.8, +3.3] (desc. 0); simple [-0.0, +2.3] (desc. 0)
+ descartados por D2:
+  S                                  con  18 (med -26.6 %, cr. 10)  sin  71 (med -31.5 %)
+      dif. medianas +4.8 pts; MW unilateral p(con > sin) = 0.2389, p(con < sin) = 0.7643
+      IC 95 % clúster [-15.2, +16.8] (desc. 0); simple [-6.7, +17.9] (desc. 0)  BAJA POTENCIA (< 20)
+  S_t0                               con  16 (med -26.6 %, cr. 10)  sin  73 (med -30.2 %)
+      dif. medianas +3.5 pts; MW unilateral p(con > sin) = 0.3404, p(con < sin) = 0.6635
+      IC 95 % clúster [-17.8, +16.8] (desc. 0); simple [-10.0, +16.4] (desc. 0)  BAJA POTENCIA (< 20)
+  S_user                             con  29 (med -28.1 %, cr. 21)  sin  60 (med -30.8 %)
+      dif. medianas +2.7 pts; MW unilateral p(con > sin) = 0.2657, p(con < sin) = 0.7372
+      IC 95 % clúster [-10.4, +15.9] (desc. 0); simple [-7.9, +16.4] (desc. 0)
+
+--- V3 (82 tokens; D2 pasan 50, descartados 32) ---
+ pasan D2:
+  S                                  con   5 (med -8.2 %, cr. 1)  sin  45 (med -5.6 %)
+      dif. medianas -2.6 pts; MW unilateral p(con > sin) = 0.8904, p(con < sin) = 0.1157
+      IC 95 % clúster [-4.2, -0.4] (desc. 716); simple [-4.2, -0.4] (desc. 10)  BAJA POTENCIA (< 20)
+  S_t0                               con   4 (med -8.2 %, cr. 1)  sin  46 (med -5.6 %)
+      dif. medianas -2.6 pts; MW unilateral p(con > sin) = 0.8623, p(con < sin) = 0.1457
+      IC 95 % clúster [-4.0, -0.1] (desc. 716); simple [-4.0, -0.2] (desc. 30)  BAJA POTENCIA (< 20)
+  S_user                             con   5 (med -8.2 %, cr. 1)  sin  45 (med -5.6 %)
+      dif. medianas -2.6 pts; MW unilateral p(con > sin) = 0.8904, p(con < sin) = 0.1157
+      IC 95 % clúster [-4.2, -0.4] (desc. 716); simple [-4.2, -0.4] (desc. 10)  BAJA POTENCIA (< 20)
+ descartados por D2:
+  S                                  con   4 (med -2.6 %, cr. 2)  sin  28 (med -24.7 %)
+      dif. medianas +22.1 pts; MW unilateral p(con > sin) = 0.1963, p(con < sin) = 0.8191
+      IC 95 % clúster [-28.7, +27.3] (desc. 273); simple [-25.6, +29.7] (desc. 30)  BAJA POTENCIA (< 20)
+  S_t0                               con   4 (med -2.6 %, cr. 2)  sin  28 (med -24.7 %)
+      dif. medianas +22.1 pts; MW unilateral p(con > sin) = 0.1963, p(con < sin) = 0.8191
+      IC 95 % clúster [-28.7, +27.3] (desc. 273); simple [-25.6, +29.7] (desc. 30)  BAJA POTENCIA (< 20)
+  S_user                             con   7 (med -2.6 %, cr. 4)  sin  25 (med -24.6 %)
+      dif. medianas +22.0 pts; MW unilateral p(con > sin) = 0.1635, p(con < sin) = 0.8475
+      IC 95 % clúster [-6.4, +30.9] (desc. 31); simple [-8.7, +32.0] (desc. 0)  BAJA POTENCIA (< 20)
+
+--- juntas (503 tokens; D2 pasan 300, descartados 203) ---
+ pasan D2:
+  S                                  con  60 (med -5.6 %, cr. 29)  sin 240 (med -7.1 %)
+      dif. medianas +1.5 pts; MW unilateral p(con > sin) = 0.1118, p(con < sin) = 0.8886
+      IC 95 % clúster [-1.5, +2.8] (desc. 0); simple [+0.1, +2.5] (desc. 0)
+  S_t0                               con  52 (med -5.6 %, cr. 23)  sin 248 (med -6.9 %)
+      dif. medianas +1.3 pts; MW unilateral p(con > sin) = 0.2293, p(con < sin) = 0.7712
+      IC 95 % clúster [-1.8, +2.5] (desc. 0); simple [-0.7, +2.4] (desc. 0)
+  S_user                             con  81 (med -5.7 %, cr. 50)  sin 219 (med -6.9 %)
+      dif. medianas +1.1 pts; MW unilateral p(con > sin) = 0.4204, p(con < sin) = 0.5802
+      IC 95 % clúster [-1.9, +2.1] (desc. 0); simple [-1.1, +2.2] (desc. 0)
+  S_mismo_simbolo (vs sin S)         con  23 (med -5.6 %, cr. 16)  sin 240 (med -7.1 %)
+      dif. medianas +1.5 pts; MW unilateral p(con > sin) = 0.0889, p(con < sin) = 0.9115
+      IC 95 % clúster [-1.7, +3.9] (desc. 0); simple [-1.5, +3.3] (desc. 0)
+  S_otro_simbolo (vs sin S)          con  37 (med -5.6 %, cr. 16)  sin 240 (med -7.1 %)
+      dif. medianas +1.5 pts; MW unilateral p(con > sin) = 0.2821, p(con < sin) = 0.7186
+      IC 95 % clúster [-2.6, +2.9] (desc. 0); simple [-0.2, +2.4] (desc. 0)
+ descartados por D2:
+  S                                  con  24 (med -19.0 %, cr. 14)  sin 179 (med -27.5 %)
+      dif. medianas +8.5 pts; MW unilateral p(con > sin) = 0.0843, p(con < sin) = 0.9162
+      IC 95 % clúster [-6.8, +23.2] (desc. 0); simple [-5.7, +20.4] (desc. 0)
+  S_t0                               con  22 (med -19.0 %, cr. 14)  sin 181 (med -27.5 %)
+      dif. medianas +8.5 pts; MW unilateral p(con > sin) = 0.1108, p(con < sin) = 0.8899
+      IC 95 % clúster [-7.5, +24.2] (desc. 0); simple [-6.7, +22.3] (desc. 0)
+  S_user                             con  49 (med -24.9 %, cr. 38)  sin 154 (med -28.2 %)
+      dif. medianas +3.3 pts; MW unilateral p(con > sin) = 0.1554, p(con < sin) = 0.8453
+      IC 95 % clúster [-5.9, +14.7] (desc. 0); simple [-4.2, +15.3] (desc. 0)
+  S_mismo_simbolo (vs sin S)         con  13 (med -15.8 %, cr. 9)  sin 179 (med -27.5 %)
+      dif. medianas +11.7 pts; MW unilateral p(con > sin) = 0.1008, p(con < sin) = 0.9001
+      IC 95 % clúster [-23.0, +23.5] (desc. 0); simple [-4.8, +24.8] (desc. 0)  BAJA POTENCIA (< 20)
+  S_otro_simbolo (vs sin S)          con  11 (med -28.1 %, cr. 8)  sin 179 (med -27.5 %)
+      dif. medianas -0.6 pts; MW unilateral p(con > sin) = 0.2409, p(con < sin) = 0.7608
+      IC 95 % clúster [-14.1, +25.9] (desc. 0); simple [-7.7, +24.2] (desc. 0)  BAJA POTENCIA (< 20)
+
+====================================================================================================
+3. DESCRIPTIVO: ¿la señal se solapa con D2? (sin mayhem, comparables, juntas)
+====================================================================================================
+  S: descartados por D2 con señal 24/84 (29 %); sin señal 179/419 (43 %)
+     retorno +30 med. con -5.7 %, sin -10.2 %; fracción > 0: con 0 %, sin 3 %
+  S_t0: descartados por D2 con señal 22/74 (30 %); sin señal 181/429 (42 %)
+     retorno +30 med. con -5.7 %, sin -9.9 %; fracción > 0: con 0 %, sin 3 %
+  lanzamientos previos visibles (con S): 1: 32, 2: 17, 3: 5, 4: 4, ≥5: 26
+  mayhem (aparte, sin contraste): 183 con retorno; S en 122; med. con -33.1 %, sin -48.8 %
+
+====================================================================================================
+ANEXO (redactado a mano el 2026-10-21; no lo genera el script)
+====================================================================================================
+
+Estado: EXPLORACIÓN POST HOC. V1, V2 y V3 ya se habían visto (D2 incluso salió de V1 y V2), así que
+nada de lo anterior confirma ni descarta la señal. No es validación.
+
+Viabilidad:
+- La señal solo ve lanzamientos del creator dentro de la franja de 8 min (censura por la izquierda: un
+  token del primer minuto casi nunca tiene historial visible).
+- Con un token por creator (regla de V3), S_t0 = 0 por construcción y S queda en 8 / 11 / 1 tokens.
+  Solo se puede medir con todos los tokens y bootstrap por clúster de creator.
+- Con todos los tokens: S en 84 de 503 comparables (V1 18, V2 57, V3 9). En V3, los 5 que pasan D2
+  con S son de UN solo creator. Por franja, casi todas las celdas quedan en baja potencia (< 20).
+
+Lectura descriptiva (juntas, sin mayhem):
+- Dentro de los que pasan D2: +1.5 pts (con S −5.6 % frente a −7.1 %), MW p(con > sin) = 0.11,
+  IC clúster [−1.5, +2.8]. En V3 la dirección se invierte (−2.6 pts, un solo creator).
+- Dentro de los descartados: +8.5 pts (−19.0 % frente a −27.5 %), p = 0.08, IC clúster [−6.8, +23.2].
+- Fracción con retorno +30 min > 0 entre los tokens con S: 0 %. Ningún grupo tiene mediana positiva.
+- S se solapa con D2: los tokens con S se descartan menos (29 % frente a 43 %), coherente con la
+  exploración de operadores (repetidores = menos banderas), y no separa grupos dentro de D2.
+- La identidad por payer (S_user) no cambia la lectura. La mitad de S en descartados viene de creators
+  que repiten el mismo símbolo (fábricas).
+- Respuesta a "¿cambia qué token evito o compro?": con estos datos, no. A lo sumo atenuaría algo el
+  daño entre los descartados, sin llevar a nadie a retorno positivo.
+
+Coste de ampliar la visibilidad del historial (estimación, NO ejecutado):
+- Vía 1 (por creator): getSignaturesForAddress sobre cada creator de una franja nueva (~110–240
+  creators, 1 página de 1 000 firmas = 40 CU) ≈ 4 400–9 600 CU, más páginas extra para los creators
+  muy activos (comerciantes). Para saber cuáles de esas firmas son creaciones sin pedir getTransaction,
+  se cruzan con las firmas de la PDA mint-authority del mismo periodo (~2 900 creaciones/hora → ~3
+  páginas/hora = 120 CU/hora; 24 h ≈ 70 páginas ≈ 2 800 CU).
+  Total para 24 h de historial: ≈ 7 000–15 000 CU por franja (orden de magnitud, sin medir).
+  Sin verificar: si `creator` firma o aparece como cuenta en create_v2 (98 de 377 tokens tienen
+  user ≠ creator); si no aparece, esta vía solo sirve con la identidad del payer (S_user).
+- Vía 2 (por mint-authority + getTransaction de cada creación previa): ~2 900 × 40 CU ≈ 116 000 CU por
+  hora de historial. Descartada por coste.
+
+BORRADOR DE DEFINICIÓN CONGELABLE — NO CONGELADO (para que Roi decida si se pre-registra)
+-----------------------------------------------------------------------------------------
+H11-D2 "lanzamiento previo del creator, dentro de D2".
+- Señal L: el token tiene L = sí si su payer (`CreateEvent.user`) es el payer de al menos 1 creación de
+  pump.fun con slot estrictamente menor que el slot de T_entry2 del token y como mucho 24 h antes de su
+  t0, encontrada con la vía 1 (firmas del payer ∩ firmas de mint-authority). Se usa el payer porque es
+  el que firma; el campo creator se reporta aparte, de forma descriptiva.
+- Tramo: N franjas nuevas de 8 min [P: N = 3, en días y horas distintos, fijadas antes de descargar],
+  con las ventanas y precios de V3, sin mirar ningún retorno antes de congelar.
+- Población: sin mayhem, con T_entry2, D2 definido (v3::d2, adenda 1), retorno neto (a) a +30 min no
+  n/e. Todos los tokens (no uno por creator), con bootstrap por clúster de payer.
+- Resultado: retorno neto (a) desde T_entry2 a +30 min (entry2::returns).
+- Comparación primaria: dentro de los tokens que PASAN D2, L = sí frente a L = no. Secundaria
+  (descriptiva): lo mismo dentro de los descartados.
+- CONTINUAR (L se añade como señal) solo si se cumplen todas, en la primaria:
+  1. ≥ 20 tokens con L = sí y ≥ 20 con L = no, de ≥ 10 payers distintos en L = sí.
+  2. Mann-Whitney unilateral (L = sí > L = no), aproximación de entry2::mann_whitney_greater, p < 0.01.
+  3. Diferencia de medianas (sí − no) ≥ +5 pts.
+  4. Misma dirección sin el payer con más tokens L = sí.
+  5. IC bootstrap 95 % por clúster de payer (2 000 réplicas, semilla 20260930, 2.5–97.5) que excluye 0.
+  6. Utilidad: la mediana del retorno a +30 min de los que pasan D2 con L = sí es > 0, o la regla
+     "evitar D2 o L = no" cambia el token evitado en ≥ 20 % de los que pasan D2.
+- PARAR (H11-D2 se cierra) si se cumple el 1 y falla cualquiera de 2–5. Si falla el 1: no concluyente
+  por potencia, sin ampliar el tramo. Si 1–5 se cumplen pero no el 6: la señal separa pero no cambia
+  decisiones, y se registra como tal (cuenta como "parar" para la opción A acotada).
+- Presupuesto: ≤ 15 000 CU de historial + ~1 M CU de ventanas y precios por franja (como V3).
+- Pendiente antes de congelar: verificar on-chain que el payer aparece en getSignaturesForAddress de
+  sus creaciones y que el cruce con mint-authority encuentra todas las de una muestra conocida.
