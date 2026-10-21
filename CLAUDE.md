@@ -65,7 +65,18 @@ Estos son principios de trabajo, no detalles técnicos — se aplican a cada dec
 
 ## Rumbo
 
-Por definir (decisión pendiente).
+Decisión (2026-10-21): opción A acotada. Seguir operadores con muestreo
+dentro del free tier, presupuesto fijo de <N semanas / N franjas>.
+- Antes de recoger datos: pre-registrar H11–H13 y H2/H3 con umbral numérico
+  de continuar/parar, y la pregunta "¿cambia qué token evito o compro?".
+- Techo conocido: seguir a un operador no resuelve la latencia de entrada
+  (el salto ocurre en el slot de creación). Valor esperado: mejorar señales
+  de EVITAR, no encontrar una entrada.
+- Si no se cumple el criterio al final del presupuesto: opción C (informe
+  del resultado negativo) y marXol queda como herramienta de descarte
+  (marxol check).
+- marxol check se mantiene como está; el grabador en tiempo real (B) solo
+  si se reactiva la idea de operar.
 
 ---
 
