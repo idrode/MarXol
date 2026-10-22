@@ -1,0 +1,150 @@
+FASE 3, OPCIÓN C' — LANZAMIENTOS PREVIOS DEL PAGADOR EN 7 DÍAS — POST HOC, EXPLORATORIO, SIN VEREDICTO
+Límite: es un MÍNIMO. No ve creaciones del mismo `creator` pagadas por otra wallet (17 % de las creaciones de
+marxol.db tienen creator ≠ pagador) ni operadores con varias wallets; un pagador truncado puede tener más.
+Todo % lleva n e IC 95 % (Wilson). Nada decide: una razón de veto necesita su adenda y el bloque B.
+
+Listado de mint-authority: 427001 firmas (35829 con error), de 2026-09-21 13:38:01 a 2026-10-01 09:07:58 UTC.
+Pagadores recorridos: 513 (35 truncados por el tope de 5 páginas, 319 hasta el principio de la wallet); 798 páginas, máx. 5 por pagador.
+Pagadores sin recorrer (fallo persistente, pendientes): 0
+
+POR TOKEN (lanzamientos previos del pagador, mínimo)
+  V1: 337 tokens, 326 clasificables (11 truncados con < 50 o sin cubrir)
+    0     94/326 = 28.8 % [IC 95 % 24.2–34.0]
+    1–4   46/326 = 14.1 % [IC 95 % 10.7–18.3]
+    5–49  95/326 = 29.1 % [IC 95 % 24.5–34.3]
+    ≥ 50  91/326 = 27.9 % [IC 95 % 23.3–33.0]
+    ≥ 1   232/326 = 71.2 % [IC 95 % 66.0–75.8]
+  V2: 400 tokens, 388 clasificables (12 truncados con < 50 o sin cubrir)
+    0     90/388 = 23.2 % [IC 95 % 19.3–27.6]
+    1–4   34/388 = 8.8 % [IC 95 % 6.3–12.0]
+    5–49  71/388 = 18.3 % [IC 95 % 14.8–22.5]
+    ≥ 50  193/388 = 49.7 % [IC 95 % 44.8–54.7]
+    ≥ 1   298/388 = 76.8 % [IC 95 % 72.4–80.7]
+  V3: 196 tokens, 190 clasificables (6 truncados con < 50 o sin cubrir)
+    0     36/190 = 18.9 % [IC 95 % 14.0–25.1]
+    1–4   24/190 = 12.6 % [IC 95 % 8.6–18.1]
+    5–49  37/190 = 19.5 % [IC 95 % 14.5–25.7]
+    ≥ 50  93/190 = 48.9 % [IC 95 % 41.9–56.0]
+    ≥ 1   154/190 = 81.1 % [IC 95 % 74.9–86.0]
+  V1–V3: 933 tokens, 904 clasificables (29 truncados con < 50 o sin cubrir)
+    0     220/904 = 24.3 % [IC 95 % 21.7–27.2]
+    1–4   104/904 = 11.5 % [IC 95 % 9.6–13.7]
+    5–49  203/904 = 22.5 % [IC 95 % 19.9–25.3]
+    ≥ 50  377/904 = 41.7 % [IC 95 % 38.5–44.9]
+    ≥ 1   684/904 = 75.7 % [IC 95 % 72.8–78.3]
+
+POR PAGADOR (máximo de previos entre sus tokens)
+  ≥ 1   297/502 = 59.2 % [IC 95 % 54.8–63.4]
+  ≥ 5   222/502 = 44.2 % [IC 95 % 39.9–48.6]
+  ≥ 50  103/502 = 20.5 % [IC 95 % 17.2–24.3]
+
+PAGADORES CON ≥ 50 PREVIOS: ¿MISMO CREATOR O VARIOS? (muestra de tx de creación por hash de la firma)
+  'operador único' = todos los creators de su muestra son el mismo; 'posible servicio' = ≥ 2 creators distintos
+  (puede ser un servicio de lanzamiento o un operador que rota creators: con estos datos no se distingue).
+  29yFzeBZgxf5…  previos ≥  373, tokens en la muestra   1, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 1 → posible servicio
+  2GBkFfJwjMkF…  previos ≥   59, tokens en la muestra   1, muestra de tx 10: 7 creators distintos, 4 = pagador; creators en marxol.db: 1 → posible servicio
+  2J2rtMBRLxAb…  previos ≥  238, tokens en la muestra   3, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 3 → posible servicio
+  2JxPmU9UU5Kh…  previos ≥  238, tokens en la muestra   3, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 1 → posible servicio
+  2aFjaPidodQy…  previos ≥  478, tokens en la muestra   3, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  2bBRwhGoL4fR…  previos ≥   75, tokens en la muestra   1, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 1 → posible servicio
+  2bRoascfGCKk…  previos ≥  397, tokens en la muestra   3, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 1 → posible servicio
+  2dKBHV53ZtqM…  previos ≥   53, tokens en la muestra   6, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 2 → posible servicio
+  37uM1rp8TK7e…  previos ≥  118, tokens en la muestra   2, muestra de tx 10: 7 creators distintos, 4 = pagador; creators en marxol.db: 2 → posible servicio
+  3CQnNpEiGBMh…  previos ≥  110, tokens en la muestra   1, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 1 → posible servicio
+  3GQAxh9s4nBp…  previos ≥  119, tokens en la muestra   1, muestra de tx 10: 10 creators distintos, 1 = pagador; creators en marxol.db: 1 → posible servicio
+  3NtTxNtQ9b83…  previos ≥  343, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  3uz65G8e463M…  previos ≥   58, tokens en la muestra   1, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 1 → posible servicio
+  3xtyS7oYkE8w…  previos ≥ 1163, tokens en la muestra   2, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  3yct19th5Cjp…  previos ≥  238, tokens en la muestra  10, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  49fAsUF3Nk8q…  previos ≥  465, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  4CPhM7PmkwPi…  previos ≥  116, tokens en la muestra   3, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  4RDNo5BBAjQh…  previos ≥   53, tokens en la muestra   2, muestra de tx 10: 7 creators distintos, 4 = pagador; creators en marxol.db: 1 → posible servicio
+  4S8cTizFiq3U…  previos ≥   94, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  4UKLdTBiz6pG…  previos ≥  727, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  4W3fiTa3Rai2…  previos ≥  239, tokens en la muestra   1, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 1 → posible servicio
+  4kQeEH3bcN4v…  previos ≥  270, tokens en la muestra   2, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  4wuDrzCRBHXQ…  previos ≥  177, tokens en la muestra   2, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  4xY9T1Q7foJz…  previos ≥  177, tokens en la muestra   1, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 1 → posible servicio
+  5EaoSFw28PNV…  previos ≥   92, tokens en la muestra   1, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 1 → posible servicio
+  5MTjkAZMe1ur…  previos ≥   82, tokens en la muestra   1, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 1 → posible servicio
+  5Xbho7faKvXK…  previos ≥  118, tokens en la muestra   3, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  5pUgxQGgX36G…  previos ≥  592, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  6Fy8LxPMdETr…  previos ≥   55, tokens en la muestra   1, muestra de tx 10: 7 creators distintos, 4 = pagador; creators en marxol.db: 1 → posible servicio
+  6SMMCc4H6DJk…  previos ≥   75, tokens en la muestra   1, muestra de tx 10: 7 creators distintos, 4 = pagador; creators en marxol.db: 1 → posible servicio
+  6gAgy3F1tLxe…  previos ≥  284, tokens en la muestra   2, muestra de tx 10: 8 creators distintos, 3 = pagador; creators en marxol.db: 2 → posible servicio
+  6tyjMaJxS46d…  previos ≥  163, tokens en la muestra   2, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 2 → posible servicio
+  6yUEc3nZPs12…  previos ≥   64, tokens en la muestra   4, muestra de tx 10: 10 creators distintos, 1 = pagador; creators en marxol.db: 4 → posible servicio
+  6zZyanyff5jr…  previos ≥  444, tokens en la muestra   2, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  78N177fzNJpp…  previos ≥   58, tokens en la muestra   2, muestra de tx 10: 8 creators distintos, 3 = pagador; creators en marxol.db: 2 → posible servicio
+  7GsNmZKY7Lvj…  previos ≥   53, tokens en la muestra   1, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 1 → posible servicio
+  7cZZZJAv5kiK…  previos ≥  399, tokens en la muestra   5, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  7g2MgxsjbR5T…  previos ≥  191, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  7ttyTk7DyFX3…  previos ≥  334, tokens en la muestra   2, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  7zEmoNaukycu…  previos ≥   52, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  84vGsG7BHQWK…  previos ≥  230, tokens en la muestra  18, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  8Q7EGENcxteR…  previos ≥  223, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  8SwxX1g9KB2G…  previos ≥   92, tokens en la muestra   2, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  8ZN71XTdVo8y…  previos ≥  171, tokens en la muestra   2, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 1 → posible servicio
+  95ZCf3jKMHeF…  previos ≥   88, tokens en la muestra   2, muestra de tx 10: 10 creators distintos, 1 = pagador; creators en marxol.db: 2 → posible servicio
+  9eZU9vEvMEvY…  previos ≥  124, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  9jwfZT1V4rvG…  previos ≥  263, tokens en la muestra   6, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 2 → posible servicio
+  AN38on9YmoH6…  previos ≥  606, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  ATQ9cEoTAvh9…  previos ≥  347, tokens en la muestra   1, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 1 → posible servicio
+  AcDJDqnKHf1n…  previos ≥   92, tokens en la muestra   3, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  AcU7BK4Ec6WL…  previos ≥  106, tokens en la muestra   1, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 1 → posible servicio
+  AeftueU1GtYg…  previos ≥  262, tokens en la muestra   2, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  B4tp4tfJU9kW…  previos ≥   59, tokens en la muestra   1, muestra de tx 10: 7 creators distintos, 4 = pagador; creators en marxol.db: 1 → posible servicio
+  BAUDoVbqPhuG…  previos ≥  249, tokens en la muestra   3, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  BLXZf3Fvw2rk…  previos ≥  192, tokens en la muestra   5, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  BUATv8Noj2xX…  previos ≥   56, tokens en la muestra   6, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  BoEVpctnMRtB…  previos ≥  110, tokens en la muestra   1, muestra de tx 10: 8 creators distintos, 3 = pagador; creators en marxol.db: 1 → posible servicio
+  BpmqDkGDfs1d…  previos ≥  144, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  Bq3JYJbkrRYx…  previos ≥   72, tokens en la muestra   1, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 1 → posible servicio
+  C5WLy9Rzzvz5…  previos ≥   54, tokens en la muestra   1, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 1 → posible servicio
+  C9iPGoSQNpyr…  previos ≥ 1698, tokens en la muestra  17, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  CS3EREmMkPMs…  previos ≥  200, tokens en la muestra   1, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 1 → posible servicio
+  CZutgB7w4Wbk…  previos ≥  131, tokens en la muestra   1, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 1 → posible servicio
+  Ce8xX6ixypbv…  previos ≥   59, tokens en la muestra   1, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 1 → posible servicio
+  Charmy1UtDkn…  previos ≥  179, tokens en la muestra   2, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 2 → posible servicio
+  D2RMiw47Am2R…  previos ≥   95, tokens en la muestra   1, muestra de tx  9: 1 creators distintos, 9 = pagador; creators en marxol.db: 1 → operador único
+  D9Z4gmwaP8F4…  previos ≥  100, tokens en la muestra   2, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 2 → posible servicio
+  D9gQ6RhKEpno…  previos ≥  307, tokens en la muestra   3, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 1 → posible servicio
+  DC99qH3jXiq5…  previos ≥  211, tokens en la muestra   2, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 2 → posible servicio
+  DCj4vauMdhKp…  previos ≥   63, tokens en la muestra   4, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  DEVrws6Fmuh4…  previos ≥  544, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  DRXPafDunsHA…  previos ≥  118, tokens en la muestra   3, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 3 → posible servicio
+  DRY2uEb6niBn…  previos ≥   59, tokens en la muestra   1, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 1 → posible servicio
+  DbG7RyLFBWXp…  previos ≥  201, tokens en la muestra   1, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 1 → posible servicio
+  Dfv8M6RUAeDV…  previos ≥   94, tokens en la muestra   1, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 1 → posible servicio
+  DsT2JZ2mKqTM…  previos ≥   73, tokens en la muestra  14, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  DwVjLtesZazk…  previos ≥   72, tokens en la muestra   2, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 2 → posible servicio
+  EEgjKTPZHNgP…  previos ≥  536, tokens en la muestra  12, muestra de tx  9: 1 creators distintos, 9 = pagador; creators en marxol.db: 1 → operador único
+  EW6k3ZkxGQxx…  previos ≥  123, tokens en la muestra   1, muestra de tx 10: 10 creators distintos, 1 = pagador; creators en marxol.db: 1 → posible servicio
+  EYSkHaMgSJp6…  previos ≥  223, tokens en la muestra   7, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  EhrQmJL2an8c…  previos ≥   72, tokens en la muestra   2, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 2 → posible servicio
+  EjcwXG6ywzor…  previos ≥  385, tokens en la muestra  27, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  EojLkJadiHcx…  previos ≥ 1025, tokens en la muestra  14, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  Ep8r1jHZp7ko…  previos ≥  115, tokens en la muestra   2, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 1 → posible servicio
+  EsSZMHhifMS6…  previos ≥   57, tokens en la muestra   1, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 1 → posible servicio
+  F5XvCe4233m6…  previos ≥  188, tokens en la muestra   1, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 1 → posible servicio
+  FKrbzhSAjaMN…  previos ≥   63, tokens en la muestra   7, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  FaJxvj5rCHhm…  previos ≥  160, tokens en la muestra   2, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 2 → posible servicio
+  GVVSEsG2JHap…  previos ≥  121, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  GeUnv1jmtviR…  previos ≥  418, tokens en la muestra   2, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 2 → posible servicio
+  GuoGKEnkd3ND…  previos ≥  255, tokens en la muestra  40, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  HBYzRFKRHGdd…  previos ≥  200, tokens en la muestra   2, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 2 → posible servicio
+  HfLpidy8DVQY…  previos ≥  268, tokens en la muestra  28, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  J4cCQgUtVmRF…  previos ≥  102, tokens en la muestra   1, muestra de tx  9: 1 creators distintos, 9 = pagador; creators en marxol.db: 1 → operador único
+  J68SYepZeNzG…  previos ≥   50, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  J7mfert6r5L3…  previos ≥  184, tokens en la muestra   1, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  JDBT5koS1f9q…  previos ≥  163, tokens en la muestra   1, muestra de tx 10: 4 creators distintos, 7 = pagador; creators en marxol.db: 1 → posible servicio
+  JDQKDrc1TQgB…  previos ≥  232, tokens en la muestra   2, muestra de tx 10: 2 creators distintos, 9 = pagador; creators en marxol.db: 1 → posible servicio
+  K6Eh9fwKkrhV…  previos ≥  710, tokens en la muestra  28, muestra de tx 10: 1 creators distintos, 10 = pagador; creators en marxol.db: 1 → operador único
+  chudc2GnxyW2…  previos ≥  105, tokens en la muestra   3, muestra de tx 10: 7 creators distintos, 4 = pagador; creators en marxol.db: 2 → posible servicio
+  dtrzJPj7yDdv…  previos ≥  274, tokens en la muestra   1, muestra de tx 10: 3 creators distintos, 8 = pagador; creators en marxol.db: 1 → posible servicio
+  gVDXhoGbePAC…  previos ≥   56, tokens en la muestra   1, muestra de tx 10: 5 creators distintos, 6 = pagador; creators en marxol.db: 1 → posible servicio
+  timeworn2X1E…  previos ≥  223, tokens en la muestra   2, muestra de tx 10: 6 creators distintos, 5 = pagador; creators en marxol.db: 2 → posible servicio
+  operador único: 45 pagadores, 288 tokens de V1–V3
+  posible servicio: 58 pagadores, 101 tokens de V1–V3
+
+CONSUMO (libro de CU, bolsa manual): 7 ejecuciones de payer-history, 2707 peticiones, 108280 CU

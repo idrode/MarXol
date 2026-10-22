@@ -1,50 +1,77 @@
-FASE 3, EXPLORACIÓN POST HOC sobre marxol.db (piloto, V1, V2 y V3) — SIN VEREDICTO
+FASE 3, EXPLORACIÓN POST HOC sobre marxol.db (piloto, V1, V2 y V3) — SIN VEREDICTO, EXPLORATORIO
 Solo describe. Nada de esto decide; lo que se use como razón de veto se fija en una adenda
-del pre-registro y se valida en el bloque B de marxol_vivo.db.
+del pre-registro y se valida en el bloque B de marxol_vivo.db. Todo % lleva n e IC 95 % (Wilson).
 
-1a. COSTE DE LANZAR (tx de creación de tests/fixtures/tx; pérdida del pagador − compra inicial con comisiones)
-    2JVXhpLyCvts…  pagador −1.032166 SOL, compra inicial 1.000000, coste de lanzar 0.032166 SOL (comisión de la tx 0.001010)
-    3mxY1rgK8EUe…  pagador −0.010044 SOL, compra inicial 0.000000, coste de lanzar 0.010044 SOL (comisión de la tx 0.000016)
-    3njLtj6QHuK5…  pagador −86.076999 SOL, compra inicial 86.067926, coste de lanzar 0.009073 SOL (comisión de la tx 0.000082)
-    4Xc5aER3hCUp…  pagador −86.076892 SOL, compra inicial 86.067926, coste de lanzar 0.008966 SOL (comisión de la tx 0.000010)
-    5NZKxQYzK4J1…  pagador −86.076958 SOL, compra inicial 85.005359, coste de lanzar 1.071599 SOL (comisión de la tx 0.000010)
-    mUKGav3xWvj5…  pagador −0.145543 SOL, compra inicial 0.136491, coste de lanzar 0.009052 SOL (comisión de la tx 0.000050)
-    mediana: 0.009558 SOL (n = 6; incluye rent de las cuentas, comisión y prioridad)
+1a. COSTE DE LANZAR (muestra de tx de creación de marxol.db por hash de la firma, marxol_fase3.db)
+    = lo que pierde el pagador en la tx − lo que pone en sus compras de la misma tx (sol + comisiones)
+    + lo que recibe de sus ventas. Incluye rent de las cuentas, comisión, prioridad y propinas.
+    n = 187: p10 0.007058 SOL, mediana 0.009697 SOL, p75 0.01082 SOL, p90 0.02077 SOL, máx 5.064 SOL
 
 1b. INGRESO POR COMISIÓN DE CREADOR (tokens en SOL con ventana temprana completa)
     783 tokens; 209 sin creator_fee_basis_points en algún trade (filas antiguas) quedan fuera.
-    Ventana de 5 min: exacta (sol_amount × creator_fee_bps de cada TradeEvent).
-    Primera hora: aproximada (5 min exactos + |Δ reservas| × bps del último trade de la ventana).
-    'Creador con ≥ 2 tokens' es solo dentro de la muestra (4 franjas de ~8 min): mínimo, no historial.
+    5 min: exacto (sol_amount × creator_fee_bps de cada TradeEvent). 1 h: aproximado (5 min exactos
+    + |Δ reservas| × bps del último trade de la ventana). Solo la curva: no incluye PumpSwap tras graduar.
+    Grupos por lanzamientos previos del PAGADOR en 7 d (C', mínimo: no ve creaciones del mismo
+    creator pagadas por otra wallet ni operadores con varias wallets). Solo tokens de V1–V3 con C'.
+    La comisión de creador va al `creator` del token, que en 'posible servicio' a menudo no es el pagador.
     todos:
-      5 min  n = 574: mediana 0.004341 SOL, p75 0.0207 SOL, p90 0.1082 SOL, máx 1.677 SOL
-      1 h    n = 574: mediana 0.005076 SOL, p75 0.02478 SOL, p90 0.1199 SOL, máx 4.421 SOL
-      supera el coste de lanzar (0.0096 SOL) en 1 h: 219/574 = 38.2 %
-    creador con 1 token en la muestra:
-      5 min  n = 258: mediana 0.01021 SOL, p75 0.06626 SOL, p90 0.2444 SOL, máx 1.677 SOL
-      1 h    n = 258: mediana 0.01085 SOL, p75 0.07456 SOL, p90 0.255 SOL, máx 4.421 SOL
-      supera el coste de lanzar (0.0096 SOL) en 1 h: 136/258 = 52.7 %
-    creador con ≥ 2 tokens en la muestra:
-      5 min  n = 316: mediana 0.002349 SOL, p75 0.01041 SOL, p90 0.02903 SOL, máx 0.7971 SOL
-      1 h    n = 316: mediana 0.002356 SOL, p75 0.01055 SOL, p90 0.02966 SOL, máx 2.816 SOL
-      supera el coste de lanzar (0.0096 SOL) en 1 h: 83/316 = 26.3 %
+      5 min  n = 574: p10 0 SOL, mediana 0.004341 SOL, p75 0.0207 SOL, p90 0.1082 SOL, máx 1.677 SOL
+      1 h    n = 574: p10 0 SOL, mediana 0.005076 SOL, p75 0.02478 SOL, p90 0.1199 SOL, máx 4.421 SOL
+      1 h > coste de lanzar mediano (0.0097 SOL): 219/574 = 38.2 % [IC 95 % 34.3–42.2]
+    pagador con 0 previos:
+      5 min  n = 125: p10 0.001097 SOL, mediana 0.01161 SOL, p75 0.07315 SOL, p90 0.2144 SOL, máx 1.052 SOL
+      1 h    n = 125: p10 0.001299 SOL, mediana 0.01294 SOL, p75 0.1049 SOL, p90 0.255 SOL, máx 4.421 SOL
+      1 h > coste de lanzar mediano (0.0097 SOL): 73/125 = 58.4 % [IC 95 % 49.6–66.7]
+    pagador con 1–4 previos:
+      5 min  n = 65: p10 0 SOL, mediana 0.003052 SOL, p75 0.009916 SOL, p90 0.01757 SOL, máx 0.4972 SOL
+      1 h    n = 65: p10 0 SOL, mediana 0.003141 SOL, p75 0.0108 SOL, p90 0.03874 SOL, máx 0.5001 SOL
+      1 h > coste de lanzar mediano (0.0097 SOL): 19/65 = 29.2 % [IC 95 % 19.6–41.2]
+    pagador con 5–49 previos:
+      5 min  n = 124: p10 0 SOL, mediana 0.001071 SOL, p75 0.006735 SOL, p90 0.05942 SOL, máx 0.7971 SOL
+      1 h    n = 124: p10 0 SOL, mediana 0.001094 SOL, p75 0.007876 SOL, p90 0.05942 SOL, máx 2.816 SOL
+      1 h > coste de lanzar mediano (0.0097 SOL): 28/124 = 22.6 % [IC 95 % 16.1–30.7]
+    pagador con ≥ 50 previos (operador único):
+      5 min  n = 201: p10 0 SOL, mediana 0.002963 SOL, p75 0.01023 SOL, p90 0.0218 SOL, máx 0.3062 SOL
+      1 h    n = 201: p10 0 SOL, mediana 0.002963 SOL, p75 0.01023 SOL, p90 0.0218 SOL, máx 1.008 SOL
+      1 h > coste de lanzar mediano (0.0097 SOL): 51/201 = 25.4 % [IC 95 % 19.9–31.8]
+    pagador con ≥ 50 previos (posible servicio):
+      5 min  n = 46: p10 0.00661 SOL, mediana 0.06237 SOL, p75 0.1445 SOL, p90 0.3677 SOL, máx 1.677 SOL
+      1 h    n = 46: p10 0.00661 SOL, mediana 0.06237 SOL, p75 0.1445 SOL, p90 0.4684 SOL, máx 3.964 SOL
+      1 h > coste de lanzar mediano (0.0097 SOL): 40/46 = 87.0 % [IC 95 % 74.3–93.9]
 
-3. QUIÉN COMPRA EN EL SLOT DE CREACIÓN (todos los tokens con ventana completa, cualquier quote)
+3. QUIÉN COMPRA EN EL SLOT DE CREACIÓN (tokens con ventana completa)
     creador = creator o pagador del CreateEvent; 'otros, mismo slot' = otras wallets en el slot de creación
     (bundle o sniper muy rápido: sin las propinas a Jito no se distinguen); 'snipers' = slots +1 y +2.
-    Resultado a 5 min marcado a mercado con el precio del último trade de la ventana, sin comisiones.
+    Cada wallet va a la categoría de su primera compra; se siguen todos sus trades de los 5 min.
+    Resultados a 5 min, solo tokens en SOL, en tres versiones:
+      bruto:      ventas − compras + lo que sigue teniendo × precio del último trade (sin comisiones)
+      realizado:  ventas − compras dentro de los 5 min (no cuenta lo que sigue teniendo)
+      realista:   con las comisiones de cada trade (fee + creator fee, bps del TradeEvent) y vendiendo lo que
+                  sigue teniendo de una vez por la curva (producto constante sobre las reservas virtuales del
+                  último trade, con su deslizamiento) pagando las comisiones del último trade. Para el creador,
+                  la comisión de creador de sus propios trades cuenta como coste (vuelve a él: conservador) y
+                  no se suma su ingreso por comisión de creador (1b).
 
-    tokens: 862; con compras de otras wallets en el slot de creación: 355 = 41.2 %
-    creador            % del supply comprado:  n = 862: mediana 1.954 %, p75 6.612 %, p90 12.52 %, máx 79.31 %
-    otros, mismo slot  % del supply comprado:  n = 862: mediana 0 %, p75 5.049 %, p90 13.29 %, máx 79.27 %
-    snipers +1/+2      % del supply comprado:  n = 862: mediana 0 %, p75 0 %, p90 1.729 %, máx 24.03 %
-    creador            resultado a 5 min por token, solo tokens en SOL:  n = 644: mediana 0.009621 SOL, p75 0.297 SOL, p90 1.343 SOL, máx 240.9 SOL
-                       con resultado > 1e-6 SOL: 413/644 = 64.1 %
-                       realizado (ventas − compras en 5 min):  n = 644: mediana 5.541e-05 SOL, p75 0.2453 SOL, p90 1.116 SOL, máx 12.85 SOL; > 0 en 328/644 = 50.9 %
-    otros, mismo slot  resultado a 5 min por token, solo tokens en SOL:  n = 281: mediana 0 SOL, p75 0.1491 SOL, p90 1.646 SOL, máx 11.84 SOL
-                       con resultado > 1e-6 SOL: 139/281 = 49.5 %
-                       realizado (ventas − compras en 5 min):  n = 281: mediana 0 SOL, p75 0.1274 SOL, p90 1.646 SOL, máx 10.23 SOL; > 0 en 132/281 = 47.0 %
-    snipers +1/+2      resultado a 5 min por token, solo tokens en SOL:  n = 193: mediana 0 SOL, p75 0.005508 SOL, p90 0.2003 SOL, máx 7.035 SOL
-                       con resultado > 1e-6 SOL: 68/193 = 35.2 %
-                       realizado (ventas − compras en 5 min):  n = 193: mediana -0.0006349 SOL, p75 0.001269 SOL, p90 0.1421 SOL, máx 7.035 SOL; > 0 en 60/193 = 31.1 %
-    (marcado a mercado sobrevalora posiciones grandes: vender todo movería el precio; el realizado no cuenta lo que siguen teniendo)
+    tokens: 862; con compras de otras wallets en el slot de creación: 355/862 = 41.2 % [IC 95 % 37.9–44.5]
+    creador            % del supply comprado:  n = 862: p10 0.01451 %, mediana 1.954 %, p75 6.612 %, p90 12.52 %, máx 79.31 %
+    otros, mismo slot  % del supply comprado:  n = 862: p10 0 %, mediana 0 %, p75 5.049 %, p90 13.29 %, máx 79.27 %
+    snipers +1/+2      % del supply comprado:  n = 862: p10 0 %, mediana 0 %, p75 0 %, p90 1.729 %, máx 24.03 %
+    (versión realista: 209 tokens en SOL sin bps de comisión en algún trade quedan fuera)
+    creador            bruto      n = 644: p10 -0.1065 SOL, mediana 0.009621 SOL, p75 0.297 SOL, p90 1.343 SOL, máx 240.9 SOL
+                                  > 0: 413/644 = 64.1 % [IC 95 % 60.4–67.7]
+    creador            realizado  n = 644: p10 -0.2959 SOL, mediana 5.541e-05 SOL, p75 0.2453 SOL, p90 1.116 SOL, máx 12.85 SOL
+                                  > 0: 328/644 = 50.9 % [IC 95 % 47.1–54.8]
+    creador            realista   n = 436: p10 -0.1789 SOL, mediana -0.0002469 SOL, p75 0.1902 SOL, p90 1.376 SOL, máx 16.36 SOL
+                                  > 0: 193/436 = 44.3 % [IC 95 % 39.7–49.0]
+    otros, mismo slot  bruto      n = 281: p10 -0.2491 SOL, mediana 0 SOL, p75 0.1491 SOL, p90 1.646 SOL, máx 11.84 SOL
+                                  > 0: 139/281 = 49.5 % [IC 95 % 43.7–55.3]
+    otros, mismo slot  realizado  n = 281: p10 -0.4938 SOL, mediana 0 SOL, p75 0.1274 SOL, p90 1.646 SOL, máx 10.23 SOL
+                                  > 0: 132/281 = 47.0 % [IC 95 % 41.2–52.8]
+    otros, mismo slot  realista   n = 183: p10 -0.5343 SOL, mediana -0.01235 SOL, p75 0.01658 SOL, p90 0.9452 SOL, máx 9.781 SOL
+                                  > 0: 51/183 = 27.9 % [IC 95 % 21.9–34.8]
+    snipers +1/+2      bruto      n = 193: p10 -0.1027 SOL, mediana 0 SOL, p75 0.005508 SOL, p90 0.2003 SOL, máx 7.035 SOL
+                                  > 0: 68/193 = 35.2 % [IC 95 % 28.8–42.2]
+    snipers +1/+2      realizado  n = 193: p10 -0.1998 SOL, mediana -0.0006349 SOL, p75 0.001269 SOL, p90 0.1421 SOL, máx 7.035 SOL
+                                  > 0: 60/193 = 31.1 % [IC 95 % 25.0–37.9]
+    snipers +1/+2      realista   n = 127: p10 -0.1106 SOL, mediana -0.008596 SOL, p75 -0.0002469 SOL, p90 0.2067 SOL, máx 2.213 SOL
+                                  > 0: 31/127 = 24.4 % [IC 95 % 17.8–32.6]

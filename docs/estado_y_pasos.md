@@ -128,4 +128,12 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - C' etapa 1 (resultados/fase3_cprima_etapa1.txt, 20 440 CU), sobre 100 tokens de V3: 80 tienen un pagador con ≥ 1 lanzamiento previo en 7 d (mínimo), y 16 de 62 pagadores tienen ≥ 50.
    - Dentro de la muestra solo se veía en 56. El rendimiento es alto; la etapa 2 queda pendiente del OK del dueño.
 
+   - C' etapa 2 (resultados/fase3_cprima.txt), 933 tokens de V1–V3 y 513 pagadores, 108 280 CU en total con la etapa 1:
+     - 75,7 % [IC 72,8–78,3] de 904 tokens clasificables tienen un pagador con ≥ 1 lanzamiento previo en 7 d (mínimo), y 41,7 % [38,5–44,9] uno con ≥ 50.
+     - Pagadores con ≥ 50 (103), según una muestra de 10 tx de creación cada uno:
+       - 45 "operador único" (un solo creator; 288 tokens);
+       - 58 "posible servicio" (≥ 2 creators; 101 tokens).
+   - Coste de lanzar medido en 187 tx de creación: mediana 0,0097 SOL, p90 0,021.
+   - Todo es exploratorio: ninguna razón de veto sale de aquí sin su adenda y el bloque B.
+
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.
