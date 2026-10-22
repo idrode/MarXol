@@ -117,4 +117,10 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
      - con 4 000 ppm, ≈ 96 000 CU/día con el coste medido y ≈ 686 000 con la cota pesimista.
    - Falta el OK del dueño para dejarlo en continuo.
 
+   **Recolección en continuo desde 2026-10-22 02:15:51 UTC** (OK del dueño):
+   - `collect --sample-ppm 4000 --poll-secs 300`, topes por defecto.
+   - Corre con `run/collect.sh`: proceso desligado con reinicio, binario copiado en `run/` y log en `run/collect.log` (fuera de git).
+   - Pre-registro de la fase 5, escrito antes de leer ningún resultado: docs/preregistro_fase5_2026-10-22.md (bloques A, B y C por fecha).
+   - Propuesta de medición de creadores en serie: docs/propuesta_creadores_serie.md. Hallazgo: el `creator` es un argumento de `create`/`create_v2`, no una cuenta; solo el pagador aparece en la tx.
+
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.

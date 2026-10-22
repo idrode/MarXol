@@ -152,6 +152,7 @@ Las referencias a "sección N" dentro de docs/ usan la numeración antigua de es
 - docs/estado_y_pasos.md — siguientes pasos y estado detallado, Etapa 0 (margen del aviso) y `marxol check`.
 - docs/historico_lineas_cerradas.md — detalle literal de las líneas cerradas y de los registros de ejecución.
 - docs/diseno_record.md — diseño de `marxol record` (Etapa 2, sin código).
+- docs/propuesta_creadores_serie.md — opciones para medir creadores en serie con muestreo del 0,4 % y su coste (pendiente de decisión).
 - docs/recoleccion.md — `marxol collect`, libro de CU diario, SQLite 24/7, retención y exportación, Termux.
 
 ---

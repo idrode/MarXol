@@ -371,3 +371,5 @@ Esta sección existe porque el principio 1 de la filosofía marXi lo exige: nada
 - [Alchemy Compute Unit Costs](https://www.alchemy.com/docs/reference/compute-unit-costs)
 - [Alchemy Yellowstone gRPC Overview](https://www.alchemy.com/docs/reference/yellowstone-grpc-overview)
 - [Helius Pricing](https://www.helius.dev/pricing)
+
+**`creator` en las instrucciones de creación (verificado 2026-10-22, idl/pump.json y 6 tx de creación de tests/fixtures/tx)**: en `create` y `create_v2`, `creator` es un argumento, no una cuenta. La única wallet del creador que aparece en la tx (y firma) es `user`, el pagador. `getSignaturesForAddress(creator)` no encuentra las creaciones con ese `creator` pagadas por otra wallet. En `marxol.db`, `creator = user` en 842 de 1 015 creaciones (83 %).
