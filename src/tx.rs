@@ -78,8 +78,13 @@ pub struct TxEvents {
 }
 
 pub fn fetch_events(rpc: &RpcClient, idl: &Idl, sig: &str) -> Result<TxEvents> {
+    decode_events(idl, sig, &fetch_raw(rpc, sig)?)
+}
+
+/// `getTransaction` en codificación `json`, sin decodificar.
+pub fn fetch_raw(rpc: &RpcClient, sig: &str) -> Result<EncodedConfirmedTransactionWithStatusMeta> {
     let signature = Signature::from_str(sig).context("firma inválida")?;
-    let tx = rpc
+    rpc
         .get_transaction_with_config(
             &signature,
             RpcTransactionConfig {
@@ -88,8 +93,28 @@ pub fn fetch_events(rpc: &RpcClient, idl: &Idl, sig: &str) -> Result<TxEvents> {
                 max_supported_transaction_version: Some(1),
             },
         )
-        .with_context(|| format!("getTransaction {sig}"))?;
-    decode_events(idl, sig, &tx)
+        .with_context(|| format!("getTransaction {sig}"))
+}
+
+/// Lamports que pierde `wallet` en la tx (pre − post) y comisión de la tx.
+/// `None` si la wallet no está entre las cuentas.
+pub fn balance_delta(tx: &EncodedConfirmedTransactionWithStatusMeta, wallet: &str) -> Result<Option<(i64, u64)>> {
+    let EncodedTransaction::Json(ui_tx) = &tx.transaction.transaction else {
+        bail!("codificación de transacción inesperada");
+    };
+    let UiMessage::Raw(msg) = &ui_tx.message else {
+        bail!("mensaje no es Raw");
+    };
+    let meta = tx.transaction.meta.as_ref().context("transacción sin meta")?;
+    // Los saldos siguen el orden de las claves estáticas y luego las cargadas.
+    let mut keys = msg.account_keys.clone();
+    if let OptionSerializer::Some(loaded) = &meta.loaded_addresses {
+        keys.extend(loaded.writable.iter().cloned());
+        keys.extend(loaded.readonly.iter().cloned());
+    }
+    Ok(keys.iter().position(|k| k == wallet).and_then(|i| {
+        Some((*meta.pre_balances.get(i)? as i64 - *meta.post_balances.get(i)? as i64, meta.fee))
+    }))
 }
 
 /// Extrae y decodifica los eventos pump.fun de una transacción ya leída

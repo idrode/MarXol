@@ -240,7 +240,8 @@ pub fn with_retry<T>(b: &Budget, m: Method, what: &str, mut f: impl FnMut() -> R
                 std::thread::sleep(wait);
                 wait *= 2;
             }
-            r => return r,
+            // El error del cliente HTTP lleva la URL del RPC, y con ella la clave.
+            r => return r.map_err(|e| anyhow::anyhow!(redact(&format!("{e:#}")))),
         }
     }
     unreachable!()
@@ -254,6 +255,28 @@ fn retry_line(provider: &str, m: Method, what: &str, n: u32, wait: Duration) -> 
         m.name(),
         wait.as_secs()
     )
+}
+
+/// Quita las claves de API de un texto (mensajes de error del cliente HTTP,
+/// que incluyen la URL del RPC): el segmento tras `/v2/` (Alchemy) y el
+/// valor de `api-key=` (Helius). Se aplica a todo error que se imprime o se
+/// guarda.
+pub fn redact(s: &str) -> String {
+    let mut out = s.to_string();
+    for marker in ["/v2/", "api-key=", "api_key="] {
+        let mut from = 0;
+        while let Some(i) = out[from..].find(marker) {
+            let start = from + i + marker.len();
+            let end = out[start..]
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+                .map_or(out.len(), |j| start + j);
+            if end > start {
+                out.replace_range(start..end, "<redactado>");
+            }
+            from = start + "<redactado>".len().min(out.len() - start);
+        }
+    }
+    out
 }
 
 pub fn unix_now() -> i64 {
@@ -362,5 +385,20 @@ mod tests {
         assert!(is_exhausted(&b.acquire(Method::GetTransaction).unwrap_err()));
         b.acquire(Method::GetAccountInfo).unwrap();
         assert_eq!(b.ledger().unwrap().used(unix_now()).unwrap().total, 80);
+    }
+
+    #[test]
+    fn los_errores_no_llevan_la_clave() {
+        let e = "HTTP status client error (429 Too Many Requests) for url (https://solana-mainnet.g.alchemy.com/v2/alch_p-x2Ab_9)";
+        assert_eq!(
+            redact(e),
+            "HTTP status client error (429 Too Many Requests) for url (https://solana-mainnet.g.alchemy.com/v2/<redactado>)"
+        );
+        assert_eq!(redact("https://mainnet.helius-rpc.com/?api-key=abc-123&x=1"), "https://mainnet.helius-rpc.com/?api-key=<redactado>&x=1");
+        assert_eq!(redact("sin url"), "sin url");
+        let b = Budget::new(ALCHEMY, Some(1000.0), None);
+        let e = "error sending request for url (https://solana-mainnet.g.alchemy.com/v2/alch_p-x2Ab_9)";
+        let r: Result<()> = with_retry(&b, Method::GetTransaction, "tx", || anyhow::bail!("{e}"));
+        assert!(!format!("{:#}", r.unwrap_err()).contains("alch_p"));
     }
 }

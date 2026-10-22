@@ -306,6 +306,15 @@ enum Cmd {
         max_ma_pages: usize,
         #[arg(long, default_value = "marxol_fase3.db")]
         out_db: String,
+        /// Tx de creación muestreadas por pagador con ≥ --min-prior lanzamientos
+        /// previos, para ver su `creator` (argumento); 0 = ninguna.
+        #[arg(long, default_value_t = 0)]
+        creator_samples: usize,
+        #[arg(long, default_value_t = 50)]
+        min_prior: i64,
+        /// Tx de creación de --db muestreadas para el coste de lanzar; 0 = ninguna.
+        #[arg(long, default_value_t = 0)]
+        cost_samples: usize,
         #[command(flatten)]
         rate: RateArgs,
     },
@@ -315,7 +324,15 @@ enum Cmd {
     Stats,
 }
 
-fn main() -> Result<()> {
+fn main() {
+    // Ningún error sale sin pasar por `redact`: el del cliente HTTP lleva la URL con la clave.
+    if let Err(e) = run() {
+        eprintln!("Error: {}", rpc::redact(&format!("{e:?}")));
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
     let rpc = RpcClient::new_with_timeout_and_commitment(
         cli.rpc.clone(),
@@ -444,7 +461,19 @@ fn main() -> Result<()> {
             print!("{}", collect::status(&st, poll_secs, sample_ppm)?);
             Ok(())
         }
-        Cmd::PayerHistory { from, until, limit, days, max_pages, max_ma_pages, ref out_db, ref rate } => {
+        Cmd::PayerHistory {
+            from,
+            until,
+            limit,
+            days,
+            max_pages,
+            max_ma_pages,
+            ref out_db,
+            creator_samples,
+            min_prior,
+            cost_samples,
+            ref rate,
+        } => {
             let cfg = historial::Config { days, max_pages_payer: max_pages, max_pages_ma: max_ma_pages };
             let b = rate.budget(&cli, "payer-history")?;
             let src = store::Store::open_readonly(&cli.db)?;
@@ -452,7 +481,16 @@ fn main() -> Result<()> {
             let n = historial::select_tokens(&db, &src, from, until, limit, &format!("fnv1a64(mint) menor, [{from}, {until}), {limit}"))?;
             eprintln!("{n} tokens en {out_db}");
             let r = historial::list_mint_authority(&rpc, &db, &b, &cfg)
-                .and_then(|_| historial::scan_payers(&rpc, &db, &b, &cfg).map(|p| eprintln!("{p} pagadores recorridos")));
+                .and_then(|_| historial::scan_payers(&rpc, &db, &b, &cfg).map(|p| eprintln!("{p} pagadores recorridos")))
+                .and_then(|_| {
+                    if creator_samples + cost_samples == 0 {
+                        return Ok(());
+                    }
+                    let sigs = historial::sample_signatures(&db, &src, days, min_prior, creator_samples, cost_samples)?;
+                    let n = historial::sample_creates(&rpc, &idl, &db, &b, &sigs)?;
+                    eprintln!("{n} tx de creación descargadas ({} pedidas)", sigs.len());
+                    Ok(())
+                });
             finish(&b)?;
             r?;
             let rows = historial::prior_launches(&db, days)?;
@@ -521,7 +559,7 @@ fn main() -> Result<()> {
                 fetched += 1;
                 std::thread::sleep(Duration::from_millis(delay_ms));
                 if let Err(e) = b.acquire(rpc::Method::GetTransaction) {
-                    eprintln!("{e:#}");
+                    eprintln!("{}", rpc::redact(&format!("{e:#}")));
                     break;
                 }
                 match tx::fetch_events(&rpc, &idl, &sig) {
@@ -532,7 +570,7 @@ fn main() -> Result<()> {
                         errors += t.decode_errors.len();
                         print_tx(&t, filter.as_deref(), cli.json);
                     }
-                    Err(e) => eprintln!("{sig}: {e:#}"),
+                    Err(e) => eprintln!("{sig}: {}", rpc::redact(&format!("{e:#}"))),
                 }
             }
             if !cli.json {

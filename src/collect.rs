@@ -73,7 +73,7 @@ pub fn run(rpc: &RpcClient, idl: &Idl, st: &mut Store, budget: &rpc::Budget, cfg
         let r = cycle(rpc, idl, st, budget, cfg, start);
         if let Err(e) = &r {
             // Un error de red no tumba el proceso: se registra y se sigue en el próximo ciclo.
-            eprintln!("ciclo con error (se reintenta en el siguiente): {e:#}");
+            eprintln!("ciclo con error (se reintenta en el siguiente): {}", rpc::redact(&format!("{e:#}")));
         }
         n += 1;
         if let (Some(days), true) = (cfg.retention_days, n.is_multiple_of(cfg.maintenance_every.max(1))) {
@@ -82,7 +82,7 @@ pub fn run(rpc: &RpcClient, idl: &Idl, st: &mut Store, budget: &rpc::Budget, cfg
                     "mantenimiento: {} exportaciones ({} filas), {} filas borradas, {} páginas liberadas",
                     m.exports, m.exported_rows, m.deleted_rows, m.freed_pages
                 ),
-                Err(e) => eprintln!("mantenimiento con error (no se ha borrado nada sin exportar): {e:#}"),
+                Err(e) => eprintln!("mantenimiento con error (no se ha borrado nada sin exportar): {}", rpc::redact(&format!("{e:#}"))),
             }
         }
         if cfg.cycles.is_some_and(|c| n >= c) {
@@ -123,7 +123,7 @@ fn cycle(rpc: &RpcClient, idl: &Idl, st: &mut Store, b: &rpc::Budget, cfg: &Conf
             c.units[i] += b.units() - u0;
             match r {
                 Err(e) if rpc::is_exhausted(&e) => {
-                    eprintln!("{e:#}: se para el ciclo (reanudable)");
+                    eprintln!("{}: se para el ciclo (reanudable)", rpc::redact(&format!("{e:#}")));
                     Ok(false)
                 }
                 Err(e) => Err(e),
@@ -164,7 +164,7 @@ fn cycle(rpc: &RpcClient, idl: &Idl, st: &mut Store, b: &rpc::Budget, cfg: &Conf
         anyhow::Ok(())
     })();
     let end = rpc::unix_now();
-    let note = r.as_ref().err().or(agg.as_ref().err()).map(|e| format!("{e:#}"));
+    let note = r.as_ref().err().or(agg.as_ref().err()).map(|e| rpc::redact(&format!("{e:#}")));
     st.conn().execute(
         "UPDATE vivo_cycles SET ended_at = ?2, units_poll = ?3, units_outcomes = ?4, units_create = ?5,
                 units_windows = ?6, units_prices = ?7, pages = ?8, sigs_listed = ?9, sampled = ?10,
@@ -285,7 +285,7 @@ fn creates(rpc: &RpcClient, idl: &Idl, st: &mut Store, b: &rpc::Budget, cfg: &Co
             Ok(t) => t,
             Err(e) if rpc::is_exhausted(&e) => return Err(e),
             Err(e) => {
-                vivo::mark_create_failed(st.conn(), &sig, "error", &format!("{e:#}"), now)?;
+                vivo::mark_create_failed(st.conn(), &sig, "error", &rpc::redact(&format!("{e:#}")), now)?;
                 continue;
             }
         };

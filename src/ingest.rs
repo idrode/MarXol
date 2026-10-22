@@ -52,7 +52,7 @@ pub fn index(
                     total.early_trades += n.early_trades;
                 }
                 // No se marca como vista: se reintentará en la próxima pasada.
-                Err(e) => eprintln!("{sig}: {e:#}"),
+                Err(e) => eprintln!("{sig}: {}", rpc::redact(&format!("{e:#}"))),
             }
         }
         eprintln!("… {walked} firmas recorridas, {fetched} getTransaction, {skipped} ya vistas");
@@ -320,7 +320,7 @@ fn fetch_token_sigs<'a>(
             Err(e) if rpc::is_exhausted(&e) => return Ok(None),
             Err(e) => {
                 errors += 1;
-                eprintln!("{sig}: {e:#}");
+                eprintln!("{sig}: {}", rpc::redact(&format!("{e:#}")));
             }
         }
     }
@@ -385,12 +385,12 @@ pub fn windows_pass(
             let sigs = match curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, w.created_at, end, max_pages) {
                 Ok(s) => s,
                 Err(e) if rpc::is_exhausted(&e) => {
-                    eprintln!("{e:#}: se para aquí (reanudable)");
+                    eprintln!("{}: se para aquí (reanudable)", rpc::redact(&format!("{e:#}")));
                     break;
                 }
                 Err(e) => {
                     // El token queda pendiente; la próxima pasada lo reintenta.
-                    eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
+                    eprintln!("{}: error listando firmas, queda pendiente: {}", w.mint, rpc::redact(&format!("{e:#}")));
                     st.note_attempt("window", &w.mint)?;
                     incomplete += 1;
                     continue;
@@ -467,11 +467,11 @@ pub fn prices_pass(
                 match curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, from, w.created_at + horizon, max_pages) {
                     Ok(s) => s,
                     Err(e) if rpc::is_exhausted(&e) => {
-                        eprintln!("{e:#}: se para aquí (reanudable)");
+                        eprintln!("{}: se para aquí (reanudable)", rpc::redact(&format!("{e:#}")));
                         break;
                     }
                     Err(e) => {
-                        eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
+                        eprintln!("{}: error listando firmas, queda pendiente: {}", w.mint, rpc::redact(&format!("{e:#}")));
                         st.note_attempt("prices", &w.mint)?;
                         incomplete += 1;
                         continue;
