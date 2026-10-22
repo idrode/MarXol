@@ -183,12 +183,24 @@ pub fn recent_signatures(
     limit: usize,
     before: Option<&str>,
 ) -> Result<Vec<SigInfo>> {
+    signatures_page(rpc, address, limit, before, None)
+}
+
+/// Como `recent_signatures`, parando en `until` (excluida): solo firmas más
+/// nuevas que ella (`collect`, desde el punto de reanudación).
+pub fn signatures_page(
+    rpc: &RpcClient,
+    address: &str,
+    limit: usize,
+    before: Option<&str>,
+    until: Option<&str>,
+) -> Result<Vec<SigInfo>> {
     let addr = solana_pubkey::Pubkey::from_str(address).context("dirección inválida")?;
     let sigs = rpc.get_signatures_for_address_with_config(
         &addr,
         GetConfirmedSignaturesForAddress2Config {
             before: before.map(Signature::from_str).transpose()?,
-            until: None,
+            until: until.map(Signature::from_str).transpose()?,
             limit: Some(limit),
             commitment: Some(CommitmentConfig::confirmed()),
         },

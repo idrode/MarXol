@@ -274,7 +274,12 @@ pub struct PendingWindow {
 
 impl Store {
     pub fn open(path: &str) -> Result<Self> {
-        let db = Connection::open(path).with_context(|| format!("abriendo {path}"))?;
+        Self::from_conn(Connection::open(path).with_context(|| format!("abriendo {path}"))?)
+    }
+
+    /// Crea o migra el esquema sobre una conexión ya abierta (la base de
+    /// recolección la abre `ledger::open_vivo_conn`, con WAL).
+    pub fn from_conn(db: Connection) -> Result<Self> {
         db.execute_batch(SCHEMA)?;
         for (table, col, ty) in MIGRATIONS {
             let exists: bool = db.query_row(
@@ -297,9 +302,12 @@ impl Store {
         Ok(Store { db })
     }
 
-    #[cfg(test)]
     pub fn conn(&self) -> &Connection {
         &self.db
+    }
+
+    pub fn conn_mut(&mut self) -> &mut Connection {
+        &mut self.db
     }
 
     /// Creaciones con slot en `[lo, hi]`, ordenadas por (slot, mint):
@@ -957,13 +965,18 @@ impl Store {
     /// Tokens con ventana temprana completa y slot de creación en
     /// `[min_slot, max_slot]`.
     pub fn entry2_inputs(&self, min_slot: u64, max_slot: u64) -> Result<Vec<Entry2Input>> {
-        self.entry2_inputs_where("c.slot BETWEEN ?1 AND ?2", min_slot as i64, max_slot.min(i64::MAX as u64) as i64)
+        self.entry2_inputs_where("c.slot BETWEEN ?1 AND ?2", params![min_slot as i64, max_slot.min(i64::MAX as u64) as i64])
     }
 
     /// Como `entry2_inputs`, con `timestamp` de creación en `[from, until)`
     /// (validación 3: el tramo se cierra por timestamp).
     pub fn entry2_inputs_ts(&self, from: i64, until: i64) -> Result<Vec<Entry2Input>> {
-        self.entry2_inputs_where("c.timestamp >= ?1 AND c.timestamp < ?2", from, until)
+        self.entry2_inputs_where("c.timestamp >= ?1 AND c.timestamp < ?2", params![from, until])
+    }
+
+    /// Como `entry2_inputs`, para un solo mint (agregación de `collect`).
+    pub fn entry2_input(&self, mint: &str) -> Result<Option<Entry2Input>> {
+        Ok(self.entry2_inputs_where("c.mint = ?1", params![mint])?.pop())
     }
 
     /// Creaciones con `timestamp` en `[from, until)`: (slot, mint, timestamp,
@@ -1005,7 +1018,7 @@ impl Store {
         Ok(out)
     }
 
-    fn entry2_inputs_where(&self, cond: &str, a: i64, b: i64) -> Result<Vec<Entry2Input>> {
+    fn entry2_inputs_where(&self, cond: &str, args: impl rusqlite::Params) -> Result<Vec<Entry2Input>> {
         let mut q = self.db.prepare(&format!(
             "SELECT c.mint, c.timestamp, c.slot,
                     (SELECT MAX(pw.horizon_secs) FROM price_windows pw WHERE pw.mint = c.mint AND pw.complete = 1),
@@ -1018,7 +1031,7 @@ impl Store {
              ORDER BY c.slot, c.timestamp"
         ))?;
         let heads = q
-            .query_map(params![a, b], |r| {
+            .query_map(args, |r| {
                 Ok((
                     r.get::<_, String>(0)?,
                     r.get::<_, i64>(1)?,

@@ -7,11 +7,20 @@ use anyhow::{Context, Result};
 use solana_rpc_client::rpc_client::RpcClient;
 use std::time::Duration;
 
-pub fn index(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, address: &str, limit: usize, delay_ms: u64) -> Result<()> {
+pub fn index(
+    rpc: &RpcClient,
+    budget: &rpc::Budget,
+    idl: &Idl,
+    st: &mut store::Store,
+    address: &str,
+    limit: usize,
+    delay_ms: u64,
+) -> Result<()> {
     let mut before: Option<String> = None;
     let (mut walked, mut fetched, mut skipped) = (0, 0, 0);
     let mut total = store::Ingested::default();
     while walked < limit {
+        budget.acquire(rpc::Method::GetSignatures)?;
         let page = tx::recent_signatures(rpc, address, (limit - walked).min(1000), before.as_deref())?;
         let Some(last) = page.last() else { break };
         before = Some(last.signature.clone());
@@ -28,6 +37,7 @@ pub fn index(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, address: &str, l
                 continue;
             }
             std::thread::sleep(Duration::from_millis(delay_ms));
+            budget.acquire(rpc::Method::GetTransaction)?;
             match tx::fetch_events(rpc, idl, &sig) {
                 Ok(t) => {
                     fetched += 1;
@@ -212,7 +222,7 @@ pub fn index_tramo(
 }
 
 pub fn unix_now() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64
+    rpc::unix_now()
 }
 
 /// Holgura (s) al filtrar firmas por `blockTime`: el filtro exacto de la
@@ -306,6 +316,8 @@ fn fetch_token_sigs<'a>(
                     st.mark_fetched(purpose, sig)?;
                 }
             }
+            // Tope diario o de la ejecución: el token queda pendiente, no fallido.
+            Err(e) if rpc::is_exhausted(&e) => return Ok(None),
             Err(e) => {
                 errors += 1;
                 eprintln!("{sig}: {e:#}");
@@ -329,6 +341,9 @@ fn with_budget(
     let r = f(st, &mut tokens);
     st.record_rpc_usage(command, budget, tokens, unix_now())?;
     eprintln!("consumo de esta ejecución: {}", budget.summary());
+    if let Some(l) = budget.finish()? {
+        eprintln!("{l}");
+    }
     for w in budget.retry_summary().into_iter().chain(tx::TRADE_EXTRA_BYTES.summary()) {
         eprintln!("{w}");
     }
@@ -339,7 +354,24 @@ fn with_budget(
 }
 
 pub fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
-    with_budget(st, "windows", budget, |st, done| {
+    with_budget(st, "windows", budget, |st, done| windows_pass(rpc, idl, st, limit, max_pages, None, budget, done))
+}
+
+/// Una pasada de `windows` sin registrar el consumo (lo hace quien llama).
+/// `max_token_sigs`: tope de tx por token (`collect`); un token con más
+/// firmas en la ventana queda incompleto sin descargarlas.
+#[allow(clippy::too_many_arguments)]
+pub fn windows_pass(
+    rpc: &RpcClient,
+    idl: &Idl,
+    st: &mut store::Store,
+    limit: usize,
+    max_pages: usize,
+    max_token_sigs: Option<usize>,
+    budget: &rpc::Budget,
+    done: &mut usize,
+) -> Result<()> {
+    {
         let now = unix_now();
         let pending = st.pending_windows(now, limit)?;
         eprintln!("{} tokens con ventana cerrada pendientes de descarga", pending.len());
@@ -352,6 +384,10 @@ pub fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, 
             let end = w.created_at + store::EARLY_WINDOW_SECS;
             let sigs = match curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, w.created_at, end, max_pages) {
                 Ok(s) => s,
+                Err(e) if rpc::is_exhausted(&e) => {
+                    eprintln!("{e:#}: se para aquí (reanudable)");
+                    break;
+                }
                 Err(e) => {
                     // El token queda pendiente; la próxima pasada lo reintenta.
                     eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
@@ -366,6 +402,14 @@ pub fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, 
                 eprintln!("{}: ventana incompleta (max_pages sin llegar a la creación)", w.mint);
                 continue;
             };
+            let ok_sigs = in_window.iter().filter(|s| !s.failed).count();
+            if let Some(cap) = max_token_sigs.filter(|&c| ok_sigs > c) {
+                incomplete += 1;
+                let note = format!("{ok_sigs} tx en la ventana, más que el tope por token ({cap})");
+                st.record_window(&w.mint, in_window.len(), 0, false, Some(&note), now)?;
+                eprintln!("{}: ventana incompleta ({note})", w.mint);
+                continue;
+            }
             let sigs = in_window.iter().filter(|s| !s.failed).map(|s| s.signature.as_str());
             let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "window", &w.mint, sigs, None)? else {
                 eprintln!("{}: tope de peticiones a mitad de token: queda pendiente (reanudable)", w.mint);
@@ -380,7 +424,7 @@ pub fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, 
         }
         println!("ventanas completas: {complete}, incompletas: {incomplete}, trades nuevos: {trades}");
         Ok(())
-    })
+    }
 }
 
 /// Horizonte de descarga de precio: 1 h de H1b más la ventana temprana, para
@@ -388,7 +432,23 @@ pub fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, 
 pub const PRICE_DOWNLOAD_SECS: i64 = h1b::PARAMS_1H.horizon_secs + store::EARLY_WINDOW_SECS;
 
 pub fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
-    with_budget(st, "prices", budget, |st, done| {
+    with_budget(st, "prices", budget, |st, done| prices_pass(rpc, idl, st, limit, max_pages, None, budget, done))
+}
+
+/// Una pasada de `prices` sin registrar el consumo; `max_token_sigs` como en
+/// `windows_pass`.
+#[allow(clippy::too_many_arguments)]
+pub fn prices_pass(
+    rpc: &RpcClient,
+    idl: &Idl,
+    st: &mut store::Store,
+    limit: usize,
+    max_pages: usize,
+    max_token_sigs: Option<usize>,
+    budget: &rpc::Budget,
+    done: &mut usize,
+) -> Result<()> {
+    {
         let horizon = PRICE_DOWNLOAD_SECS;
         let now = unix_now();
         let copied = st.backfill_prices_from_early_trades()?;
@@ -406,6 +466,10 @@ pub fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, m
             let listed =
                 match curve_signatures(rpc, budget, &w.bonding_curve, &w.signature, from, w.created_at + horizon, max_pages) {
                     Ok(s) => s,
+                    Err(e) if rpc::is_exhausted(&e) => {
+                        eprintln!("{e:#}: se para aquí (reanudable)");
+                        break;
+                    }
                     Err(e) => {
                         eprintln!("{}: error listando firmas, queda pendiente: {e:#}", w.mint);
                         st.note_attempt("prices", &w.mint)?;
@@ -419,6 +483,14 @@ pub fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, m
                 eprintln!("{}: ventana de precio incompleta (max_pages)", w.mint);
                 continue;
             };
+            let ok_sigs = sigs.iter().filter(|s| !s.failed).count();
+            if let Some(cap) = max_token_sigs.filter(|&c| ok_sigs > c) {
+                incomplete += 1;
+                let note = format!("{ok_sigs} tx en el rango, más que el tope por token ({cap})");
+                st.record_price_window(&w.mint, horizon, sigs.len(), 0, false, Some(&note), now)?;
+                eprintln!("{}: ventana de precio incompleta ({note})", w.mint);
+                continue;
+            }
             let fetch = std::iter::once(w.signature.as_str())
                 .chain(sigs.iter().filter(|s| !s.failed).map(|s| s.signature.as_str()));
             let Some((errors, n)) = fetch_token_sigs(rpc, idl, st, budget, "prices", &w.mint, fetch, Some(horizon))? else {
@@ -434,5 +506,5 @@ pub fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, m
         }
         println!("ventanas de precio completas: {complete}, incompletas: {incomplete}, puntos nuevos: {points}");
         Ok(())
-    })
+    }
 }

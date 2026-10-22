@@ -944,29 +944,29 @@ fn entry2_replica_report(
 }
 
 /// Fila por token con T_entry2 para la validación 3 (y su prueba sobre V2).
-struct V3Row<'a> {
-    i: &'a store::Entry2Input,
-    e: entry2::Entry2,
-    creator: String,
-    mayhem: bool,
+pub struct V3Row<'a> {
+    pub i: &'a store::Entry2Input,
+    pub e: entry2::Entry2,
+    pub creator: String,
+    pub mayhem: bool,
     /// H4', H6', H7' con las definiciones congeladas.
-    h4: bool,
-    h6: Option<bool>,
-    h7: bool,
-    d2: Option<bool>,
+    pub h4: bool,
+    pub h6: Option<bool>,
+    pub h7: bool,
+    pub d2: Option<bool>,
     /// Pump-y-caída en 1 h; `None` sin ventana de precio de 1 h.
-    pd: Option<bool>,
-    ret_a: [Option<f64>; 5],
-    ret_b: [entry2::ExitB; 5],
+    pub pd: Option<bool>,
+    pub ret_a: [Option<f64>; 5],
+    pub ret_b: [entry2::ExitB; 5],
     /// Slot del primer punto con precio ≥ 2× el inicial en la primera hora.
-    first_2x: Option<u64>,
+    pub first_2x: Option<u64>,
     /// H4' y H7' con identidades de creador limitadas a lo anterior a T_entry2.
-    strict: (bool, bool),
+    pub strict: (bool, bool),
 }
 
 /// Filas de los tokens con T_entry2; devuelve también cuántos no tienen
 /// precio inicial y cuántos no tienen T_entry2.
-fn v3_rows<'a>(st: &store::Store, inputs: &'a [store::Entry2Input]) -> Result<(Vec<V3Row<'a>>, usize, usize)> {
+pub fn v3_rows<'a>(st: &store::Store, inputs: &'a [store::Entry2Input]) -> Result<(Vec<V3Row<'a>>, usize, usize)> {
     let (p, pb) = (entry2::PARAMS, h1b::PARAMS_1H);
     let (mut rows, mut no_init, mut no_entry) = (Vec::new(), 0, 0);
     for i in inputs {

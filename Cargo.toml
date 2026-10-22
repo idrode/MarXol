@@ -17,3 +17,5 @@ solana-commitment-config = "*"
 solana-signature = "*"
 solana-pubkey = { version = "*", features = ["curve25519"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
+flate2 = "1"
+sha2 = "0.10"

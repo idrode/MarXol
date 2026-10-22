@@ -3,13 +3,15 @@
 use crate::idl::{Decoded, Idl};
 use crate::pump::{self, Graduation};
 use crate::report::print_graduation;
+use crate::rpc;
 use anyhow::{bail, Context, Result};
 use solana_pubkey::Pubkey;
 use solana_rpc_client::rpc_client::RpcClient;
 use std::str::FromStr;
 
-pub fn read_account(rpc: &RpcClient, idl: &Idl, address: &str) -> Result<Decoded> {
+pub fn read_account(rpc: &RpcClient, budget: &rpc::Budget, idl: &Idl, address: &str) -> Result<Decoded> {
     let pk = Pubkey::from_str(address)?;
+    budget.acquire(rpc::Method::GetAccountInfo)?;
     let acc = rpc.get_account(&pk).with_context(|| format!("getAccountInfo {address}"))?;
     anyhow::ensure!(
         acc.owner == pump::program_id(),
@@ -19,9 +21,10 @@ pub fn read_account(rpc: &RpcClient, idl: &Idl, address: &str) -> Result<Decoded
     idl.decode_account(&acc.data)
 }
 
-pub fn verify(rpc: &RpcClient, idl: &Idl) -> Result<()> {
+pub fn verify(rpc: &RpcClient, budget: &rpc::Budget, idl: &Idl) -> Result<()> {
     let ok = |b: bool| if b { "OK  " } else { "FALLO" };
 
+    budget.acquire(rpc::Method::GetAccountInfo)?;
     let prog = rpc.get_account(&pump::program_id())?;
     println!(
         "[{}] program {} ejecutable={} owner={}",
@@ -45,7 +48,7 @@ pub fn verify(rpc: &RpcClient, idl: &Idl) -> Result<()> {
     println!("[{}] Global PDA derivada = {derived}", ok(derived.to_string() == pump::GLOBAL_PDA));
     println!("      mint-authority PDA = {} (para `index --address`)", pump::mint_authority_pda());
 
-    let g = read_account(rpc, idl, pump::GLOBAL_PDA)?;
+    let g = read_account(rpc, budget, idl, pump::GLOBAL_PDA)?;
     let exact = global_exact(&g);
     println!(
         "[{}] Global decodificado ({} campos, faltan {:?}, {} bytes sobrantes)",

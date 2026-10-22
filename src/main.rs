@@ -7,7 +7,7 @@ use marxol::ingest::{index, index_tramo, prices, unix_now, windows};
 use marxol::pump::{self, Graduation};
 use marxol::report::*;
 use marxol::verify::{read_account, verify};
-use marxol::{check, rpc, store, tx};
+use marxol::{check, collect, ledger, rpc, store, tx, vivo};
 use solana_commitment_config::CommitmentConfig;
 use solana_pubkey::Pubkey;
 use solana_rpc_client::rpc_client::RpcClient;
@@ -26,6 +26,16 @@ struct Cli {
     /// Salida en JSON en vez de texto.
     #[arg(long, global = true)]
     json: bool,
+    /// Base de recolección: guarda el libro de CU diario compartido por todos
+    /// los comandos que usan la red (y los datos de `collect`).
+    #[arg(long, env = "MARXOL_VIVO_DB", default_value = "marxol_vivo.db", global = true)]
+    vivo_db: String,
+    /// Tope diario total de CU (día UTC), sumando collect y comandos manuales.
+    #[arg(long, env = "MARXOL_DAILY_CU", default_value_t = ledger::DEFAULT_TOTAL, global = true)]
+    daily_cu: u64,
+    /// Cuota diaria de `collect` dentro del total; el resto es de los manuales.
+    #[arg(long, env = "MARXOL_COLLECT_CU", default_value_t = ledger::DEFAULT_COLLECT, global = true)]
+    collect_cu: u64,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -48,9 +58,36 @@ struct RateArgs {
 }
 
 impl RateArgs {
-    fn budget(&self, rpc_url: &str) -> Result<rpc::Budget> {
-        Ok(rpc::Budget::new(rpc::Provider::parse(&self.provider, rpc_url)?, self.max_rps, self.max_requests))
+    fn budget(&self, cli: &Cli, command: &str) -> Result<rpc::Budget> {
+        let b = rpc::Budget::new(rpc::Provider::parse(&self.provider, &cli.rpc)?, self.max_rps, self.max_requests);
+        with_ledger(b, cli, command, ledger::Pool::Manual)
     }
+}
+
+/// Añade al presupuesto el libro de CU diario compartido (`--vivo-db`).
+fn with_ledger(b: rpc::Budget, cli: &Cli, command: &str, pool: ledger::Pool) -> Result<rpc::Budget> {
+    let caps = ledger::Caps::new(cli.daily_cu, cli.collect_cu)?;
+    let l = ledger::Ledger::open(&cli.vivo_db, command, pool, caps, b.provider.name, unix_now())?;
+    Ok(b.with_ledger(l))
+}
+
+/// Presupuesto de los comandos manuales sin opciones de ritmo (`verify`,
+/// `tx`, `scan`...): proveedor de `MARXOL_PROVIDER` o de la URL, sin tope
+/// por ejecución, con el libro diario. `scan` e `index` llevan su propia
+/// pausa (`--delay-ms`), así que no se les añade ritmo.
+fn manual_budget(cli: &Cli, command: &str, paced: bool) -> Result<rpc::Budget> {
+    let name = std::env::var("MARXOL_PROVIDER").unwrap_or_else(|_| "auto".into());
+    let rps = (!paced).then_some(1e6);
+    with_ledger(rpc::Budget::new(rpc::Provider::parse(&name, &cli.rpc)?, rps, None), cli, command, ledger::Pool::Manual)
+}
+
+/// Cierra la fila del proceso en el libro e imprime el consumo en stderr.
+fn finish(b: &rpc::Budget) -> Result<()> {
+    eprintln!("consumo: {}", b.summary());
+    if let Some(l) = b.finish()? {
+        eprintln!("{l}");
+    }
+    Ok(())
 }
 
 #[derive(Subcommand)]
@@ -194,6 +231,57 @@ enum Cmd {
         #[command(flatten)]
         rate: RateArgs,
     },
+    /// Recolección continua en `--vivo-db` (24/7): lista las creaciones desde
+    /// el punto de reanudación, muestrea por hash de la firma (cubre las 24 h),
+    /// descarga creación, ventana temprana y precio, sigue el estado de la
+    /// curva a +1 h/+24 h/+7 d/+60 d y agrega con el código congelado. Gasta
+    /// solo la bolsa `collect` del libro diario (`--collect-cu`).
+    Collect {
+        /// Tasa de muestreo en partes por millón de las creaciones listadas.
+        #[arg(long, default_value_t = 3_000)]
+        sample_ppm: u32,
+        /// Segundos entre ciclos.
+        #[arg(long, default_value_t = 300)]
+        poll_secs: u64,
+        /// Ciclos a ejecutar (por defecto, sin fin).
+        #[arg(long)]
+        cycles: Option<u64>,
+        /// Páginas de 1 000 firmas para alcanzar el punto de reanudación; si no
+        /// bastan, el hueco queda registrado.
+        #[arg(long, default_value_t = 100)]
+        max_backfill_pages: usize,
+        /// Páginas de firmas por bonding curve (como `windows --max-pages`).
+        #[arg(long, default_value_t = 5)]
+        max_pages: usize,
+        /// Tope de tx por token en cada ventana; con más, queda incompleta.
+        #[arg(long, default_value_t = 400)]
+        max_token_sigs: usize,
+        /// Tokens por etapa y ciclo.
+        #[arg(long, default_value_t = 50)]
+        per_cycle: usize,
+        /// Días de crudos que se guardan; 0 desactiva el borrado.
+        #[arg(long, default_value_t = 30)]
+        retention_days: i64,
+        /// Carpeta de las exportaciones CSV comprimidas (verificadas antes de borrar).
+        #[arg(long, default_value = "marxol_export")]
+        export_dir: String,
+        /// Mantenimiento cada N ciclos (exportar, borrar, vacuum, checkpoint).
+        #[arg(long, default_value_t = 12)]
+        maintenance_every: u64,
+        /// Filas por transacción al borrar.
+        #[arg(long, default_value_t = 500)]
+        delete_batch: usize,
+        #[command(flatten)]
+        rate: RateArgs,
+    },
+    /// Estado de `--vivo-db`: punto de reanudación, tokens, CU medidos por
+    /// ciclo y etapa, proyección diaria y cobertura por hora UTC. Sin red.
+    CollectStatus {
+        #[arg(long, default_value_t = 300)]
+        poll_secs: u64,
+        #[arg(long, default_value_t = 3_000)]
+        sample_ppm: u32,
+    },
     /// Informe de un operador (identidad = campo `creator`, no el payer).
     Operator { creator: String },
     /// Recuento de filas de la base local.
@@ -209,9 +297,17 @@ fn main() -> Result<()> {
     );
     let idl = Idl::pump()?;
     match cli.cmd {
-        Cmd::Verify => verify(&rpc, &idl),
+        Cmd::Verify => {
+            let b = manual_budget(&cli, "verify", true)?;
+            let r = verify(&rpc, &b, &idl);
+            finish(&b)?;
+            r
+        }
         Cmd::Global => {
-            let g = read_account(&rpc, &idl, pump::GLOBAL_PDA)?;
+            let b = manual_budget(&cli, "global", true)?;
+            let g = read_account(&rpc, &b, &idl, pump::GLOBAL_PDA);
+            finish(&b)?;
+            let g = g?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&g.to_json())?);
             } else {
@@ -220,10 +316,13 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        Cmd::Curve { mint } => {
-            let mint = Pubkey::from_str(&mint).context("mint inválido")?;
+        Cmd::Curve { ref mint } => {
+            let mint = Pubkey::from_str(mint).context("mint inválido")?;
             let pda = pump::bonding_curve_pda(&mint);
-            let c = read_account(&rpc, &idl, &pda.to_string())?;
+            let b = manual_budget(&cli, "curve", true)?;
+            let c = read_account(&rpc, &b, &idl, &pda.to_string());
+            finish(&b)?;
+            let c = c?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&c.to_json())?);
             } else {
@@ -232,25 +331,31 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        Cmd::Index { address, limit, delay_ms } => {
+        Cmd::Index { ref address, limit, delay_ms } => {
+            let b = manual_budget(&cli, "index", false)?;
             let mut st = store::Store::open(&cli.db)?;
-            index(&rpc, &idl, &mut st, &address, limit, delay_ms)
+            let r = index(&rpc, &b, &idl, &mut st, address, limit, delay_ms);
+            finish(&b)?;
+            r
         }
-        Cmd::IndexTramo { from, count, until, rate } => {
+        Cmd::IndexTramo { from, count, until, ref rate } => {
+            let b = rate.budget(&cli, "index-tramo")?;
             let mut st = store::Store::open(&cli.db)?;
-            index_tramo(&rpc, &idl, &mut st, from, count, until, &rate.budget(&cli.rpc)?)
+            index_tramo(&rpc, &idl, &mut st, from, count, until, &b)
         }
-        Cmd::Windows { limit, max_pages, rate } => {
+        Cmd::Windows { limit, max_pages, ref rate } => {
+            let b = rate.budget(&cli, "windows")?;
             let mut st = store::Store::open(&cli.db)?;
-            windows(&rpc, &idl, &mut st, limit, max_pages, &rate.budget(&cli.rpc)?)
+            windows(&rpc, &idl, &mut st, limit, max_pages, &b)
         }
         Cmd::H1 { variant } => {
             let st = store::Store::open(&cli.db)?;
             h1_report(&st, cli.json, &variant)
         }
-        Cmd::Prices { limit, max_pages, rate } => {
+        Cmd::Prices { limit, max_pages, ref rate } => {
+            let b = rate.budget(&cli, "prices")?;
             let mut st = store::Store::open(&cli.db)?;
-            prices(&rpc, &idl, &mut st, limit, max_pages, &rate.budget(&cli.rpc)?)
+            prices(&rpc, &idl, &mut st, limit, max_pages, &b)
         }
         Cmd::H1b { variant } => {
             let st = store::Store::open(&cli.db)?;
@@ -272,8 +377,45 @@ fn main() -> Result<()> {
             }
             entry2_report(&st, cli.json, check, &tramo, replica)
         }
-        Cmd::Check { mint, offline, max_pages, rate } => {
-            check_cmd(&rpc, &idl, &cli.db, &cli.rpc, &mint, offline, max_pages, &rate, cli.json)
+        Cmd::Check { ref mint, offline, max_pages, ref rate } => check_cmd(&rpc, &idl, &cli, mint, offline, max_pages, rate),
+        Cmd::Collect {
+            sample_ppm,
+            poll_secs,
+            cycles,
+            max_backfill_pages,
+            max_pages,
+            max_token_sigs,
+            per_cycle,
+            retention_days,
+            ref export_dir,
+            maintenance_every,
+            delete_batch,
+            ref rate,
+        } => {
+            let cfg = collect::Config {
+                sample_ppm,
+                poll_secs,
+                cycles,
+                max_backfill_pages,
+                max_pages,
+                max_token_sigs,
+                per_cycle,
+                retention_days: (retention_days > 0).then_some(retention_days),
+                export_dir: export_dir.clone(),
+                maintenance_every,
+                delete_batch,
+            };
+            let b = rpc::Budget::new(rpc::Provider::parse(&rate.provider, &cli.rpc)?, rate.max_rps, rate.max_requests);
+            let b = with_ledger(b, &cli, "collect", ledger::Pool::Collect)?;
+            let mut st = vivo::open(&cli.vivo_db, unix_now())?;
+            let r = collect::run(&rpc, &idl, &mut st, &b, &cfg);
+            finish(&b)?;
+            r
+        }
+        Cmd::CollectStatus { poll_secs, sample_ppm } => {
+            let st = vivo::open(&cli.vivo_db, unix_now())?;
+            print!("{}", collect::status(&st, poll_secs, sample_ppm)?);
+            Ok(())
         }
         Cmd::Operator { creator } => {
             let st = store::Store::open(&cli.db)?;
@@ -292,16 +434,19 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        Cmd::Tx { signature } => {
-            let t = tx::fetch_events(&rpc, &idl, &signature)?;
-            print_tx(&t, None, cli.json);
+        Cmd::Tx { ref signature } => {
+            let b = manual_budget(&cli, "tx", true)?;
+            let t = b.acquire(rpc::Method::GetTransaction).and_then(|_| tx::fetch_events(&rpc, &idl, signature));
+            finish(&b)?;
+            print_tx(&t?, None, cli.json);
             Ok(())
         }
-        Cmd::Scan { address, limit, events, all, delay_ms } => {
+        Cmd::Scan { ref address, limit, ref events, all, delay_ms } => {
+            let b = manual_budget(&cli, "scan", false)?;
             let filter: Option<Vec<String>> = if all {
                 None
             } else {
-                Some(events.unwrap_or_else(|| {
+                Some(events.clone().unwrap_or_else(|| {
                     pump::IDENTITY_EVENTS
                         .iter()
                         .chain(pump::LIFECYCLE_EVENTS)
@@ -309,7 +454,14 @@ fn main() -> Result<()> {
                         .collect()
                 }))
             };
-            let sigs = tx::recent_signatures(&rpc, &address, limit, None)?;
+            let sigs = b.acquire(rpc::Method::GetSignatures).and_then(|_| tx::recent_signatures(&rpc, address, limit, None));
+            let sigs = match sigs {
+                Ok(s) => s,
+                Err(e) => {
+                    finish(&b)?;
+                    return Err(e);
+                }
+            };
             let mut counts = std::collections::BTreeMap::<String, usize>::new();
             let (mut errors, mut failed_txs, mut fetched) = (0, 0, 0);
             for s in sigs {
@@ -320,6 +472,10 @@ fn main() -> Result<()> {
                 let sig = s.signature;
                 fetched += 1;
                 std::thread::sleep(Duration::from_millis(delay_ms));
+                if let Err(e) = b.acquire(rpc::Method::GetTransaction) {
+                    eprintln!("{e:#}");
+                    break;
+                }
                 match tx::fetch_events(&rpc, &idl, &sig) {
                     Ok(t) => {
                         for e in &t.events {
@@ -337,7 +493,7 @@ fn main() -> Result<()> {
                      errores de decodificación: {errors}"
                 );
             }
-            Ok(())
+            finish(&b)
         }
     }
 }
@@ -345,17 +501,8 @@ fn main() -> Result<()> {
 
 /// `marxol check`: imprime el informe y sale con 3 si no hay veredicto.
 #[allow(clippy::too_many_arguments)]
-fn check_cmd(
-    rpc: &RpcClient,
-    idl: &Idl,
-    db: &str,
-    rpc_url: &str,
-    mint: &str,
-    offline: bool,
-    max_pages: usize,
-    rate: &RateArgs,
-    json: bool,
-) -> Result<()> {
+fn check_cmd(rpc: &RpcClient, idl: &Idl, cli: &Cli, mint: &str, offline: bool, max_pages: usize, rate: &RateArgs) -> Result<()> {
+    let (db, json) = (cli.db.as_str(), cli.json);
     let mint = check::parse_mint(mint)?.to_string();
     let report = if offline {
         let st = store::Store::open_readonly(db)?;
@@ -367,12 +514,13 @@ fn check_cmd(
     } else {
         let max = rate.max_requests.unwrap_or(check::MAX_REQUESTS);
         anyhow::ensure!(max <= check::MAX_REQUESTS, "--max-requests no puede pasar de {}", check::MAX_REQUESTS);
-        let budget = rpc::Budget::new(rpc::Provider::parse(&rate.provider, rpc_url)?, rate.max_rps, Some(max));
+        let budget = rpc::Budget::new(rpc::Provider::parse(&rate.provider, &cli.rpc)?, rate.max_rps, Some(max));
+        let budget = with_ledger(budget, cli, "check", ledger::Pool::Manual)?;
         let now = unix_now();
         let fetched = check::fetch(rpc, idl, &budget, &Pubkey::from_str(&mint)?, max_pages);
         // El consumo se registra también si la lectura falla.
         store::Store::open(db)?.record_rpc_usage("check", &budget, 1, now)?;
-        eprintln!("consumo: {}", budget.summary());
+        finish(&budget)?;
         for w in budget.retry_summary().into_iter().chain(tx::TRADE_EXTRA_BYTES.summary()) {
             eprintln!("{w}");
         }
