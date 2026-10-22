@@ -196,6 +196,19 @@ impl Ledger {
         r
     }
 
+    /// Pids de otros procesos vivos de `command` según el libro (fila sin
+    /// `ended_at` y proceso `marxol` aún presente en `/proc`).
+    pub fn others_running(&self, command: &str) -> Result<Vec<i64>> {
+        let mut q = self.db.prepare("SELECT DISTINCT pid FROM cu_ledger_runs WHERE command = ?1 AND ended_at IS NULL AND run_id != ?2")?;
+        let pids: Vec<i64> = q.query_map(params![command, self.run_id], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        Ok(pids
+            .into_iter()
+            .filter(|p| {
+                std::fs::read(format!("/proc/{p}/cmdline")).is_ok_and(|c| c.windows(6).any(|w| w == b"marxol"))
+            })
+            .collect())
+    }
+
     pub fn finish(&self, now: i64) -> Result<()> {
         self.db.execute("UPDATE cu_ledger_runs SET ended_at = ?2 WHERE run_id = ?1", params![self.run_id, now])?;
         Ok(())
@@ -298,5 +311,20 @@ mod tests {
         let mode: String = db.query_row("PRAGMA journal_mode", [], |r| r.get(0)).unwrap();
         let av: i64 = db.query_row("PRAGMA auto_vacuum", [], |r| r.get(0)).unwrap();
         assert_eq!((mode.as_str(), av), ("wal", 2));
+    }
+
+    #[test]
+    fn ve_un_collect_vivo_y_no_uno_terminado() {
+        let p = tmp("ledger_vivos.db");
+        let caps = Caps::new(1000, 500).unwrap();
+        // Este proceso de test se llama marxol-…: cuenta como un collect vivo.
+        let c = Ledger::open(&p, "collect", Pool::Collect, caps, "alchemy", T).unwrap();
+        let m = Ledger::open(&p, "payer-history", Pool::Manual, caps, "alchemy", T).unwrap();
+        assert_eq!(m.others_running("collect").unwrap(), vec![std::process::id() as i64]);
+        c.finish(T).unwrap();
+        assert!(m.others_running("collect").unwrap().is_empty());
+        // Un pid que ya no existe no cuenta.
+        c.db.execute("INSERT INTO cu_ledger_runs (started_at, command, pool, pid, provider, requests, units) VALUES (0, 'collect', 'collect', 999999999, 'alchemy', 0, 0)", []).unwrap();
+        assert!(m.others_running("collect").unwrap().is_empty());
     }
 }

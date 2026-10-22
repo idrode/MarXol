@@ -171,6 +171,8 @@ def main():
     print("    + |Δ reservas| × bps del último trade de la ventana). Solo la curva: no incluye PumpSwap tras graduar.")
     sel = [("todos", lambda m: True)]
     if groups:
+        # En 'posible servicio' la comisión va al creator, que a menudo no es el pagador: no se mezcla.
+        sel.append(("todos salvo 'posible servicio' (con C')", lambda m: m in groups and groups[m] != "≥ 50, posible servicio"))
         print(f"    Grupos por lanzamientos previos del PAGADOR en {DAYS} d (C', mínimo: no ve creaciones del mismo")
         print("    creator pagadas por otra wallet ni operadores con varias wallets). Solo tokens de V1–V3 con C'.")
         for g in ["0", "1–4", "5–49", "≥ 50, operador único", "≥ 50, posible servicio", "≥ 50, sin muestra de creators"]:
@@ -185,7 +187,10 @@ def main():
         print(f"    {name}:")
         print(f"      5 min  {desc(a, ' SOL', LAMPORTS)}")
         print(f"      1 h    {desc(b, ' SOL', LAMPORTS)}")
-        if cost_ok and b:
+        if cost_ok and b and name.endswith("(posible servicio)"):
+            print(f"      1 h > coste de lanzar mediano: {share(sum(v > launch_cost for v in b), len(b))} — NO COMPARABLE: la comisión")
+            print("      la cobra el creator del token y el coste lo paga el pagador (otra wallet en parte de los casos)")
+        elif cost_ok and b:
             print(f"      1 h > coste de lanzar mediano ({launch_cost / LAMPORTS:.4f} SOL): {share(sum(v > launch_cost for v in b), len(b))}")
     print()
 

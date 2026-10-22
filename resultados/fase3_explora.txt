@@ -18,6 +18,10 @@ del pre-registro y se valida en el bloque B de marxol_vivo.db. Todo % lleva n e 
       5 min  n = 574: p10 0 SOL, mediana 0.004341 SOL, p75 0.0207 SOL, p90 0.1082 SOL, máx 1.677 SOL
       1 h    n = 574: p10 0 SOL, mediana 0.005076 SOL, p75 0.02478 SOL, p90 0.1199 SOL, máx 4.421 SOL
       1 h > coste de lanzar mediano (0.0097 SOL): 219/574 = 38.2 % [IC 95 % 34.3–42.2]
+    todos salvo 'posible servicio' (con C'):
+      5 min  n = 515: p10 0 SOL, mediana 0.003266 SOL, p75 0.0142 SOL, p90 0.06901 SOL, máx 1.052 SOL
+      1 h    n = 515: p10 0 SOL, mediana 0.003334 SOL, p75 0.01565 SOL, p90 0.07921 SOL, máx 4.421 SOL
+      1 h > coste de lanzar mediano (0.0097 SOL): 171/515 = 33.2 % [IC 95 % 29.3–37.4]
     pagador con 0 previos:
       5 min  n = 125: p10 0.001097 SOL, mediana 0.01161 SOL, p75 0.07315 SOL, p90 0.2144 SOL, máx 1.052 SOL
       1 h    n = 125: p10 0.001299 SOL, mediana 0.01294 SOL, p75 0.1049 SOL, p90 0.255 SOL, máx 4.421 SOL
@@ -37,7 +41,8 @@ del pre-registro y se valida en el bloque B de marxol_vivo.db. Todo % lleva n e 
     pagador con ≥ 50 previos (posible servicio):
       5 min  n = 46: p10 0.00661 SOL, mediana 0.06237 SOL, p75 0.1445 SOL, p90 0.3677 SOL, máx 1.677 SOL
       1 h    n = 46: p10 0.00661 SOL, mediana 0.06237 SOL, p75 0.1445 SOL, p90 0.4684 SOL, máx 3.964 SOL
-      1 h > coste de lanzar mediano (0.0097 SOL): 40/46 = 87.0 % [IC 95 % 74.3–93.9]
+      1 h > coste de lanzar mediano: 40/46 = 87.0 % [IC 95 % 74.3–93.9] — NO COMPARABLE: la comisión
+      la cobra el creator del token y el coste lo paga el pagador (otra wallet en parte de los casos)
 
 3. QUIÉN COMPRA EN EL SLOT DE CREACIÓN (tokens con ventana completa)
     creador = creator o pagador del CreateEvent; 'otros, mismo slot' = otras wallets en el slot de creación

@@ -476,6 +476,12 @@ fn run() -> Result<()> {
         } => {
             let cfg = historial::Config { days, max_pages_payer: max_pages, max_pages_ma: max_ma_pages };
             let b = rate.budget(&cli, "payer-history")?;
+            // Regla del dueño (2026-10-22): no en paralelo con collect (se reparten el ritmo del plan y hubo 429).
+            let running = b.ledger().map(|l| l.others_running("collect")).transpose()?.unwrap_or_default();
+            if !running.is_empty() {
+                finish(&b)?;
+                anyhow::bail!("collect está corriendo (pid {running:?}): payer-history no se ejecuta en paralelo; páralo antes");
+            }
             let src = store::Store::open_readonly(&cli.db)?;
             let db = historial::open(out_db)?;
             let n = historial::select_tokens(&db, &src, from, until, limit, &format!("fnv1a64(mint) menor, [{from}, {until}), {limit}"))?;

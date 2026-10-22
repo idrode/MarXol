@@ -52,3 +52,40 @@ Pendiente de decisión del dueño. No hay nada implementado.
 - **C en `collect`** solo si C' da algo que valga la pena validar, con retención por tabla de 90 días para `vivo_create_sigs`.
 
 Hasta entonces, **A**: el límite queda documentado y `collect` sigue guardando todas las firmas de creación. C sigue siendo posible a posteriori sobre los bloques A y B, mientras esas firmas no se borren.
+
+## Espacio para C con retención de 60–90 días (2026-10-22, medido; sin cambiar nada)
+
+**Medido en `marxol_vivo.db`**:
+- 4 357 firmas en `vivo_create_sigs` ocupan 1 044 480 bytes: tabla 503 808, índice de la clave 475 136 e índice de blockTime 65 536. Son unos **240 bytes por firma**: la firma en texto base58 (88 caracteres) se guarda dos veces, en la tabla y en su índice.
+- Ritmo: 0,49–0,59 firmas por segundo en las medidas, unas **42 000–51 000 al día**. El 4 % tiene error.
+
+**Tabla actual** (firma completa):
+
+| Retención | Filas | Espacio |
+|---|---|---|
+| 30 d (la actual) | 1,3–1,5 M | **300–370 MB** |
+| 60 d | 2,5–3,1 M | 600–735 MB |
+| 90 d | 3,8–4,6 M | 0,9–1,1 GB |
+
+Ya con la configuración actual son unos 300–370 MB en el teléfono cuando se estabilice, más las exportaciones.
+
+**Propuesta compacta**, solo para el cruce de C:
+- `vivo_create_h_AAAAMMDD (h INTEGER PRIMARY KEY, slot INTEGER NOT NULL)`, una tabla por día UTC.
+  - `h` = los 8 primeros bytes de la firma decodificada, como entero con signo.
+  - Las firmas ed25519 son uniformes, así que no hace falta otro hash.
+  - Solo se guardan las firmas sin error.
+- `h` es el rowid, así que no hay índice aparte. Unos 20 bytes de registro; con las claves aleatorias, las páginas se llenan al ~70 %, así que quedan **≈ 30 bytes por firma**.
+- **Retención**: `DROP TABLE` del día que caduca. Es instantáneo, sin borrados fila a fila ni índice por tiempo.
+- **Cruce**: las firmas del pagador se convierten a `h` y se buscan en las tablas de los 7 días de la ventana.
+- **Colisiones**: con 4,6 M filas (90 días), la probabilidad de alguna colisión en toda la tabla es ≈ n²/2⁶⁵ ≈ 6·10⁻⁷. Una colisión solo sumaría 1 previo a un pagador. Se documenta como límite.
+
+| Retención | Espacio compacto |
+|---|---|
+| 60 d | ≈ 76–92 MB |
+| 90 d | ≈ 113–138 MB |
+
+**Además**, si se activa C, se puede bajar la retención de la tabla completa `vivo_create_sigs` de 30 a 7 días: de 300–370 MB a 70–85 MB. Después de listar no se usa salvo para exportarla, y las exportaciones CSV.gz se conservan.
+
+**Comprobación antes de fiarse**: una semana con las dos tablas a la vez. Los previos calculados con `h` tienen que coincidir con los de la firma completa en todos los tokens muestreados.
+
+No se ha cambiado nada. Requiere el OK del dueño, que lo decide tras el informe de 24 h.

@@ -110,6 +110,69 @@ Las métricas de la fase 3 todavía no están definidas: se exploran sobre `marx
    - No antes del 2026-11-15 00:00 UTC para resultados de +1 h o +24 h.
    - Para resultados a +7 d o +60 d, no antes de que venzan en todos los tokens del bloque: el 2026-11-20 o el 2027-01-12, más 48 h.
 
+## Adenda 1 (2026-10-22): razones de veto R1 y R2 para el bloque B
+
+Redactada antes de calcular nada sobre el bloque B. Tampoco se han cruzado R1 ni R2 con ningún retorno, ni en `marxol.db`: la exploración (resultados/fase3_cprima.txt y fase3_explora.txt) solo contó tokens por grupo y resultados del creador.
+
+Se puede revisar, con commit y anotándolo en el registro de cambios, **hasta que se calcule algo de R1 o R2 sobre el bloque B**. Después queda fija.
+
+**k = 2 razones → umbral de p = 0,01 / 2 = 0,005 para cada una (Bonferroni).**
+
+### R1: pagador en serie
+
+- **Definición**:
+  - Pagador = `CreateEvent.user`, la wallet que firma y paga la creación.
+  - Previos = creaciones sin error en `[t0 − 7 d, t0)` cuya tx incluye al pagador. Se cuentan como las firmas sin error de la PDA mint-authority que también aparecen en `getSignaturesForAddress(pagador)`, sin la del propio token.
+  - Es el método de `marxol payer-history` (`historial::prior_launches`), con 7 días y un tope de 5 páginas de 1 000 firmas por pagador.
+- **R1 = verdadero si previos ≥ 5.** El umbral sale de los cortes de la exploración (0 / 1–4 / 5–49 / ≥ 50), fijados sin mirar retornos.
+  - Un pagador truncado por el tope cuenta como verdadero si ya tiene ≥ 5 contados (es un mínimo). Si tiene menos, es n/e: se excluye y se cuenta aparte.
+- **Fuente del listado de mint-authority en el bloque B**: `vivo_create_sigs` de `marxol_vivo.db`, solo firmas con `failed = 0`, sin coste extra.
+  - Un token es n/e si su ventana `[t0 − 7 d, t0)` se solapa con un hueco de `vivo_gaps` o queda antes del inicio del listado.
+  - El listado empieza el 2026-10-22 02:15 UTC y el bloque B el 30-10, así que cubre los 7 días previos de todos sus tokens.
+  - La retención de 30 días no borra nada necesario antes de la evaluación.
+- **Límite**: es un mínimo. No ve las creaciones con el mismo `creator` pagadas por otra wallet, ni operadores con varias wallets.
+- **Datos**:
+  - Las firmas de los pagadores del bloque B se descargan después del 2026-11-13, **con `collect` parado** (regla del dueño: no en paralelo), en la bolsa manual.
+  - Estimación: ≈ 2 700 tokens × 1,8 páginas × 40 CU ≈ 200 000 CU, repartidas en los días que haga falta.
+
+### R2: creador con resultado positivo en T_entry2
+
+- **Por qué en T_entry2 y no a +5 min**: el veto se decide en T_entry2. La versión a +5 min de la exploración usa trades posteriores, así que solo se reporta como descriptiva.
+- **Identidades del creador**: `creator` y pagador del `CreateEvent`. Cuentan si su primera compra es en el slot de creación, igual que en scripts/fase3_explora.py, sección 3. Si no compran en ese slot, R2 = falso.
+- **Trades**: los de esas identidades **anteriores a T_entry2** en orden de ejecución, la misma partición que H4'–H7' (`entry2::compute`).
+- **Resultado realista**, en SOL:
+  - Ventas − compras, con las comisiones de cada trade: compra = `sol_amount` × (1 + (fee_bps + creator_fee_bps)/10⁴); venta = `sol_amount` × (1 − …).
+  - Más la venta de una vez de lo que aún tienen, por la curva de producto constante sobre las reservas virtuales justo antes de T_entry2, pagando la comisión del último trade anterior.
+  - La comisión de creador de sus propios trades cuenta como coste, y no se suma su ingreso por comisión.
+- **R2 = verdadero si el resultado > 1 000 lamports (10⁻⁶ SOL).**
+- **n/e**: tokens no cotizados en SOL, tokens con algún trade sin bps de comisión, y tokens sin T_entry2 (no entran en la población).
+- **Implementación**: una función pura nueva en Rust. Antes de calcularla sobre el bloque B se prueba sobre `marxol.db`: tiene que reproducir el mismo cálculo hecho en Python con el corte en T_entry2. El commit queda anotado en el registro de cambios.
+
+### Criterio (igual para R1 y R2)
+
+- **Resultado**: retorno neto (a) a +30 min desde T_entry2 (congelado).
+- **Población**: la de V4-D2 aplicada al bloque B:
+  - sin mayhem, con T_entry2, un token por creator;
+  - ventana temprana y de precio completas;
+  - sin los n/e de cada razón, que se cuentan aparte.
+- **Hipótesis**: tokens con R = verdadero tienen menor retorno que con R = falso.
+- **"R VALIDADA" solo si se cumplen todos**:
+  1. ≥ 20 tokens por grupo.
+  2. Mann-Whitney unilateral (falso > verdadero) con **p < 0,005**.
+  3. Diferencia de medianas (falso − verdadero) ≥ 10 puntos (tolerancia 1e-9).
+  4. Misma dirección sin el token de mayor peso.
+  5. Bootstrap de 2 000 réplicas, semilla 20260930, remuestreo por creator: IC al 95 % de la diferencia de medianas que excluye 0 (estricto).
+- **Otros veredictos**: si falla el 1, "NO CONCLUYENTE POR POTENCIA" (no se amplía el bloque). Si se cumple el 1 y falla alguno de los criterios 2–5, "NO VALIDADA".
+- Una razón no validada queda en `check` solo como descriptiva.
+- **Secundario** (descriptivo):
+  - cada razón dentro de los tokens que pasan D2 (¿añade algo a D2?);
+  - solapamiento de R2 con H4';
+  - R1 por subgrupos 5–49 / ≥ 50;
+  - R2 a +5 min;
+  - retornos a +5 min y +60 min.
+- **Fecha**: una sola evaluación, no antes del **2026-11-15 00:00 UTC** y con los datos de R1 descargados.
+
 ## Registro de cambios
 
 - 2026-10-22: versión inicial, antes de leer ningún resultado de `marxol_vivo.db`.
+- 2026-10-22: adenda 1 (R1 pagador en serie, R2 creador con resultado positivo en T_entry2; Bonferroni k = 2), antes de calcular nada sobre el bloque B y sin cruzar R1/R2 con retornos.
