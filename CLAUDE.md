@@ -176,7 +176,10 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
 
 `--json` sirve para todos los comandos que imprimen eventos o cuentas.
 
-**Módulos**:
+**Módulos** (desde 2026-10-22, librería `marxol` en `src/lib.rs` y CLI fina en `src/main.rs`: clap, despacho y `check`):
+- `src/ingest.rs`: descargas a la base local (`index`, `index-tramo`, `windows`, `prices`), con presupuesto y registro en `rpc_usage`.
+- `src/report.rs`: informes de los comandos de análisis (`h1`, `h1b`, `entry`, `entry2`, `operator`) y salida de cuentas y tx decodificadas.
+- `src/verify.rs`: `marxol verify` y lectura de cuentas del programa.
 - `src/idl.rs`: decodificador Borsh genérico dirigido por `idl/pump.json` (embebido en el binario). No hay structs escritos a mano por evento. Si los bytes son más cortos que el IDL actual (eventos o cuentas históricos, de antes de que se añadieran campos al final), los campos que faltan se reportan en `missing`, nunca se rellenan con valores por defecto.
 - `src/tx.rs`: `getTransaction` → inner instructions al programa pump cuyo primer account es el `event_authority` (PDA `["__event_authority"]`) → prefijo `e445a52e51cb9a1d` (sha256("anchor:event")[..8]) + discriminador de evento → Borsh. Incluye las cuentas cargadas desde lookup tables.
 - `src/store.rs`: tablas `creations` (creator original, inmutable), `creator_changes` (una fila por evento, `kind ∈ {set_creator, migrate_to_sharing}`, nunca sobreescribe), `completions`, `migrations`, `seen_signatures`; para H1: `early_trades` (los `TradeEvent` de la ventana temprana de mints con creación conocida, con el `creator` embebido del trade = creator vigente en ese momento), `trade_windows` (cobertura por mint: solo con `complete = 1` H1 es evaluable) y `h1_results` (resultado derivado por `(mint, variant)` con los parámetros usados; recalculable, se reemplaza; sustituye a la antigua `h1_signals`, que se borra al abrir la base).

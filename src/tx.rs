@@ -27,6 +27,12 @@ pub struct ExtraBytes {
     warned: AtomicBool,
 }
 
+impl Default for ExtraBytes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExtraBytes {
     pub const fn new() -> Self {
         ExtraBytes { count: AtomicU64::new(0), warned: AtomicBool::new(false) }

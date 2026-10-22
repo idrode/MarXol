@@ -95,7 +95,7 @@ pub fn evaluate(st: &Store, mint: &str, now: Option<i64>) -> Result<Report> {
     let initial = st.creation_initial(mint)?.with_context(|| format!("{mint}: sin precio inicial del CreateEvent"))?;
     let trades = st.entry_trades(mint, c.t0, store::EARLY_WINDOW_SECS)?;
     let ids = st.creator_identities(mint)?;
-    let window_open = now.is_some_and(|n| n < c.t0 + p.window_secs + crate::BLOCK_TIME_SLACK);
+    let window_open = now.is_some_and(|n| n < c.t0 + p.window_secs + crate::ingest::BLOCK_TIME_SLACK);
     let mut r = Report::not_evaluable(mint, String::new());
     r.reason = None;
     r.bonding_curve = Some(c.bonding_curve);
@@ -111,7 +111,7 @@ pub fn evaluate(st: &Store, mint: &str, now: Option<i64>) -> Result<Report> {
         r.reason = Some(if window_open {
             format!(
                 "aún no hay T_entry2 y la ventana temprana sigue abierta: vuelve a comprobarlo a partir de t0 + {} s",
-                p.window_secs + crate::BLOCK_TIME_SLACK
+                p.window_secs + crate::ingest::BLOCK_TIME_SLACK
             )
         } else {
             format!(
@@ -352,7 +352,7 @@ pub fn fetch(rpc: &RpcClient, idl: &Idl, budget: &rpc::Budget, mint: &Pubkey, ma
     let t0 = st.creation_info(&mint_s)?.context("creación no guardada")?.t0;
 
     // Transacciones de la ventana temprana (mismo filtro por blockTime que `windows`).
-    let slack = crate::BLOCK_TIME_SLACK;
+    let slack = crate::ingest::BLOCK_TIME_SLACK;
     let window: Vec<&str> = sigs
         .iter()
         .filter(|s| !s.failed && s.signature != creation)
