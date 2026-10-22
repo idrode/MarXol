@@ -15,7 +15,7 @@ Desde el 2026-10-21, este archivo solo guarda lo necesario en toda sesión. El r
 - **Verificar on-chain antes de construir encima**: ningún program ID, umbral o parámetro se da por bueno por una doc o un blog. Los parámetros económicos se leen de `Global`, nunca se hardcodean.
 - **Pre-registro**: hipótesis, umbrales y criterio de éxito se fijan y se anotan antes de mirar los datos. Cada evaluación congelada se ejecuta una sola vez. Un cambio posterior es una hipótesis nueva que exige tokens nuevos. Lo post hoc se etiqueta como tal y no decide nada.
 - **Las definiciones congeladas no se modifican**: ver docs/validaciones_congeladas.md.
-- **Datos de `marxol_vivo.db` = fuera de muestra**: D2 y las métricas actuales quedan congeladas en docs/congelado_vivo_2026-10-22.md antes de recolectar. No se ajusta nada contra esos datos sin avisar al dueño.
+- **Datos de `marxol_vivo.db` = fuera de muestra**: D2 y las métricas actuales quedan congeladas en docs/congelado_vivo_2026-10-22.md antes de recolectar. No se ajusta nada contra esos datos sin avisar al dueño. Su uso (bloques por fecha, réplica de D2, validación de la fase 3) está pre-registrado en docs/preregistro_fase5_2026-10-22.md; la fase 3 se explora solo sobre `marxol.db`.
 - **Registrar** cada hallazgo verificado en la misma sesión, con el mismo detalle si confirma o descarta. Correlación no es causalidad.
 
 ---
@@ -145,6 +145,7 @@ Las referencias a "sección N" dentro de docs/ usan la numeración antigua de es
 
 - docs/referencia_tecnica.md — pump.fun (program ID, PDAs, `Global`, graduación), identidad del creator, eventos del IDL, proveedores RPC y costes, límites de APIs, puntos no verificados, hallazgos operativos de mainnet y fuentes.
 - docs/congelado_vivo_2026-10-22.md — D2 y métricas congeladas antes de la recolección continua (sha256 del código de cálculo) y regla sobre los datos fuera de muestra.
+- docs/preregistro_fase5_2026-10-22.md — pre-registro de la fase 5: bloques A (réplica de D2), B (métricas de la fase 3) y C, criterios y fechas de evaluación.
 - docs/validaciones_congeladas.md — definiciones congeladas de V1, V2 y V3 (con adenda y tramos) y definiciones de la robustez post hoc que cita V2. No se modifican.
 - docs/hipotesis_y_resultados.md — H1, H1b, H2 y H3, y resultados completos de V1, V2 y V3.
 - docs/exploracion_operadores.md — exploración de operadores (2026-09-29) e hipótesis H11–H13 sin pre-registrar.
