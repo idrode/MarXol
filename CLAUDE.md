@@ -57,7 +57,7 @@ Estos son principios de trabajo, no detalles técnicos — se aplican a cada dec
 - **Datos** (`marxol.db`): piloto (40 tokens, calibración), V1 (337), V2 (400) y V3 (196), con ventanas tempranas y precios de 65 min completos.
 - **Veredictos**: V1 confirmó H5, H6', H7' y H8 (H4' no, +19 pts). V2 (réplica) confirmó H4', H6' y H7'; H5, H8 y H10 no. V3: **D2 SEPARA GRUPOS** (+19.0 pts de retorno mediano a +30 min, p = 0.00016).
 - **Lectura**: en todas, los tokens que pasan siguen con retorno mediano negativo. Las señales sirven para evitar, no para entrar. Solo valen para tres franjas de 8 minutos.
-- **Herramienta**: `marxol check <mint>` aplica D2 a un token. Verificada sin red y en vivo con tokens inactivos; falta probarla con un token recién creado.
+- **Herramienta**: `marxol check <mint>` aplica D2 a un token. Verificada sin red y en vivo, también con tokens recién creados (resultados/check_en_vivo_*.txt, check_temprano_2026-10-22.txt).
 - **Pendiente**: benchmark de un día de WebSocket (tarifa por byte de Alchemy sin aclarar); `SetCreatorEvent` sin observar; H9–H13 sin pre-registrar.
 - Detalle: docs/estado_y_pasos.md.
 
@@ -65,18 +65,17 @@ Estos son principios de trabajo, no detalles técnicos — se aplican a cada dec
 
 ## Rumbo
 
-Decisión (2026-10-21): opción A acotada. Seguir operadores con muestreo
-dentro del free tier, presupuesto fijo de <N semanas / N franjas>.
-- Antes de recoger datos: pre-registrar H11–H13 y H2/H3 con umbral numérico
-  de continuar/parar, y la pregunta "¿cambia qué token evito o compro?".
-- Techo conocido: seguir a un operador no resuelve la latencia de entrada
-  (el salto ocurre en el slot de creación). Valor esperado: mejorar señales
-  de EVITAR, no encontrar una entrada.
-- Si no se cumple el criterio al final del presupuesto: opción C (informe
-  del resultado negativo) y marXol queda como herramienta de descarte
-  (marxol check).
-- marxol check se mantiene como está; el grabador en tiempo real (B) solo
-  si se reactiva la idea de operar.
+REABIERTO (2026-10-22). Decisión del dueño. Nueva orientación: de "señal de entrada" a **veto/descarte y reputación de creador**, con datos validados.
+- Punto de partida: entrar como comprador tiene mediana negativa (V3: −5.6 % los que pasan D2, −24.7 % los descartados, a +30 min). D2 es un filtro de descarte validado y `marxol check` lo implementa.
+- Fases (cada una termina con resumen, tests y CU, y espera confirmación del dueño):
+  1. Separar núcleo (librería) y CLI fina, sin cambiar comportamiento.
+  2. Recolección continua 24/7 en base aparte (`marxol.db` queda congelada con V1–V3), con tope de CU diario y reanudación.
+  3. Métricas: ingresos por comisión de creador (serie frente a puntuales), fábricas por fuente de fondos, quién captura el slot de creación.
+  4. `marxol check` con razones medidas, su cifra histórica y su n (la línea de D2 y los códigos de salida no cambian).
+  5. Validación fuera de muestra: definiciones congeladas antes de recoger los datos que las evalúan.
+- Reglas: lenguaje neutral en la salida (hechos verificables, sin etiquetas); presupuesto Alchemy free tier (~1M CU/día), consumo registrado por comando; commits pequeños con tests.
+- Se mantiene: revisar el IDL tras cada despliegue en ProgramData; check_en_vivo y check_temprano documentan los límites de uso de `check`.
+- Estado previo (APARCADO, 2026-10-22) y su resumen: docs/estado_y_pasos.md.
 
 ---
 

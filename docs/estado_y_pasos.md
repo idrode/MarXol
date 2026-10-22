@@ -96,4 +96,14 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
      - En los muy activos no basta: a 30 s ya hay ventanas de 27–103 tx (hasta ≈ 4 200 CU). El coste depende del volumen, no de la edad.
      - 0 reintentos 429 a 12 req/s.
    - Consumo: 2 680 CU.
+   **Estado (2026-10-22): APARCADO por decisión del dueño** (`CLAUDE.md`, "Rumbo").
+   - No hay señal de entrada rentable en pump.fun con estos datos. D2 es un filtro de descarte validado y `marxol check` lo implementa: funciona y es fiable, con cobertura limitada en tokens muy activos.
+   - La señal de creador repetido no mejoró D2 (post hoc).
+   - Operadores (H2, H3, H11–H13): sin explorar y sin pre-registrar.
+   - Para retomar:
+     1. Revisar el IDL tras cada despliegue en ProgramData (`docs/referencia_tecnica.md` §6).
+     2. Si se reabre la línea de operadores, fijar el presupuesto de franjas y el criterio de parada ANTES de recoger datos.
+     3. Los límites de uso de `check` están documentados en `resultados/check_en_vivo_2026-10-21.txt`, `check_en_vivo_2_2026-10-22.txt` y `check_temprano_2026-10-22.txt`.
+   **Estado (2026-10-22, después): REABIERTO por decisión del dueño** (`CLAUDE.md`, "Rumbo"). Orientación nueva: veto/descarte y reputación de creador, en cinco fases (núcleo/CLI, recolección continua en base aparte, métricas de creador, veto en `check`, validación fuera de muestra). Fase 0 (auditoría, 0 CU): `windows` ≈ 2 710 CU/token, `prices` ≈ 690, `index-tramo` ≈ 82 por creación, `check` 80–1 040 en vivo; `tx`, `scan`, `index`, `verify`, `global` y `curve` no registran su consumo en `rpc_usage`. Indexar todas las creaciones (35–70 k/día) costaría 1.4–2.8 M CU/día: la recolección tiene que muestrear.
+
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.
