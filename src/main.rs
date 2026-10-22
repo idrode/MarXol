@@ -7,7 +7,7 @@ use marxol::ingest::{index, index_tramo, prices, unix_now, windows};
 use marxol::pump::{self, Graduation};
 use marxol::report::*;
 use marxol::verify::{read_account, verify};
-use marxol::{check, collect, ledger, rpc, store, tx, vivo};
+use marxol::{check, collect, historial, ledger, rpc, store, tx, vivo};
 use solana_commitment_config::CommitmentConfig;
 use solana_pubkey::Pubkey;
 use solana_rpc_client::rpc_client::RpcClient;
@@ -282,6 +282,33 @@ enum Cmd {
         #[arg(long, default_value_t = 3_000)]
         sample_ppm: u32,
     },
+    /// Fase 3 (opción C'): lanzamientos previos del pagador de tokens de
+    /// `--db` (solo lectura), cruzando sus firmas con las de mint-authority,
+    /// sin getTransaction. Escribe en `--out-db`. Es un mínimo (ver
+    /// docs/propuesta_creadores_serie.md). Gasta la bolsa manual.
+    PayerHistory {
+        /// Creaciones con timestamp en [from, until) (por defecto, el tramo de V3).
+        #[arg(long, default_value_t = marxol::entry2::VALIDATION3_FROM_TS)]
+        from: i64,
+        #[arg(long, default_value_t = marxol::entry2::VALIDATION3_UNTIL_TS)]
+        until: i64,
+        /// Tokens elegidos (los de menor fnv1a64(mint) del rango).
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+        /// Días de historial previo.
+        #[arg(long, default_value_t = 7)]
+        days: i64,
+        /// Páginas de 1 000 firmas por pagador; si no bastan, queda truncado.
+        #[arg(long, default_value_t = 5)]
+        max_pages: usize,
+        /// Páginas de mint-authority como máximo en esta ejecución.
+        #[arg(long, default_value_t = 1_000)]
+        max_ma_pages: usize,
+        #[arg(long, default_value = "marxol_fase3.db")]
+        out_db: String,
+        #[command(flatten)]
+        rate: RateArgs,
+    },
     /// Informe de un operador (identidad = campo `creator`, no el payer).
     Operator { creator: String },
     /// Recuento de filas de la base local.
@@ -415,6 +442,27 @@ fn main() -> Result<()> {
         Cmd::CollectStatus { poll_secs, sample_ppm } => {
             let st = vivo::open(&cli.vivo_db, unix_now())?;
             print!("{}", collect::status(&st, poll_secs, sample_ppm)?);
+            Ok(())
+        }
+        Cmd::PayerHistory { from, until, limit, days, max_pages, max_ma_pages, ref out_db, ref rate } => {
+            let cfg = historial::Config { days, max_pages_payer: max_pages, max_pages_ma: max_ma_pages };
+            let b = rate.budget(&cli, "payer-history")?;
+            let src = store::Store::open_readonly(&cli.db)?;
+            let db = historial::open(out_db)?;
+            let n = historial::select_tokens(&db, &src, from, until, limit, &format!("fnv1a64(mint) menor, [{from}, {until}), {limit}"))?;
+            eprintln!("{n} tokens en {out_db}");
+            let r = historial::list_mint_authority(&rpc, &db, &b, &cfg)
+                .and_then(|_| historial::scan_payers(&rpc, &db, &b, &cfg).map(|p| eprintln!("{p} pagadores recorridos")));
+            finish(&b)?;
+            r?;
+            let rows = historial::prior_launches(&db, days)?;
+            let ok: Vec<_> = rows.iter().filter(|r| r.3 && r.4).collect();
+            let bucket = |lo: i64, hi: i64| ok.iter().filter(|r| (lo..=hi).contains(&r.2)).count();
+            println!("tokens con pagador recorrido: {} (completos y cubiertos: {}, truncados o sin cubrir: {})", rows.len(), ok.len(), rows.len() - ok.len());
+            println!("lanzamientos previos del pagador en {days} d (mínimo): 0 → {}, 1 → {}, 2–4 → {}, 5–9 → {}, ≥10 → {}",
+                bucket(0, 0), bucket(1, 1), bucket(2, 4), bucket(5, 9), bucket(10, i64::MAX));
+            let trunc: Vec<_> = rows.iter().filter(|r| !r.3).collect();
+            println!("truncados por el tope de páginas: {} (sus previos, mínimo: {:?})", trunc.len(), trunc.iter().map(|r| r.2).collect::<Vec<_>>());
             Ok(())
         }
         Cmd::Operator { creator } => {

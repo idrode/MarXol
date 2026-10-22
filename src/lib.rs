@@ -8,6 +8,7 @@ pub mod entry;
 pub mod entry2;
 pub mod h1;
 pub mod h1b;
+pub mod historial;
 pub mod idl;
 pub mod ingest;
 pub mod ledger;
