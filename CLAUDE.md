@@ -151,6 +151,7 @@ Las referencias a "sección N" dentro de docs/ usan la numeración antigua de es
 - docs/estado_y_pasos.md — siguientes pasos y estado detallado, Etapa 0 (margen del aviso) y `marxol check`.
 - docs/historico_lineas_cerradas.md — detalle literal de las líneas cerradas y de los registros de ejecución.
 - docs/diseno_record.md — diseño de `marxol record` (Etapa 2, sin código).
+- docs/recoleccion.md — `marxol collect`, libro de CU diario, SQLite 24/7, retención y exportación, Termux.
 
 ---
 
@@ -173,15 +174,22 @@ CLI Rust (`cargo build`; binario `marxol`). RPC por `--rpc` / `MARXOL_RPC_URL` (
 | `marxol entry` | T_entry (primer trade con precio ≥ 1.5× el inicial en 5 min, en orden de ejecución) e indicadores previos H4–H7, cruzados con pump-y-caída en 1 h: tablas 2×2 con y sin `CRHnzej9…`, veredicto del criterio pre-registrado y distribuciones. Sin RPC |
 | `marxol entry2 [--check] [--tramo validacion\|validacion2\|piloto] [--replica]` | Validación congelada (sección 8): T_entry2, H4', H5, H6', H7', H8 contra pump-y-caída en 1 h (Fisher, criterio congelado, sin el token de mayor peso) y retorno neto desde T_entry2 a +10/+30/+60 min (Mann-Whitney). `--check` solo cuenta grupos, sin resultado. Sin `--check`, se niega a usar el piloto. Con `--tramo validacion2` (o `--replica` sobre `validacion`, solo como comprobación), aplica el criterio de réplica de la validación 2: tres poblaciones, H4'–H8 y H10, retornos (a)/(b) y filtros A/B/C con bootstrap. Sin RPC |
 | `marxol check <mint\|URL> [--offline] [--provider P] [--max-rps R] [--max-requests K ≤ 400]` | Comprobación previa con D2 (validación 3). Lista la bonding curve hasta la creación, pide las tx de la ventana temprana y las ingiere en una base en memoria con `Store::ingest`, como `windows`. Calcula T_entry2, H4', H6' y H7' con `entry2::compute` y D2 con `v3::d2`, sin tocar las definiciones. Veredicto `EVITAR` / `SIN BANDERAS DE D2` / `NO EVALUABLE`, con aviso de mayhem y avisos fijos. Tope de 400 peticiones (16 000 CU), registradas en `rpc_usage`. Sale con 0 si hay veredicto, 3 si no es evaluable y 1 si falla la lectura. `--offline` evalúa con `--db` en solo lectura (`src/check.rs`) |
+| `marxol collect [--sample-ppm N] [--poll-secs S] [--max-token-sigs K] [--retention-days D] …` | Recolección continua en `marxol_vivo.db` (fuera de muestra): listado de mint-authority desde el punto de reanudación, muestreo por hash de la firma (24 h), creación, ventana temprana y precio, seguimiento de la curva a +1 h/+24 h/+7 d/+60 d, agregación con el código congelado y retención con exportación verificada. Solo gasta la bolsa `collect` del libro de CU. Detalle: docs/recoleccion.md |
+| `marxol collect-status` | Punto de reanudación, tokens por estado, CU medidos por ciclo y etapa, proyección diaria y cobertura por hora UTC. Sin red |
 | `marxol operator <creator>` | Informe de un operador sobre lo indexado |
 | `marxol stats` | Recuento de filas |
 
 `--json` sirve para todos los comandos que imprimen eventos o cuentas.
 
+**Libro de CU diario** (desde 2026-10-22): todos los comandos con red cargan cada petición, antes de hacerla, en `marxol_vivo.db` (`--vivo-db` / `MARXOL_VIVO_DB`). Hay dos bolsas por día UTC: `collect` (`--collect-cu`, 700 000) y `manual` (el resto hasta `--daily-cu`, 1 000 000). Al agotarse, las descargas paran limpias y son reanudables. Los comandos sin red no lo abren. Detalle: docs/recoleccion.md.
+
 **Módulos** (desde 2026-10-22, librería `marxol` en `src/lib.rs` y CLI fina en `src/main.rs`: clap, despacho y `check`):
 - `src/ingest.rs`: descargas a la base local (`index`, `index-tramo`, `windows`, `prices`), con presupuesto y registro en `rpc_usage`.
 - `src/report.rs`: informes de los comandos de análisis (`h1`, `h1b`, `entry`, `entry2`, `operator`) y salida de cuentas y tx decodificadas.
 - `src/verify.rs`: `marxol verify` y lectura de cuentas del programa.
+- `src/ledger.rs`: libro de CU diario compartido entre procesos (`BEGIN IMMEDIATE`), apertura de la base de recolección (WAL, auto_vacuum incremental; rechaza bases que no lo sean).
+- `src/vivo.rs`: esquema de `marxol_vivo.db`, punto de reanudación, muestreo, seguimiento, agregación congelada, retención y exportación CSV.gz verificada.
+- `src/collect.rs`: ciclo de `collect` y `collect-status`.
 - `src/idl.rs`: decodificador Borsh genérico dirigido por `idl/pump.json` (embebido en el binario). No hay structs escritos a mano por evento. Si los bytes son más cortos que el IDL actual (eventos o cuentas históricos, de antes de que se añadieran campos al final), los campos que faltan se reportan en `missing`, nunca se rellenan con valores por defecto.
 - `src/tx.rs`: `getTransaction` → inner instructions al programa pump cuyo primer account es el `event_authority` (PDA `["__event_authority"]`) → prefijo `e445a52e51cb9a1d` (sha256("anchor:event")[..8]) + discriminador de evento → Borsh. Incluye las cuentas cargadas desde lookup tables.
 - `src/store.rs`: tablas `creations` (creator original, inmutable), `creator_changes` (una fila por evento, `kind ∈ {set_creator, migrate_to_sharing}`, nunca sobreescribe), `completions`, `migrations`, `seen_signatures`; para H1: `early_trades` (los `TradeEvent` de la ventana temprana de mints con creación conocida, con el `creator` embebido del trade = creator vigente en ese momento), `trade_windows` (cobertura por mint: solo con `complete = 1` H1 es evaluable) y `h1_results` (resultado derivado por `(mint, variant)` con los parámetros usados; recalculable, se reemplaza; sustituye a la antigua `h1_signals`, que se borra al abrir la base).

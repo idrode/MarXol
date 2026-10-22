@@ -1,0 +1,44 @@
+MEDICIÓN DE marxol collect ANTES DEL MODO CONTINUO — 2026-10-22, 00:46–02:01 UTC
+Base de medida aparte (scratchpad, no es marxol_vivo.db): estos tokens no forman parte de la recolección.
+Alchemy, 12 req/s. Bolsa collect limitada a 30 000 CU para la medida.
+16 ciclos de 300 s, muestreo 4 000 ppm, tope de 400 tx por token, sin retención.
+
+CONSUMO REAL
+- 5 580 CU (100 getTransaction + 37 getSignaturesForAddress + 5 getMultipleAccounts), 0 reintentos por 429.
+- Pruebas manuales del libro: 60 CU (verify 20 + tx 40) en otra base de prueba.
+- Total de la fase: 5 640 CU.
+
+CU POR CICLO Y ETAPA (medido)
+- Listado: 40 CU por ciclo (1 página).
+  - El primer arranque lista una página de 1 000 firmas acumuladas.
+  - En cada ciclo de 300 s llegan 147–235 firmas nuevas.
+- Ciclo típico sin trabajo de tokens: 80–120 CU. Ciclos con ventanas o precios de tokens activos: hasta 1 240 CU.
+- Por token (13 ventanas y 8 precios):
+  - creación: 40;
+  - ventana: 231 de media;
+  - precio: 160 de media;
+  - total: unas 432 CU por token.
+- Seguimiento: 20 CU por lote de hasta 100 curvas. Como mucho es una llamada por ciclo con algo vencido, unas 5 800 CU/día con poll de 300 s.
+
+RITMO DE CREACIONES (por blockTime de las firmas listadas)
+- 3 707 firmas en 4 501 s: unas 51 000 firmas de mint-authority al día, el 96 % sin error.
+- Es una sola ventana nocturna (00–02 UTC): el perfil horario real lo dará el primer día de recolección.
+
+PROYECCIÓN DIARIA (marxol collect-status, poll 300 s)
+  muestreo     tokens/día   con el coste medido (432)   cota pesimista (coste V1–V3, 3 444 CU/token)
+  4 000 ppm    ≈ 196        ≈  96 000 CU/día            ≈ 686 000 CU/día
+  2 000 ppm    ≈  98        ≈  54 000 CU/día            ≈ 349 000 CU/día
+- Las cifras incluyen el listado (11 520 CU/día) y no el seguimiento, que añade hasta unas 5 800 CU/día.
+- El coste por token tiene cola larga. En V1–V3 la media fue de 3 444 CU por token: 8 veces la medida aquí con solo 13 tokens nocturnos. Por eso la cota pesimista es la que importa para el tope.
+- Con 4 000 ppm, incluso la cota pesimista queda por debajo de la bolsa de 700 000. El tope por token (400 tx por ventana, unas 16 000 CU como mucho) acota la cola.
+
+COMPROBACIONES
+- 14 tokens muestreados y creados, 13/13 ventanas tempranas completas, 8/8 ventanas de precio completas.
+- 8 seguimientos a +1 h hechos (curva existente); 0 huecos en el listado; 0 errores de ciclo.
+- 8 tokens agregados con el código congelado (3 evaluados, 5 sin T_entry2). No se han leído los resultados.
+- Aviso esperado: TradeEvent de 382 bytes, 8 más que el IDL embebido (ya documentado en referencia_tecnica §6).
+- sha256 de marxol.db sin cambios: d513e1f3a0fa0459… (igual que antes de la fase).
+
+PROPUESTA PARA EL CONTINUO (pendiente del OK del dueño)
+- --sample-ppm 4000 --poll-secs 300, bolsa collect de 700 000 y total de 1 000 000 (valores por defecto).
+- Revisar collect-status tras 24 h: perfil horario real y coste por token con unos 200 tokens. Ajustar solo la tasa de muestreo (operativo, sin mirar resultados) si la proyección pasa de la bolsa.

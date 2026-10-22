@@ -106,4 +106,15 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
      3. Los límites de uso de `check` están documentados en `resultados/check_en_vivo_2026-10-21.txt`, `check_en_vivo_2_2026-10-22.txt` y `check_temprano_2026-10-22.txt`.
    **Estado (2026-10-22, después): REABIERTO por decisión del dueño** (`CLAUDE.md`, "Rumbo"). Orientación nueva: veto/descarte y reputación de creador, en cinco fases (núcleo/CLI, recolección continua en base aparte, métricas de creador, veto en `check`, validación fuera de muestra). Fase 0 (auditoría, 0 CU): `windows` ≈ 2 710 CU/token, `prices` ≈ 690, `index-tramo` ≈ 82 por creación, `check` 80–1 040 en vivo; `tx`, `scan`, `index`, `verify`, `global` y `curve` no registran su consumo en `rpc_usage`. Indexar todas las creaciones (35–70 k/día) costaría 1.4–2.8 M CU/día: la recolección tiene que muestrear.
 
+   **Fase 2 (2026-10-22): recolección continua lista, sin lanzar en continuo** (docs/recoleccion.md).
+   - D2 y las métricas actuales se congelaron antes de recolectar (docs/congelado_vivo_2026-10-22.md, commit `a74a456`).
+   - Libro de CU diario compartido en `marxol_vivo.db`: bolsa `collect` de 700 000 y bolsa manual hasta 1 000 000. Lo usan todos los comandos con red.
+   - `marxol collect`: muestreo por hash (24 h), fecha y hora de captura, WAL, punto de reanudación, retención con exportación verificada.
+   - Medición (resultados/collect_medida_2026-10-22.txt, 5 580 CU):
+     - ~51 000 firmas de mint-authority al día;
+     - 40 CU por ciclo de listado;
+     - ~432 CU por token medidos (13 tokens nocturnos), 3 444 en V1–V3;
+     - con 4 000 ppm, ≈ 96 000 CU/día con el coste medido y ≈ 686 000 con la cota pesimista.
+   - Falta el OK del dueño para dejarlo en continuo.
+
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.

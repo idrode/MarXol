@@ -60,6 +60,11 @@ pub fn run(rpc: &RpcClient, idl: &Idl, st: &mut Store, budget: &rpc::Budget, cfg
     loop {
         let start = rpc::unix_now();
         if ledger.remaining(start)? < MIN_CYCLE_UNITS {
+            if cfg.cycles.is_some() {
+                // Ejecución acotada (medición, pruebas): no se espera al día siguiente.
+                eprintln!("{}: fin de la ejecución acotada", ledger.summary(start)?);
+                return Ok(());
+            }
             let next_day = (start.div_euclid(86_400) + 1) * 86_400;
             eprintln!("{}: se espera al día UTC siguiente", ledger.summary(start)?);
             sleep_until(next_day.min(start + 600));
@@ -319,6 +324,10 @@ pub fn ingest_create(st: &mut Store, sig: &str, t: &tx::TxEvents, now: i64) -> R
     Ok(true)
 }
 
+/// CU medios por token en V1–V3 (`rpc_usage` de marxol.db: `windows`
+/// 2 547 760 / 939 y `prices` 644 520 / 933), más la creación (40).
+const V1V3_TOKEN_CU: u64 = 3_444;
+
 /// Resumen para `collect-status`: CU por ciclo medidos y proyección diaria.
 pub fn status(st: &Store, poll_secs: u64, sample_ppm: u32) -> Result<String> {
     use std::fmt::Write;
@@ -370,7 +379,14 @@ pub fn status(st: &Store, poll_secs: u64, sample_ppm: u32) -> Result<String> {
     writeln!(out, "  precios      {u_pr} CU, {prs} tokens")?;
     let per = |u: i64, n: i64| if n > 0 { u as f64 / n as f64 } else { f64::NAN };
     let poll_per_cycle = per(u_poll, cycles);
-    let sigs_per_sec = if span > 0 { listed as f64 / span as f64 } else { f64::NAN };
+    // Ritmo por blockTime de las firmas listadas, no por la duración de los
+    // ciclos: el primer arranque lista de golpe una página acumulada.
+    let (bt_n, bt_span): (i64, i64) = db.query_row(
+        "SELECT COUNT(*), COALESCE(MAX(block_time) - MIN(block_time), 0) FROM vivo_create_sigs WHERE block_time IS NOT NULL",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let sigs_per_sec = if bt_span > 0 { bt_n as f64 / bt_span as f64 } else { f64::NAN };
     // Firmas de creación por día; cada ciclo lista al menos una página.
     let sigs_day = sigs_per_sec * 86_400.0;
     let cycles_day = 86_400.0 / poll_secs as f64;
@@ -401,6 +417,12 @@ pub fn status(st: &Store, poll_secs: u64, sample_ppm: u32) -> Result<String> {
         tokens_day * per_token
     )?;
     writeln!(out, "  total ≈ {:.0} CU/día", poll_day + tokens_day * per_token)?;
+    writeln!(
+        out,
+        "  cota pesimista con el coste por token de V1–V3 ({V1V3_TOKEN_CU} CU: ventana 2 713 + precio 691): ≈ {:.0} CU/día",
+        poll_day + tokens_day * V1V3_TOKEN_CU as f64
+    )?;
+    writeln!(out, "  (span medido {span} s; la media por token tiene cola larga: con pocos tokens es poco fiable)")?;
 
     writeln!(out, "\ncobertura por hora UTC (últimas 48 h de blockTime: listadas / muestreadas):")?;
     let mut q = db.prepare(
