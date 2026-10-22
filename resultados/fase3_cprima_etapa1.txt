@@ -1,0 +1,42 @@
+FASE 3, OPCIÓN C' — ETAPA 1 (2026-10-22): lanzamientos previos del pagador, 100 tokens de V3
+POST HOC sobre marxol.db (solo lectura). Resultados en marxol_fase3.db. Sin veredicto.
+Comando: marxol payer-history --limit 100 --days 7 --max-pages 5 (bolsa manual del libro de CU).
+
+QUÉ MIDE (LÍMITE, va con cada cifra)
+- Lanzamientos previos = creaciones sin error, en los 7 días anteriores al token, cuya tx firmó (pagó) la misma wallet que la del token. Se obtiene cruzando las firmas del pagador con todas las de la PDA mint-authority, sin getTransaction.
+- Es un MÍNIMO:
+  - no ve las creaciones con el mismo `creator` pagadas por otra wallet (en marxol.db, el 17 % de las creaciones tiene creator ≠ pagador; en estos 100, 12);
+  - no ve un operador con varias wallets;
+  - un pagador con más de 5 páginas de firmas (5 000) queda truncado y solo se cuenta lo que entra en esas páginas.
+
+ELECCIÓN
+- Los 100 tokens del tramo V3 con menor fnv1a64(mint). No se mira ningún dato del token para elegirlos.
+- 62 pagadores distintos. En 88 de los 100, creator = pagador.
+
+CONSUMO
+- 20 440 CU en 511 getSignaturesForAddress (bolsa manual):
+  - listado de mint-authority: 319 páginas (319 001 firmas, del 2026-09-24 08:21 al 2026-10-01 09:07 UTC; 25 698 con error);
+  - firmas de los pagadores: 111 páginas (1,8 de media, máximo 5);
+  - el resto, reintentos por 429.
+- 429: los primeros 63 intentos, a 12 req/s con collect corriendo, dieron 429. A 4 req/s hubo 76 líneas de reintento: el plan gratuito limita también el volumen de respuestas de 1 000 firmas. Los reintentos cuentan en el libro. Ningún dato se perdió (todo es reanudable).
+
+RESULTADO (mínimos)
+- Por token (100):
+  - completos y cubiertos: 73;
+  - truncados: 27, todos de 6 pagadores con ≥ 54 lanzamientos ya contados en 7 días; la mayoría, 500–730.
+- Lanzamientos previos del pagador en 7 d, en los 73 completos:
+      0 → 20 | 1 → 4 | 2–4 → 11 | 5–9 → 8 | ≥ 10 → 30
+- Con los truncados (≥ 54 cada uno): 80 de 100 tokens tienen un pagador con ≥ 1 lanzamiento previo en 7 d, y ≥ 65 tienen ≥ 5.
+- Por pagador (62): 42 con ≥ 1 lanzamiento previo en 7 d, 32 con ≥ 5, 16 con ≥ 50.
+- Frente a lo que ya se veía dentro de la muestra de marxol.db: el mismo pagador con otro token en las 4 franjas solo aparece en 56 de los 100 tokens. C' encuentra 80 (+24).
+- Coherencia: en ningún token el conteo de C' es menor que el de la muestra. Toda creación del pagador que ya estaba en marxol.db aparece también en el cruce.
+
+RENDIMIENTO
+- Alto: unas 200 CU por token, contando el listado fijo de mint-authority, que se reparte entre todos los tokens del periodo. El listado ya cubre del 24-09 al 01-10.
+- Etapa 2 (resto de V1–V3, unos 870 tokens y unos 500 pagadores más):
+  - ampliar el listado hasta el 2026-09-21 para V1: unas 160 páginas, ≈ 6 400 CU;
+  - pagadores: ≈ 500 × 1,8 páginas × 40 ≈ 36 000 CU, más los reintentos.
+  - Total ≈ 45 000–55 000 CU, dentro de la bolsa manual de un día. Pendiente del OK del dueño.
+
+NO SE CONCLUYE
+- Nada sobre si estos pagadores lanzan peores tokens: no se ha cruzado con retornos ni con D2. Esa exploración, en marxol.db, viene después, y la razón de veto que salga necesita su adenda antes de mirar el bloque B.

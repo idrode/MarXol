@@ -123,4 +123,9 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - Pre-registro de la fase 5, escrito antes de leer ningún resultado: docs/preregistro_fase5_2026-10-22.md (bloques A, B y C por fecha).
    - Propuesta de medición de creadores en serie: docs/propuesta_creadores_serie.md. Hallazgo: el `creator` es un argumento de `create`/`create_v2`, no una cuenta; solo el pagador aparece en la tx.
 
+   **Fase 3 (2026-10-22, post hoc sobre marxol.db)**:
+   - Exploración sin red en resultados/fase3_explora.txt (comisión de creador, coste de lanzar, compras en el slot de creación).
+   - C' etapa 1 (resultados/fase3_cprima_etapa1.txt, 20 440 CU), sobre 100 tokens de V3: 80 tienen un pagador con ≥ 1 lanzamiento previo en 7 d (mínimo), y 16 de 62 pagadores tienen ≥ 50.
+   - Dentro de la muestra solo se veía en 56. El rendimiento es alto; la etapa 2 queda pendiente del OK del dueño.
+
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.
