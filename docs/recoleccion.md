@@ -17,6 +17,7 @@ Los datos de `marxol_vivo.db` son **fuera de muestra**. D2 y las métricas actua
   - Alchemy: `getTransaction` y `getSignaturesForAddress` a 40 CU, `getAccountInfo` a 10 y `getMultipleAccounts` a 20.
   - `getMultipleAccounts` no figura en la tabla revisada, así que se cargan 20 CU por el lado conservador.
   - El CU real solo lo da el panel de Alchemy.
+- **El libro reparte CU, no ritmo.** Con `collect` corriendo a 12 req/s, un comando manual al mismo ritmo pasa de los 500 CU/s del free tier y provoca 429. Observado el 2026-10-22: `payer-history` a 12 req/s tuvo 429, `collect` ninguno. Mientras `collect` corre, los comandos manuales largos van con `--max-rps 4` (12 + 4 = 16 req/s, 640 CU/s de pico; en la práctica `collect` está casi siempre en espera).
 - Al agotarse una bolsa, las descargas paran limpias (`ledger::Exhausted`): el token a medias queda pendiente y no se cuenta como intento fallido.
 - La base solo guarda el nombre del proveedor, nunca la URL del RPC ni la clave. Hay un test que lo comprueba en los bytes del archivo y del WAL.
 

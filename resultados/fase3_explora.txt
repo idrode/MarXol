@@ -1,0 +1,50 @@
+FASE 3, EXPLORACIÓN POST HOC sobre marxol.db (piloto, V1, V2 y V3) — SIN VEREDICTO
+Solo describe. Nada de esto decide; lo que se use como razón de veto se fija en una adenda
+del pre-registro y se valida en el bloque B de marxol_vivo.db.
+
+1a. COSTE DE LANZAR (tx de creación de tests/fixtures/tx; pérdida del pagador − compra inicial con comisiones)
+    2JVXhpLyCvts…  pagador −1.032166 SOL, compra inicial 1.000000, coste de lanzar 0.032166 SOL (comisión de la tx 0.001010)
+    3mxY1rgK8EUe…  pagador −0.010044 SOL, compra inicial 0.000000, coste de lanzar 0.010044 SOL (comisión de la tx 0.000016)
+    3njLtj6QHuK5…  pagador −86.076999 SOL, compra inicial 86.067926, coste de lanzar 0.009073 SOL (comisión de la tx 0.000082)
+    4Xc5aER3hCUp…  pagador −86.076892 SOL, compra inicial 86.067926, coste de lanzar 0.008966 SOL (comisión de la tx 0.000010)
+    5NZKxQYzK4J1…  pagador −86.076958 SOL, compra inicial 85.005359, coste de lanzar 1.071599 SOL (comisión de la tx 0.000010)
+    mUKGav3xWvj5…  pagador −0.145543 SOL, compra inicial 0.136491, coste de lanzar 0.009052 SOL (comisión de la tx 0.000050)
+    mediana: 0.009558 SOL (n = 6; incluye rent de las cuentas, comisión y prioridad)
+
+1b. INGRESO POR COMISIÓN DE CREADOR (tokens en SOL con ventana temprana completa)
+    783 tokens; 209 sin creator_fee_basis_points en algún trade (filas antiguas) quedan fuera.
+    Ventana de 5 min: exacta (sol_amount × creator_fee_bps de cada TradeEvent).
+    Primera hora: aproximada (5 min exactos + |Δ reservas| × bps del último trade de la ventana).
+    'Creador con ≥ 2 tokens' es solo dentro de la muestra (4 franjas de ~8 min): mínimo, no historial.
+    todos:
+      5 min  n = 574: mediana 0.004341 SOL, p75 0.0207 SOL, p90 0.1082 SOL, máx 1.677 SOL
+      1 h    n = 574: mediana 0.005076 SOL, p75 0.02478 SOL, p90 0.1199 SOL, máx 4.421 SOL
+      supera el coste de lanzar (0.0096 SOL) en 1 h: 219/574 = 38.2 %
+    creador con 1 token en la muestra:
+      5 min  n = 258: mediana 0.01021 SOL, p75 0.06626 SOL, p90 0.2444 SOL, máx 1.677 SOL
+      1 h    n = 258: mediana 0.01085 SOL, p75 0.07456 SOL, p90 0.255 SOL, máx 4.421 SOL
+      supera el coste de lanzar (0.0096 SOL) en 1 h: 136/258 = 52.7 %
+    creador con ≥ 2 tokens en la muestra:
+      5 min  n = 316: mediana 0.002349 SOL, p75 0.01041 SOL, p90 0.02903 SOL, máx 0.7971 SOL
+      1 h    n = 316: mediana 0.002356 SOL, p75 0.01055 SOL, p90 0.02966 SOL, máx 2.816 SOL
+      supera el coste de lanzar (0.0096 SOL) en 1 h: 83/316 = 26.3 %
+
+3. QUIÉN COMPRA EN EL SLOT DE CREACIÓN (todos los tokens con ventana completa, cualquier quote)
+    creador = creator o pagador del CreateEvent; 'otros, mismo slot' = otras wallets en el slot de creación
+    (bundle o sniper muy rápido: sin las propinas a Jito no se distinguen); 'snipers' = slots +1 y +2.
+    Resultado a 5 min marcado a mercado con el precio del último trade de la ventana, sin comisiones.
+
+    tokens: 862; con compras de otras wallets en el slot de creación: 355 = 41.2 %
+    creador            % del supply comprado:  n = 862: mediana 1.954 %, p75 6.612 %, p90 12.52 %, máx 79.31 %
+    otros, mismo slot  % del supply comprado:  n = 862: mediana 0 %, p75 5.049 %, p90 13.29 %, máx 79.27 %
+    snipers +1/+2      % del supply comprado:  n = 862: mediana 0 %, p75 0 %, p90 1.729 %, máx 24.03 %
+    creador            resultado a 5 min por token, solo tokens en SOL:  n = 644: mediana 0.009621 SOL, p75 0.297 SOL, p90 1.343 SOL, máx 240.9 SOL
+                       con resultado > 1e-6 SOL: 413/644 = 64.1 %
+                       realizado (ventas − compras en 5 min):  n = 644: mediana 5.541e-05 SOL, p75 0.2453 SOL, p90 1.116 SOL, máx 12.85 SOL; > 0 en 328/644 = 50.9 %
+    otros, mismo slot  resultado a 5 min por token, solo tokens en SOL:  n = 281: mediana 0 SOL, p75 0.1491 SOL, p90 1.646 SOL, máx 11.84 SOL
+                       con resultado > 1e-6 SOL: 139/281 = 49.5 %
+                       realizado (ventas − compras en 5 min):  n = 281: mediana 0 SOL, p75 0.1274 SOL, p90 1.646 SOL, máx 10.23 SOL; > 0 en 132/281 = 47.0 %
+    snipers +1/+2      resultado a 5 min por token, solo tokens en SOL:  n = 193: mediana 0 SOL, p75 0.005508 SOL, p90 0.2003 SOL, máx 7.035 SOL
+                       con resultado > 1e-6 SOL: 68/193 = 35.2 %
+                       realizado (ventas − compras en 5 min):  n = 193: mediana -0.0006349 SOL, p75 0.001269 SOL, p90 0.1421 SOL, máx 7.035 SOL; > 0 en 60/193 = 31.1 %
+    (marcado a mercado sobrevalora posiciones grandes: vender todo movería el precio; el realizado no cuenta lo que siguen teniendo)
