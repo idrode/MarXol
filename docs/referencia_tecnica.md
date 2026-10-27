@@ -179,10 +179,14 @@ shareholders (Vec<Shareholder>),
 quote_mint, quote_amount, virtual_quote_reserves, real_quote_reserves,
 holder_rewards_bps, holder_rewards,
 creator_fee_unclaimed (u64, nuevo 2026-10)
-+ 8 bytes sin describir (despliegue 2026-10-18/19; no están en el IDL público del 2026-10-13)
++ quote_transfer_fee (u64, desde el despliegue del 2026-10-19 15:46:16 UTC, slot 458 888 140; está en el IDL de @pump-fun/pump-sdk 4.2.0, no en el de GitHub ni en idl/pump.json, así que marXol lo trata como 8 bytes sobrantes)
 ```
 - `ix_name` **no distingue la versión** de la instrucción. En mainnet (2026-10-21), un `buy_v2` emite `ix_name = "buy"` y un `sell_v2` emite `"sell"`. La instrucción concreta se ve en `TxEvents.instructions`.
 - Con el IDL vigente, el `TradeEvent` real mide 382–383 bytes (según la longitud de `ix_name`), de los que 8 no están descritos.
+- **Identificado el 2026-10-22**: los 8 bytes son `quote_transfer_fee`, la comisión de transferencia Token-2022 del mint de quote. Según el SDK, se cobra encima de la entrada en las compras y se descuenta de la salida en las ventas; vale 0 si el quote es SOL.
+  - Acotación: el último evento sin sobrantes es del slot 458 888 128 y el primero con ellos del 458 921 419.
+  - En 11 trades reales de antes y de después cuadran la constante de la curva, las reservas reales, las comisiones y el paso creación → trade.
+  - Detalle: docs/informe_noche_2_2026-10-23.md.
 - Desde el 2026-10-22, la decodificación cuenta estos eventos con bytes de más y avisa una sola vez por ejecución, con la longitud observada (`tx::TRADE_EXTRA_BYTES`). `check`, `windows`, `prices` e `index-tramo` imprimen el contador al final. No es un error: el prefijo descrito se decodifica igual.
 - En los fixtures de V1–V3 no sobra ningún byte.
 

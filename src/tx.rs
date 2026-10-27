@@ -75,6 +75,9 @@ pub struct TxEvents {
     pub events: Vec<Decoded>,
     /// Inner instructions de evento que no se pudieron decodificar.
     pub decode_errors: Vec<String>,
+    /// Por cada `TradeEvent`: (bytes de datos sin prefijo ni discriminador,
+    /// bytes sobrantes en hex). Solo diagnóstico (`scan --json`).
+    pub trade_sizes: Vec<(usize, String)>,
 }
 
 pub fn fetch_events(rpc: &RpcClient, idl: &Idl, sig: &str) -> Result<TxEvents> {
@@ -155,6 +158,7 @@ pub fn decode_events(idl: &Idl, sig: &str, tx: &EncodedConfirmedTransactionWithS
 
     let mut events = Vec::new();
     let mut decode_errors = Vec::new();
+    let mut trade_sizes = Vec::new();
     if let OptionSerializer::Some(inner) = &meta.inner_instructions {
         for group in inner {
             for ix in &group.instructions {
@@ -167,6 +171,11 @@ pub fn decode_events(idl: &Idl, sig: &str, tx: &EncodedConfirmedTransactionWithS
                 let data = bs58::decode(&c.data).into_vec().context("inner ix no es base58")?;
                 match idl.decode_event_cpi(&data) {
                     Some(Ok(ev)) => {
+                        if ev.name == "TradeEvent" {
+                            let len = data.len().saturating_sub(16);
+                            let extra: String = data[data.len() - ev.trailing_bytes..].iter().map(|b| format!("{b:02x}")).collect();
+                            trade_sizes.push((len, extra));
+                        }
                         if ev.name == "TradeEvent" && ev.trailing_bytes > 0 {
                             // Datos de evento sin el prefijo de emit_cpi! ni el discriminador.
                             let len = data.len().saturating_sub(16);
@@ -191,6 +200,7 @@ pub fn decode_events(idl: &Idl, sig: &str, tx: &EncodedConfirmedTransactionWithS
         instructions,
         events,
         decode_errors,
+        trade_sizes,
     })
 }
 

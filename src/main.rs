@@ -118,6 +118,12 @@ enum Cmd {
         /// Pausa entre getTransaction (ms), para no saturar RPC públicos.
         #[arg(long, default_value_t = 150)]
         delay_ms: u64,
+        /// Recorrer hacia atrás desde esta firma (excluida).
+        #[arg(long)]
+        before: Option<String>,
+        /// Solo listar firmas (slot, hora, fallida), sin pedir las tx.
+        #[arg(long)]
+        solo_firmas: bool,
     },
     /// Indexa en la base local los eventos de identidad y ciclo de vida de las
     /// firmas de una dirección, paginando hacia atrás y saltando las ya vistas.
@@ -533,7 +539,7 @@ fn run() -> Result<()> {
             print_tx(&t?, None, cli.json);
             Ok(())
         }
-        Cmd::Scan { ref address, limit, ref events, all, delay_ms } => {
+        Cmd::Scan { ref address, limit, ref events, all, delay_ms, ref before, solo_firmas } => {
             let b = manual_budget(&cli, "scan", false)?;
             let filter: Option<Vec<String>> = if all {
                 None
@@ -546,7 +552,7 @@ fn run() -> Result<()> {
                         .collect()
                 }))
             };
-            let sigs = b.acquire(rpc::Method::GetSignatures).and_then(|_| tx::recent_signatures(&rpc, address, limit, None));
+            let sigs = b.acquire(rpc::Method::GetSignatures).and_then(|_| tx::recent_signatures(&rpc, address, limit, before.as_deref()));
             let sigs = match sigs {
                 Ok(s) => s,
                 Err(e) => {
@@ -554,6 +560,12 @@ fn run() -> Result<()> {
                     return Err(e);
                 }
             };
+            if solo_firmas {
+                for s in &sigs {
+                    println!("{} slot={} t={:?}{}", s.signature, s.slot, s.block_time, if s.failed { " FALLIDA" } else { "" });
+                }
+                return finish(&b);
+            }
             let mut counts = std::collections::BTreeMap::<String, usize>::new();
             let (mut errors, mut failed_txs, mut fetched) = (0, 0, 0);
             for s in sigs {

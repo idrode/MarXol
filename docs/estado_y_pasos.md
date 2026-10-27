@@ -136,4 +136,13 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - Coste de lanzar medido en 187 tx de creación: mediana 0,0097 SOL, p90 0,021.
    - Todo es exploratorio: ninguna razón de veto sale de aquí sin su adenda y el bloque B.
 
+   **Amenaza a la validez: cambio del `TradeEvent` el 2026-10-19 (verificado contra la chain el 2026-10-22, 880 CU).**
+   - Desde el despliegue del **2026-10-19 15:46:16 UTC (slot 458 888 140)**, el `TradeEvent` lleva al final un campo nuevo, `quote_transfer_fee: u64`: 8 bytes, que dan 382 en vez de 374 en un `buy` típico.
+     - Acotación: el último evento de 374 se vio en el slot 458 888 128 y el primero de 382 en el 458 921 419. Entre ambos solo hay ese despliegue.
+     - El campo está en el IDL del SDK `@pump-fun/pump-sdk` 4.2.0 (2026-10-19 14:28 UTC), pero todavía no en el IDL de GitHub ni en `idl/pump.json`.
+   - Significado, según el SDK: es la comisión de transferencia Token-2022 del mint de quote, que se cobra encima de la entrada (compras) o se descuenta de la salida (ventas). Vale 0 cuando el quote es SOL.
+   - **El parser es seguro**: el campo va al final y el resto de campos decodifica igual. En 11 trades reales (6 de antes del cambio y 5 de después) cuadran la constante de la curva, las reservas reales, las comisiones y el paso creación → trade.
+   - **Efecto**: el retorno congelado no descuenta esta comisión. Solo puede afectar a los tokens con un quote Token-2022 que la cobre. V1–V3 son anteriores al cambio. El rodaje y los bloques A y B quedan después.
+   - Detalle: docs/informe_noche_2_2026-10-23.md.
+
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.

@@ -445,6 +445,7 @@ mod tests {
 
     fn txe(sig: &str, slot: u64, events: Vec<Decoded>) -> TxEvents {
         TxEvents {
+            trade_sizes: vec![],
             signature: sig.into(),
             slot,
             block_time: None,

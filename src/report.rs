@@ -1516,6 +1516,7 @@ pub fn print_tx(t: &tx::TxEvents, filter: Option<&[String]>, json: bool) {
             "instructions": t.instructions,
             "events": shown.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
             "decode_errors": t.decode_errors,
+            "trade_sizes": t.trade_sizes,
         });
         println!("{v}");
         return;

@@ -1155,6 +1155,7 @@ mod tests {
 
     fn tx(sig: &str, events: Vec<Decoded>) -> TxEvents {
         TxEvents {
+            trade_sizes: vec![],
             signature: sig.into(),
             slot: 1,
             block_time: None,

@@ -59,6 +59,7 @@ Estos son principios de trabajo, no detalles técnicos — se aplican a cada dec
 - **Veredictos**: V1 confirmó H5, H6', H7' y H8 (H4' no, +19 pts). V2 (réplica) confirmó H4', H6' y H7'; H5, H8 y H10 no. V3: **D2 SEPARA GRUPOS** (+19.0 pts de retorno mediano a +30 min, p = 0.00016).
 - **Lectura**: en todas, los tokens que pasan siguen con retorno mediano negativo. Las señales sirven para evitar, no para entrar. Solo valen para tres franjas de 8 minutos.
 - **Herramienta**: `marxol check <mint>` aplica D2 a un token. Verificada sin red y en vivo, también con tokens recién creados (resultados/check_en_vivo_*.txt, check_temprano_2026-10-22.txt).
+- **Amenaza a la validez (2026-10-19 15:46:16 UTC, slot 458 888 140)**: el `TradeEvent` añade al final `quote_transfer_fee` (u64, comisión Token-2022 del quote; 0 en SOL). El parser decodifica bien el resto, y está verificado en 11 trades reales. El retorno congelado no la descuenta, y todo `marxol_vivo.db` es posterior al cambio. Detalle: docs/estado_y_pasos.md.
 - **Pendiente**: benchmark de un día de WebSocket (tarifa por byte de Alchemy sin aclarar); `SetCreatorEvent` sin observar; H9–H13 sin pre-registrar.
 - Detalle: docs/estado_y_pasos.md.
 
