@@ -5,6 +5,11 @@
 //! memoria con el mismo `Store::ingest` que usa `windows`, y se leen con las
 //! mismas consultas que `entry2_inputs`, así que el token se evalúa igual que
 //! en las validaciones. Solo lectura sobre la cadena: ni wallets ni firmas.
+//!
+//! Código de salida (main.rs): 0 = hay veredicto (EVITAR o SIN BANDERAS DE D2);
+//! 3 = NO EVALUABLE (sin T_entry2, tope de peticiones, o H6' n/e con una sola
+//! bandera): no hay base para ninguna conclusión y no equivale a aprobado;
+//! 1 = fallo de lectura.
 
 use crate::idl::Idl;
 use crate::store::{self, Store};
@@ -23,6 +28,13 @@ const CREATION_TRIES: usize = 3;
 pub const EVITAR: &str = "EVITAR";
 pub const SIN_BANDERAS: &str = "SIN BANDERAS DE D2";
 pub const NO_EVALUABLE: &str = "NO EVALUABLE";
+/// Texto del veredicto de un token sin T_entry2. Solo presentación: `verdict`
+/// sigue siendo NO_EVALUABLE (JSON) y el código de salida sigue siendo 3.
+pub const SIN_DATOS: &str =
+    "SIN DATOS SUFICIENTES: no hay base para ninguna conclusión, ni a favor ni en contra. NO es una aprobación.";
+/// Tokens de V1–V3 sin T_entry2 (de 933; mayhem entre ellos), contados con
+/// `entry2 --check --json` sobre marxol.db el 2026-10-27. Contexto fijo.
+const SIN_ENTRY2_V1_V3: (usize, usize, usize) = (241, 933, 39);
 
 /// Acepta la dirección del mint o una URL que la contenga en la ruta
 /// (p. ej. `https://pump.fun/coin/<mint>`).
@@ -191,7 +203,13 @@ pub fn render(r: &Report) -> String {
     }
     line(String::new());
     let flags = [r.h4, r.h6, r.h7].iter().filter(|&&h| h == Some(true)).count();
+    // Sin T_entry2: los datos de la creación están, pero no hay T_entry2.
+    let sin_entry2 = r.verdict == NO_EVALUABLE && r.t0.is_some() && r.entry2.is_none();
     match r.verdict {
+        _ if sin_entry2 => {
+            line(format!("VEREDICTO: {SIN_DATOS}"));
+            line(format!("  motivo: {}", r.reason.as_deref().unwrap_or("")));
+        }
         NO_EVALUABLE => line(format!("VEREDICTO: {NO_EVALUABLE} — {}", r.reason.as_deref().unwrap_or(""))),
         v => line(format!("VEREDICTO: {v}  (D2: {flags} de 3 banderas; descarta con 2 o más)")),
     }
@@ -231,8 +249,16 @@ pub fn render(r: &Report) -> String {
     line(String::new());
     line("Avisos:".into());
     line("  - D2 solo descarta: \"SIN BANDERAS DE D2\" no es una señal de compra.".into());
-    line("  - En las validaciones, los tokens que pasan D2 siguieron con retorno mediano negativo".into());
-    line("    (−5.6 % a +30 min en la validación 3; solo un 2 % con retorno positivo).".into());
+    if sin_entry2 {
+        let (n, total, mayhem) = SIN_ENTRY2_V1_V3;
+        line(format!("  - Contexto, no un resultado: en V1–V3, {n} de {total} tokens ({mayhem} mayhem) no tuvieron T_entry2."));
+        line("    Ninguno tiene retorno (a), que se mide desde T_entry2: no hay ninguna cifra de resultado".into());
+        line("    para este grupo.".into());
+        line("  - Código de salida 3: no evaluable. No equivale a \"SIN BANDERAS DE D2\" ni a una aprobación.".into());
+    } else {
+        line("  - En las validaciones, los tokens que pasan D2 siguieron con retorno mediano negativo".into());
+        line("    (−5.6 % a +30 min en la validación 3; solo un 2 % con retorno positivo).".into());
+    }
     line("  - Validado en tres franjas de 8 minutos; no generaliza a otros regímenes de mercado.".into());
     line("  - No es consejo financiero.".into());
     o
@@ -564,6 +590,9 @@ mod tests {
         let r = evaluate(&st, "M", None).unwrap();
         assert_eq!(r.verdict, NO_EVALUABLE);
         assert!(r.reason.as_deref().unwrap().contains("sin T_entry2"));
+        let out = render(&r);
+        assert!(out.contains(&format!("VEREDICTO: {SIN_DATOS}")) && out.contains("NO es una aprobación"), "{out}");
+        assert!(!out.contains("−5.6 %") && out.contains("241 de 933") && out.contains("Código de salida 3"), "{out}");
         let r = evaluate(&st, "M", Some(1_100)).unwrap();
         assert!(r.window_open && r.reason.as_deref().unwrap().contains("sigue abierta"));
 
@@ -576,6 +605,8 @@ mod tests {
         let r = evaluate(&st, "M", None).unwrap();
         assert_eq!((r.verdict, r.h6, r.mayhem), (NO_EVALUABLE, None, Some(true)));
         assert!(render(&r).contains("TOKEN MAYHEM"));
+        // H6' n/e no es "sin T_entry2": conserva su veredicto y sus avisos.
+        assert!(render(&r).contains("VEREDICTO: NO EVALUABLE — H6'") && render(&r).contains("−5.6 %"));
     }
 
     #[test]

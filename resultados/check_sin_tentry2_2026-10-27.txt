@@ -1,0 +1,29 @@
+marxol check, token sin T_entry2: salida de referencia (2026-10-27, cambio de presentación)
+Sin red: --offline sobre una copia de marxol.db (V2). Comando:
+  marxol --db <copia de marxol.db> check DLKFyqEYQCnwTMw5ybz5xqnhhAKZRCcWSJSy2WstjAxD --offline
+La lógica no cambia: el campo verdict del JSON sigue siendo "NO EVALUABLE" y el código de salida sigue siendo 3.
+
+--- salida ---
+marxol check DLKFyqEYQCnwTMw5ybz5xqnhhAKZRCcWSJSy2WstjAxD
+  bonding curve kfj3UTLG1ZPNwQaYkHH1zqy32pY1czTHMAkdv34UAc1
+  creación 2026-09-30 01:00:09 UTC (slot 451810044); quote 11111111111111111111111111111111
+  creator HfLpidy8DVQYFMk845WfiUAWARfwqcMFGGeEb2wxqUff; payer HfLpidy8DVQYFMk845WfiUAWARfwqcMFGGeEb2wxqUff; identidades de creador: 1
+
+VEREDICTO: SIN DATOS SUFICIENTES: no hay base para ninguna conclusión, ni a favor ni en contra. NO es una aprobación.
+  motivo: sin T_entry2: ningún trade en un slot posterior al de creación con t ≥ t0 + 10 s dentro de los 300 primeros segundos
+
+Avisos:
+  - D2 solo descarta: "SIN BANDERAS DE D2" no es una señal de compra.
+  - Contexto, no un resultado: en V1–V3, 241 de 933 tokens (39 mayhem) no tuvieron T_entry2.
+    Ninguno tiene retorno (a), que se mide desde T_entry2: no hay ninguna cifra de resultado
+    para este grupo.
+  - Código de salida 3: no evaluable. No equivale a "SIN BANDERAS DE D2" ni a una aprobación.
+  - Validado en tres franjas de 8 minutos; no generaliza a otros regímenes de mercado.
+  - No es consejo financiero.
+--- código de salida: 3 ---
+
+--- --json (campos verdict y reason) ---
+{
+  "verdict": "NO EVALUABLE",
+  "reason": "sin T_entry2: ningún trade en un slot posterior al de creación con t ≥ t0 + 10 s dentro de los 300 primeros segundos"
+}
