@@ -456,7 +456,10 @@ fn run() -> Result<()> {
                 delete_batch,
             };
             let b = rpc::Budget::new(rpc::Provider::parse(&rate.provider, &cli.rpc)?, rate.max_rps, rate.max_requests);
-            let b = with_ledger(b, &cli, "collect", ledger::Pool::Collect)?;
+            // Ritmo horario de la bolsa collect (desde 2026-10-26): ~29 000 CU/h con traspaso.
+            let caps = ledger::Caps::new(cli.daily_cu, cli.collect_cu)?;
+            let l = ledger::Ledger::open(&cli.vivo_db, "collect", ledger::Pool::Collect, caps, b.provider.name, unix_now())?;
+            let b = b.with_ledger(l.with_hourly_pacing());
             let mut st = vivo::open(&cli.vivo_db, unix_now())?;
             let r = collect::run(&rpc, &idl, &mut st, &b, &cfg);
             finish(&b)?;

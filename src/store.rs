@@ -541,14 +541,20 @@ impl Store {
     }
 
     /// Creaciones con la ventana temprana ya cerrada en `now` y sin descarga
-    /// completa de sus trades, más antiguas primero.
-    pub fn pending_windows(&self, now: i64, limit: usize) -> Result<Vec<PendingWindow>> {
-        let mut q = self.db.prepare(
+    /// completa de sus trades, más antiguas primero. Con `skip_final`
+    /// (`collect`, base de recolección), sin las marcadas en `vivo_download_final`.
+    pub fn pending_windows(&self, now: i64, limit: usize, skip_final: bool) -> Result<Vec<PendingWindow>> {
+        let skip = if skip_final {
+            " AND NOT EXISTS (SELECT 1 FROM vivo_download_final f WHERE f.purpose = 'window' AND f.mint = c.mint)"
+        } else {
+            ""
+        };
+        let mut q = self.db.prepare(&format!(
             "SELECT c.mint, c.bonding_curve, c.timestamp, c.signature FROM creations c
              LEFT JOIN trade_windows w ON w.mint = c.mint
-             WHERE c.timestamp + ?1 <= ?2 AND COALESCE(w.complete, 0) = 0
+             WHERE c.timestamp + ?1 <= ?2 AND COALESCE(w.complete, 0) = 0{skip}
              ORDER BY c.timestamp LIMIT ?3",
-        )?;
+        ))?;
         let rows = q.query_map(params![EARLY_WINDOW_SECS, now, limit as i64], |r| {
             Ok(PendingWindow {
                 mint: r.get(0)?,
@@ -843,14 +849,20 @@ impl Store {
 
     /// Tokens con ventana temprana completa, ventana de precio cerrada en
     /// `now` y sin descarga completa de precio (con cualquier horizonte).
-    pub fn pending_price_windows(&self, now: i64, horizon: i64, limit: usize) -> Result<Vec<PendingWindow>> {
-        let mut q = self.db.prepare(
+    /// `skip_final` como en `pending_windows`.
+    pub fn pending_price_windows(&self, now: i64, horizon: i64, limit: usize, skip_final: bool) -> Result<Vec<PendingWindow>> {
+        let skip = if skip_final {
+            " AND NOT EXISTS (SELECT 1 FROM vivo_download_final f WHERE f.purpose = 'prices' AND f.mint = c.mint)"
+        } else {
+            ""
+        };
+        let mut q = self.db.prepare(&format!(
             "SELECT c.mint, c.bonding_curve, c.timestamp, c.signature FROM creations c
              LEFT JOIN price_windows w ON w.mint = c.mint
              WHERE c.timestamp + ?1 <= ?2 AND COALESCE(w.complete, 0) = 0
-               AND EXISTS (SELECT 1 FROM trade_windows t WHERE t.mint = c.mint AND t.complete = 1)
+               AND EXISTS (SELECT 1 FROM trade_windows t WHERE t.mint = c.mint AND t.complete = 1){skip}
              ORDER BY c.timestamp LIMIT ?3",
-        )?;
+        ))?;
         let rows = q.query_map(params![horizon, now, limit as i64], |r| {
             Ok(PendingWindow {
                 mint: r.get(0)?,

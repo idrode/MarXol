@@ -60,6 +60,7 @@ Estos son principios de trabajo, no detalles técnicos — se aplican a cada dec
 - **Lectura**: en todas, los tokens que pasan siguen con retorno mediano negativo. Las señales sirven para evitar, no para entrar. Solo valen para tres franjas de 8 minutos.
 - **Herramienta**: `marxol check <mint>` aplica D2 a un token. Verificada sin red y en vivo, también con tokens recién creados (resultados/check_en_vivo_*.txt, check_temprano_2026-10-22.txt).
 - **Amenaza a la validez (2026-10-19 15:46:16 UTC, slot 458 888 140)**: el `TradeEvent` añade al final `quote_transfer_fee` (u64, comisión Token-2022 del quote; 0 en SOL). El parser decodifica bien el resto, y está verificado en 11 trades reales. El retorno congelado no la descuenta, y todo `marxol_vivo.db` es posterior al cambio. Detalle: docs/estado_y_pasos.md.
+- **Recolección (2026-10-26 18:40:53 UTC)**: se cambió el protocolo de `collect`. Las ventanas con fallo determinista ya no se reintentan (antes había un bucle que gastaba el 44 % de los CU); hay 3 intentos como mucho ante fallos transitorios y la bolsa se reparte por hora UTC. La redefinición de los bloques A y B está pendiente de decisión del dueño: docs/informe_2026-10-26.md.
 - **Pendiente**: benchmark de un día de WebSocket (tarifa por byte de Alchemy sin aclarar); `SetCreatorEvent` sin observar; H9–H13 sin pre-registrar.
 - Detalle: docs/estado_y_pasos.md.
 

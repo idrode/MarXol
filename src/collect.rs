@@ -12,6 +12,11 @@
 //!    `windows` y `prices`, con tope de tx por token).
 //! 5. Agrega los tokens terminados con el código congelado.
 //!
+//! Desde 2026-10-26 (cambio de protocolo de recolección): las ventanas con
+//! fallo determinista no se reintentan (`incompleto_permanente`), las de fallo
+//! transitorio se reintentan hasta 3 veces (`pendiente_agotado`), y la bolsa
+//! se gasta con ritmo horario (`ledger::hourly_cap`).
+//!
 //! Todo es idempotente y se guarda en transacciones: tras un corte, el
 //! siguiente arranque sigue desde el cursor y lo pendiente.
 
@@ -56,6 +61,11 @@ const MIN_CYCLE_UNITS: u64 = 2_000;
 
 pub fn run(rpc: &RpcClient, idl: &Idl, st: &mut Store, budget: &rpc::Budget, cfg: &Config) -> Result<()> {
     let ledger = budget.ledger().context("collect necesita el libro de CU")?;
+    // Ventanas incompletas de antes del cambio del 2026-10-26: se clasifican por su nota, sin red.
+    let (perm, exh) = vivo::sweep_download_backlog(st.conn(), rpc::unix_now())?;
+    if perm + exh > 0 {
+        eprintln!("descargas marcadas sin reintento: {perm} incompleto_permanente, {exh} pendiente_agotado");
+    }
     let mut n = 0u64;
     loop {
         let start = rpc::unix_now();
@@ -65,9 +75,14 @@ pub fn run(rpc: &RpcClient, idl: &Idl, st: &mut Store, budget: &rpc::Budget, cfg
                 eprintln!("{}: fin de la ejecución acotada", ledger.summary(start)?);
                 return Ok(());
             }
-            let next_day = (start.div_euclid(86_400) + 1) * 86_400;
-            eprintln!("{}: se espera al día UTC siguiente", ledger.summary(start)?);
-            sleep_until(next_day.min(start + 600));
+            let next = if ledger.day_exhausted(start, MIN_CYCLE_UNITS)? {
+                eprintln!("{}: se espera al día UTC siguiente", ledger.summary(start)?);
+                (start.div_euclid(86_400) + 1) * 86_400
+            } else {
+                eprintln!("{}: se espera a la hora UTC siguiente", ledger.summary(start)?);
+                (start.div_euclid(3_600) + 1) * 3_600
+            };
+            sleep_until(next.min(start + 600));
             continue;
         }
         let r = cycle(rpc, idl, st, budget, cfg, start);
@@ -141,7 +156,7 @@ fn cycle(rpc: &RpcClient, idl: &Idl, st: &mut Store, b: &rpc::Budget, cfg: &Conf
         }
         if !stage(3, &mut c, &mut |c| {
             let mut done = 0;
-            windows_pass(rpc, idl, st, cfg.per_cycle, cfg.max_pages, Some(cfg.max_token_sigs), b, &mut done)?;
+            windows_pass(rpc, idl, st, cfg.per_cycle, cfg.max_pages, Some(cfg.max_token_sigs), true, b, &mut done)?;
             c.windows = done;
             Ok(())
         })? {
@@ -149,7 +164,7 @@ fn cycle(rpc: &RpcClient, idl: &Idl, st: &mut Store, b: &rpc::Budget, cfg: &Conf
         }
         stage(4, &mut c, &mut |c| {
             let mut done = 0;
-            prices_pass(rpc, idl, st, cfg.per_cycle, cfg.max_pages, Some(cfg.max_token_sigs), b, &mut done)?;
+            prices_pass(rpc, idl, st, cfg.per_cycle, cfg.max_pages, Some(cfg.max_token_sigs), true, b, &mut done)?;
             c.prices = done;
             Ok(())
         })?;
@@ -356,6 +371,14 @@ pub fn status(st: &Store, poll_secs: u64, sample_ppm: u32) -> Result<String> {
     )?;
     writeln!(out, "seguimientos hechos {}/{}; resultados agregados (sin leer): {}", o.0, o.1,
         db.query_row("SELECT COUNT(*) FROM vivo_results", [], |r| r.get::<_, i64>(0))?)?;
+    let mut q = db.prepare(
+        "SELECT purpose, state, CASE WHEN reason LIKE 'max_pages%' THEN 'max_pages'
+                                     WHEN reason LIKE '%tope por token%' THEN 'tope de tx' ELSE reason END, COUNT(*)
+         FROM vivo_download_final GROUP BY 1, 2, 3 ORDER BY 1, 2, 3",
+    )?;
+    let f: Vec<(String, String, String, i64)> =
+        q.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<rusqlite::Result<_>>()?;
+    writeln!(out, "descargas sin reintento (propósito, estado, motivo, tokens): {f:?}")?;
     let gaps: i64 = db.query_row("SELECT COUNT(*) FROM vivo_gaps", [], |r| r.get(0))?;
     writeln!(out, "huecos en el listado: {gaps}")?;
 
@@ -486,6 +509,93 @@ mod tests {
         assert_eq!(n, 1);
         let st2: String = c.query_row("SELECT status FROM vivo_tokens WHERE signature = ?1", [other], |r| r.get(0)).unwrap();
         assert_eq!(st2, "sin_create");
+    }
+
+    /// Protocolo del 2026-10-26: un fallo determinista queda
+    /// `incompleto_permanente` y no vuelve a la cola; uno transitorio, al
+    /// tercer intento, `pendiente_agotado`. Los dos siguen contando en la
+    /// agregación (censura y exclusiones) y `windows` sobre marxol.db (sin
+    /// `skip_final`) los sigue viendo como antes.
+    #[test]
+    fn fallos_deterministas_y_transitorios_salen_de_la_cola_y_siguen_contando() {
+        let all = fixtures();
+        let creates: Vec<_> = all.iter().filter(|(_, t)| t.events.iter().any(|e| e.name == "CreateEvent")).take(2).collect();
+        assert_eq!(creates.len(), 2, "hacen falta 2 fixtures con CreateEvent");
+        let mut st = vivo::open(&tmp("collect_final.db"), 0).unwrap();
+        let s = |sig: &str| tx::SigInfo { signature: sig.into(), slot: 1, block_time: Some(0), failed: false };
+        vivo::record_listing(&mut st, &creates.iter().map(|(g, _)| s(g)).collect::<Vec<_>>(), 1_000_000, None, 0).unwrap();
+        let mut mints = vec![];
+        for (sig, t) in &creates {
+            assert!(ingest_create(&mut st, sig, t, 5).unwrap());
+            mints.push(st.conn().query_row("SELECT mint FROM vivo_tokens WHERE signature = ?1", [sig], |r| r.get::<_, String>(0)).unwrap());
+        }
+        let now = 4_000_000_000;
+        let pending = |st: &Store, skip| st.pending_windows(now, 10, skip).unwrap().into_iter().map(|w| w.mint).collect::<Vec<_>>();
+        assert_eq!(pending(&st, true).len(), 2);
+        // Determinista (lo que hace windows_pass con el tope de tx): fuera de la cola al primer intento.
+        let note = "512 tx en la ventana, más que el tope por token (400)";
+        st.record_window(&mints[0], 512, 0, false, Some(note), now).unwrap();
+        vivo::mark_download_final(st.conn(), "window", &mints[0], vivo::DownloadFinal::Permanent, note, now).unwrap();
+        assert_eq!(pending(&st, true), vec![mints[1].clone()]);
+        // Transitorio: sigue en la cola hasta el tercer intento.
+        for i in 1..=3 {
+            st.record_window(&mints[1], 3, 1, false, Some("errores de getTransaction o decodificación"), now).unwrap();
+            let marked = vivo::note_transient_failure(&st, "window", &mints[1], "errores de getTransaction o decodificación", now).unwrap();
+            assert_eq!(marked, i == 3, "intento {i}");
+        }
+        assert!(pending(&st, true).is_empty());
+        // Sin skip_final (windows sobre marxol.db), la consulta es la de siempre.
+        assert_eq!(pending(&st, false).len(), 2);
+        let f: Vec<(String, String, i64)> = st
+            .conn()
+            .prepare("SELECT mint, state, attempts FROM vivo_download_final ORDER BY state")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(f, vec![(mints[0].clone(), "incompleto_permanente".into(), 1), (mints[1].clone(), "pendiente_agotado".into(), 3)]);
+        // Siguen contando: se agregan como sin ventana.
+        let mut fin = vivo::finished_without_result(st.conn(), 10).unwrap();
+        fin.sort();
+        let mut want = mints.clone();
+        want.sort();
+        assert_eq!(fin, want);
+    }
+
+    /// Las ventanas incompletas del bucle (anteriores al cambio) se clasifican
+    /// por su nota sin red; es idempotente y no toca las completas.
+    #[test]
+    fn el_atasco_previo_se_clasifica_por_su_nota() {
+        let st = vivo::open(&tmp("collect_backlog.db"), 0).unwrap();
+        st.record_window("A", 0, 0, false, Some("max_pages sin llegar a la creación"), 1).unwrap();
+        st.record_window("B", 900, 0, false, Some("900 tx en la ventana, más que el tope por token (400)"), 1).unwrap();
+        st.record_window("C", 3, 1, false, Some("errores de getTransaction o decodificación"), 1).unwrap();
+        st.record_window("D", 3, 0, true, None, 1).unwrap();
+        st.record_price_window("B2", 3900, 500, 0, false, Some("500 tx en el rango, más que el tope por token (400)"), 1).unwrap();
+        for _ in 0..3 {
+            st.note_attempt("window", "E").unwrap(); // solo errores al listar, sin fila en trade_windows
+        }
+        assert_eq!(vivo::sweep_download_backlog(st.conn(), 2).unwrap(), (3, 1));
+        assert_eq!(vivo::sweep_download_backlog(st.conn(), 3).unwrap(), (0, 0));
+        let f: Vec<(String, String, String)> = st
+            .conn()
+            .prepare("SELECT purpose, mint, state FROM vivo_download_final ORDER BY purpose, mint")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        let p = |a: &str, b: &str, c: &str| (a.to_string(), b.to_string(), c.to_string());
+        assert_eq!(
+            f,
+            vec![
+                p("prices", "B2", "incompleto_permanente"),
+                p("window", "A", "incompleto_permanente"),
+                p("window", "B", "incompleto_permanente"),
+                p("window", "E", "pendiente_agotado"),
+            ]
+        );
     }
 
     /// La agregación de collect da lo mismo que las filas de la validación 3:

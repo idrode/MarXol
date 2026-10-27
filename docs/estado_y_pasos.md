@@ -120,6 +120,11 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    **Recolección en continuo desde 2026-10-22 02:15:51 UTC** (OK del dueño):
    - `collect --sample-ppm 4000 --poll-secs 300`, topes por defecto.
    - Corre con `run/collect.sh`: proceso desligado con reinicio, binario copiado en `run/` y log en `run/collect.log` (fuera de git).
+   - **Parada y reinicio (2026-10-22)**:
+     - Último ciclo a las 04:38 UTC. El log no muestra ninguna salida del proceso: la máquina se suspendió o se reinició.
+     - Relanzado a las 16:24:39 UTC con el mismo binario (`cad4ce6`): `setsid nohup run/collect.sh >> run/collect.out 2>> run/collect.log < /dev/null &`.
+     - `run/collect.pid` guarda el pid del bucle, que es líder de su grupo. Para pararlo: `kill -- -$(cat run/collect.pid)`.
+     - El hueco (~12 h, rodaje) cabe en `--max-backfill-pages 100` y se recupera entero. No afecta al bloque A.
    - Pre-registro de la fase 5, escrito antes de leer ningún resultado: docs/preregistro_fase5_2026-10-22.md (bloques A, B y C por fecha).
    - Propuesta de medición de creadores en serie: docs/propuesta_creadores_serie.md. Hallazgo: el `creator` es un argumento de `create`/`create_v2`, no una cuenta; solo el pagador aparece en la tx.
 
@@ -144,5 +149,20 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - **El parser es seguro**: el campo va al final y el resto de campos decodifica igual. En 11 trades reales (6 de antes del cambio y 5 de después) cuadran la constante de la curva, las reservas reales, las comisiones y el paso creación → trade.
    - **Efecto**: el retorno congelado no descuenta esta comisión. Solo puede afectar a los tokens con un quote Token-2022 que la cobre. V1–V3 son anteriores al cambio. El rodaje y los bloques A y B quedan después.
    - Detalle: docs/informe_noche_2_2026-10-23.md.
+
+   **Cambio de protocolo de recolección (2026-10-26 18:40:53 UTC, reinicio de `marxol-collect`)** — autorizado por el dueño, solo lo de la fase 2 de docs/informe_2026-10-26.md:
+   - **Causa, el bucle**: `pending_windows` / `pending_price_windows` devolvían para siempre los tokens con `complete = 0`, los más antiguos primero. Los 40 con fallo determinista (17 + 9 del bloque A, 14 del rodaje) más 5 de precio ocupaban cada ciclo y se volvían a listar en cada pasada: 10 635 reintentos, ≈ 1,36 M CU estimados (44 % del gasto de collect) y 6 151 reintentos por 429. La bolsa se agotó el 25-10 a las 08:37 UTC y el 26-10 a las 06:03 UTC. Medición: resultados/fase1_bucle_2026-10-26.txt (`scripts/fase1_bucle_2026-10-26.py`, solo lectura, sin retornos).
+   - **Fallo determinista** (tope de 400 tx por token, max_pages sin llegar a la creación o al rango) → fila en `vivo_download_final` con estado `incompleto_permanente` y su motivo. No se reintenta nunca.
+   - **Fallo transitorio** (red, 429 tras los reintentos de `with_retry`, errores de `getTransaction` o de decodificación) → como mucho 3 intentos por token (`download_attempts`). Después pasa a `pendiente_agotado`, con su motivo.
+   - En los dos casos la fila de `trade_windows` / `price_windows` sigue con `complete = 0` y su nota, así que el token sigue contando en censura y exclusiones. La agregación (`finished_without_result`) no cambia.
+   - Al arrancar, `vivo::sweep_download_backlog` clasifica por su nota lo incompleto de antes del cambio, sin red: 45 `incompleto_permanente` (40 ventanas y 5 de precio) y 0 `pendiente_agotado`.
+   - **Ritmo horario**: el libro reparte la bolsa `collect` por hora UTC (`ledger::hourly_cap`). Al final de la hora h el tope acumulado es 700 000 · (h + 1) / 24 (≈ 29 167 CU/h) y lo no gastado pasa a las horas siguientes. Al tope horario, `collect` espera a la hora siguiente; al diario, al día siguiente. Los comandos manuales no llevan ritmo horario.
+   - Sin cambios: selección por hash de firma, 4 000 ppm, sondeo de 300 s, tope de 400 tx, `max_pages` 5 y ningún cálculo congelado (D2, T_entry2, retornos). `windows` y `prices` sobre marxol.db usan las consultas de siempre (`skip_final = false`).
+   - Tests: 99 en verde (3 nuevos). Las salidas de referencia sobre una copia de marxol.db (17 comandos y 1 015 `check --offline`) son idénticas byte a byte, y el sha256 de marxol.db no cambia (`d513e1f3…`).
+   - Binario anterior guardado en `run/marxol.antes-2026-10-26`.
+   - **Primeros 3 ciclos (2026-10-27, 00:00–02:00 UTC)**:
+     - Cada ciclo gasta ~29 170 CU (el tope horario) en vaciar la cola atrasada. Los 54 tokens descargados tienen 1 solo intento y los 3 topes nuevos quedaron permanentes al primero.
+     - La clave nueva funciona y hubo 13 reintentos por 429.
+     - Hallazgo: el 26-10, entre las 16 y las 17 UTC, hubo 61 867 firmas de mint-authority, 59 007 de ellas fallidas. La recuperación usó 100 páginas, justo `--max-backfill-pages`, sin hueco.
 
 6. Registrar cada hallazgo nuevo en este archivo en la misma sesión en que se confirme.

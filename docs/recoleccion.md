@@ -49,6 +49,13 @@ Cada `--poll-secs` (por defecto 300 s):
    - Un test comprueba que coincide con V3 en sus 196 tokens.
    - Los resultados **no se resumen ni se leen** hasta el pre-registro de la fase 5.
 
+**Desde el 2026-10-26 18:40:53 UTC** (cambio de protocolo, docs/estado_y_pasos.md):
+- Una ventana o un precio con fallo determinista (tope de tx por token, max_pages) queda en `vivo_download_final` como `incompleto_permanente` y no se reintenta.
+- Uno con fallo transitorio se intenta 3 veces como mucho y después queda `pendiente_agotado`.
+- La fila de `trade_windows` / `price_windows` se conserva con `complete = 0`: el token cuenta igual en censura y exclusiones.
+- La bolsa `collect` se reparte por hora UTC: tope acumulado de 700 000 · (h + 1) / 24, con traspaso de lo no gastado.
+- `collect-status` muestra las descargas sin reintento por propósito, estado y motivo.
+
 Cada ciclo deja una fila en `vivo_cycles`, con las CU por etapa y el trabajo hecho. `marxol collect-status` las resume, proyecta el consumo diario y muestra la cobertura por hora.
 
 Un error de red no tumba el proceso: se registra en el ciclo y se sigue en el siguiente. Todo es idempotente, así que tras un corte el arranque sigue desde el cursor y lo pendiente.

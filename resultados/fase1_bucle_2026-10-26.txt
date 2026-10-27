@@ -1,0 +1,55 @@
+a) Bolsa collect y horas con ciclos de listado (desde 2026-10-23)
+
+  2026-10-23: 81 ciclos, bolsa 679920 CU, agotada a las — (no se agotó) UTC
+    horas UTC sin ningún ciclo (16): 03–19
+  2026-10-24: 43 ciclos, bolsa 528760 CU, agotada a las — (no se agotó) UTC
+    horas UTC sin ningún ciclo (20): 00–20
+  2026-10-25: 103 ciclos, bolsa 699980 CU, agotada a las 08:37 UTC
+    horas UTC sin ningún ciclo (15): 09–24
+  2026-10-26: 63 ciclos, bolsa 700000 CU, agotada a las 06:03 UTC
+    horas UTC sin ningún ciclo (17): 07–24
+
+b) Bloque A (creados hasta ahora): tokens por hora UTC de creación y ventana incompleta
+
+  hora   n           tope400        max_pages   precio_tope400  precio_pendiente   % incompleta
+  00    21                 0                0                0                0      0.0
+  01    25                 1                1                0                0      8.0
+  02    30                 0                0                0                0      0.0
+  03    22                 0                1                0                0      4.5
+  04    18                 0                1                0                0      5.6
+  05    21                 0                0                0                1      4.8
+  06    19                 0                0                0                0      0.0
+  07    13                 1                0                0                0      7.7
+  08    11                 1                0                1                0     18.2
+  09    14                 1                0                0                0      7.1
+  10    15                 2                0                0                0     13.3
+  11    12                 1                0                0                0      8.3
+  12    20                 0                0                0                0      0.0
+  13    29                 4                0                1                0     17.2
+  14    25                 1                2                0                0     12.0
+  15    29                 1                1                0                0      6.9
+  16    30                 1                0                0                0      3.3
+  17    18                 0                0                0                0      0.0
+  18    24                 0                0                0                0      0.0
+  19    36                 0                2                1                0      8.3
+  20    20                 1                0                0                0      5.0
+  21    30                 1                1                0                0      6.7
+  22    19                 0                0                0                0      0.0
+  23    20                 1                0                0                0      5.0
+  tot  521                17                9                3                1   5.8
+  además, no 'creado': [('sin_create', 5)]
+  (precio_*: ventana temprana completa y ventana de precio incompleta)
+
+c) CU en reintentos de ventanas sin progreso
+
+  día          reintentos  CU reintentos  CU del día  % del día  % de la bolsa (700 000)
+  2026-10-22         592          76762      481460      15.9      11.0
+  2026-10-23        2054         241039      681080      35.4      34.4
+  2026-10-24        1491         181732      532960      34.1      26.0
+  2026-10-25        3721         527600      694620      76.0      75.4
+  2026-10-26        2777         337440      700000      48.2      48.2
+  total            10635        1364573     3090120      44.2
+
+  reintentos 429 en el log: 6151 (cada uno cuenta 40 CU)
+  estimación: CU de ventana+precio del ciclo − coste de lo completado en él (40 CU por página y por tx),
+  repartido entre primeros intentos y reintentos según las líneas del log.

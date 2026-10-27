@@ -2,7 +2,7 @@
 //! `windows` y `prices`, con presupuesto de RPC y registro en `rpc_usage`.
 
 use crate::idl::Idl;
-use crate::{h1b, pump, rpc, store, tx};
+use crate::{h1b, pump, rpc, store, tx, vivo};
 use anyhow::{Context, Result};
 use solana_rpc_client::rpc_client::RpcClient;
 use std::time::Duration;
@@ -354,12 +354,16 @@ fn with_budget(
 }
 
 pub fn windows(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
-    with_budget(st, "windows", budget, |st, done| windows_pass(rpc, idl, st, limit, max_pages, None, budget, done))
+    with_budget(st, "windows", budget, |st, done| windows_pass(rpc, idl, st, limit, max_pages, None, false, budget, done))
 }
 
 /// Una pasada de `windows` sin registrar el consumo (lo hace quien llama).
 /// `max_token_sigs`: tope de tx por token (`collect`); un token con más
 /// firmas en la ventana queda incompleto sin descargarlas.
+/// `final_states` (`collect`, desde 2026-10-26): un fallo determinista (tope
+/// de tx, max_pages) marca el token `incompleto_permanente` y uno transitorio
+/// lo marca `pendiente_agotado` al tercer intento (`vivo_download_final`); los
+/// marcados no se vuelven a pedir.
 #[allow(clippy::too_many_arguments)]
 pub fn windows_pass(
     rpc: &RpcClient,
@@ -368,12 +372,13 @@ pub fn windows_pass(
     limit: usize,
     max_pages: usize,
     max_token_sigs: Option<usize>,
+    final_states: bool,
     budget: &rpc::Budget,
     done: &mut usize,
 ) -> Result<()> {
     {
         let now = unix_now();
-        let pending = st.pending_windows(now, limit)?;
+        let pending = st.pending_windows(now, limit, final_states)?;
         eprintln!("{} tokens con ventana cerrada pendientes de descarga", pending.len());
         let (mut complete, mut incomplete, mut trades) = (0, 0, 0);
         for w in pending {
@@ -392,14 +397,21 @@ pub fn windows_pass(
                     // El token queda pendiente; la próxima pasada lo reintenta.
                     eprintln!("{}: error listando firmas, queda pendiente: {}", w.mint, rpc::redact(&format!("{e:#}")));
                     st.note_attempt("window", &w.mint)?;
+                    if final_states {
+                        vivo::note_transient_failure(st, "window", &w.mint, "error listando firmas", now)?;
+                    }
                     incomplete += 1;
                     continue;
                 }
             };
             let Some(in_window) = sigs else {
                 incomplete += 1;
-                st.record_window(&w.mint, 0, 0, false, Some("max_pages sin llegar a la creación"), now)?;
-                eprintln!("{}: ventana incompleta (max_pages sin llegar a la creación)", w.mint);
+                let note = "max_pages sin llegar a la creación";
+                st.record_window(&w.mint, 0, 0, false, Some(note), now)?;
+                if final_states {
+                    vivo::mark_download_final(st.conn(), "window", &w.mint, vivo::DownloadFinal::Permanent, note, now)?;
+                }
+                eprintln!("{}: ventana incompleta ({note})", w.mint);
                 continue;
             };
             let ok_sigs = in_window.iter().filter(|s| !s.failed).count();
@@ -407,6 +419,9 @@ pub fn windows_pass(
                 incomplete += 1;
                 let note = format!("{ok_sigs} tx en la ventana, más que el tope por token ({cap})");
                 st.record_window(&w.mint, in_window.len(), 0, false, Some(&note), now)?;
+                if final_states {
+                    vivo::mark_download_final(st.conn(), "window", &w.mint, vivo::DownloadFinal::Permanent, &note, now)?;
+                }
                 eprintln!("{}: ventana incompleta ({note})", w.mint);
                 continue;
             }
@@ -421,6 +436,9 @@ pub fn windows_pass(
             if ok { complete += 1 } else { incomplete += 1 }
             let note = (!ok).then_some("errores de getTransaction o decodificación");
             st.record_window(&w.mint, in_window.len(), errors, ok, note, now)?;
+            if let (Some(note), true) = (note, final_states) {
+                vivo::note_transient_failure(st, "window", &w.mint, note, now)?;
+            }
         }
         println!("ventanas completas: {complete}, incompletas: {incomplete}, trades nuevos: {trades}");
         Ok(())
@@ -432,11 +450,11 @@ pub fn windows_pass(
 pub const PRICE_DOWNLOAD_SECS: i64 = h1b::PARAMS_1H.horizon_secs + store::EARLY_WINDOW_SECS;
 
 pub fn prices(rpc: &RpcClient, idl: &Idl, st: &mut store::Store, limit: usize, max_pages: usize, budget: &rpc::Budget) -> Result<()> {
-    with_budget(st, "prices", budget, |st, done| prices_pass(rpc, idl, st, limit, max_pages, None, budget, done))
+    with_budget(st, "prices", budget, |st, done| prices_pass(rpc, idl, st, limit, max_pages, None, false, budget, done))
 }
 
-/// Una pasada de `prices` sin registrar el consumo; `max_token_sigs` como en
-/// `windows_pass`.
+/// Una pasada de `prices` sin registrar el consumo; `max_token_sigs` y
+/// `final_states` como en `windows_pass`.
 #[allow(clippy::too_many_arguments)]
 pub fn prices_pass(
     rpc: &RpcClient,
@@ -445,6 +463,7 @@ pub fn prices_pass(
     limit: usize,
     max_pages: usize,
     max_token_sigs: Option<usize>,
+    final_states: bool,
     budget: &rpc::Budget,
     done: &mut usize,
 ) -> Result<()> {
@@ -452,7 +471,7 @@ pub fn prices_pass(
         let horizon = PRICE_DOWNLOAD_SECS;
         let now = unix_now();
         let copied = st.backfill_prices_from_early_trades()?;
-        let pending = st.pending_price_windows(now, horizon, limit)?;
+        let pending = st.pending_price_windows(now, horizon, limit, final_states)?;
         eprintln!("{copied} puntos copiados de la ventana temprana; {} tokens pendientes", pending.len());
         let (mut complete, mut incomplete, mut points) = (0, 0, 0);
         for w in pending {
@@ -473,13 +492,20 @@ pub fn prices_pass(
                     Err(e) => {
                         eprintln!("{}: error listando firmas, queda pendiente: {}", w.mint, rpc::redact(&format!("{e:#}")));
                         st.note_attempt("prices", &w.mint)?;
+                        if final_states {
+                            vivo::note_transient_failure(st, "prices", &w.mint, "error listando firmas", now)?;
+                        }
                         incomplete += 1;
                         continue;
                     }
                 };
             let Some(sigs) = listed else {
                 incomplete += 1;
-                st.record_price_window(&w.mint, horizon, 0, 0, false, Some("max_pages sin llegar al rango"), now)?;
+                let note = "max_pages sin llegar al rango";
+                st.record_price_window(&w.mint, horizon, 0, 0, false, Some(note), now)?;
+                if final_states {
+                    vivo::mark_download_final(st.conn(), "prices", &w.mint, vivo::DownloadFinal::Permanent, note, now)?;
+                }
                 eprintln!("{}: ventana de precio incompleta (max_pages)", w.mint);
                 continue;
             };
@@ -488,6 +514,9 @@ pub fn prices_pass(
                 incomplete += 1;
                 let note = format!("{ok_sigs} tx en el rango, más que el tope por token ({cap})");
                 st.record_price_window(&w.mint, horizon, sigs.len(), 0, false, Some(&note), now)?;
+                if final_states {
+                    vivo::mark_download_final(st.conn(), "prices", &w.mint, vivo::DownloadFinal::Permanent, &note, now)?;
+                }
                 eprintln!("{}: ventana de precio incompleta ({note})", w.mint);
                 continue;
             }
@@ -503,6 +532,9 @@ pub fn prices_pass(
             if ok { complete += 1 } else { incomplete += 1 }
             let note = (!ok).then_some("errores de getTransaction o decodificación");
             st.record_price_window(&w.mint, horizon, sigs.len(), errors, ok, note, now)?;
+            if let (Some(note), true) = (note, final_states) {
+                vivo::note_transient_failure(st, "prices", &w.mint, note, now)?;
+            }
         }
         println!("ventanas de precio completas: {complete}, incompletas: {incomplete}, puntos nuevos: {points}");
         Ok(())

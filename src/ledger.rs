@@ -124,6 +124,16 @@ pub struct Ledger {
     pool: Pool,
     caps: Caps,
     run_id: i64,
+    /// Reparto de la bolsa por hora UTC (`collect`, desde 2026-10-26).
+    hourly: bool,
+}
+
+/// Tope acumulado de una bolsa diaria con ritmo horario: al terminar la
+/// hora UTC `h` (0–23) se puede haber gastado hasta `cap · (h + 1) / 24`.
+/// Lo no gastado en una hora pasa a las siguientes.
+pub fn hourly_cap(cap: u64, now: i64) -> u64 {
+    let h = now.rem_euclid(86_400) / 3_600;
+    cap * (h as u64 + 1) / 24
 }
 
 /// Consumo del día UTC de `now`: (bolsa propia, total de las dos).
@@ -143,7 +153,32 @@ impl Ledger {
             params![now, command, pool.name(), std::process::id(), provider],
         )?;
         let run_id = db.last_insert_rowid();
-        Ok(Ledger { db, pool, caps, run_id })
+        Ok(Ledger { db, pool, caps, run_id, hourly: false })
+    }
+
+    /// Reparte la bolsa por hora UTC (`hourly_cap`): las peticiones que no
+    /// caben en el tope acumulado de la hora fallan con `Exhausted`, igual
+    /// que con el tope diario.
+    pub fn with_hourly_pacing(mut self) -> Ledger {
+        self.hourly = true;
+        self
+    }
+
+    pub fn hourly(&self) -> bool {
+        self.hourly
+    }
+
+    /// Tope de la bolsa vigente en `now`: el diario o, con ritmo horario, el
+    /// acumulado hasta el final de la hora UTC en curso.
+    pub fn pool_cap(&self, now: i64) -> u64 {
+        let cap = self.caps.pool(self.pool);
+        if self.hourly { hourly_cap(cap, now) } else { cap }
+    }
+
+    /// `true` si la bolsa diaria (sin el reparto horario) ya no da para un ciclo.
+    pub fn day_exhausted(&self, now: i64, min: u64) -> Result<bool> {
+        let u = self.used(now)?;
+        Ok(self.caps.pool(self.pool).saturating_sub(u.pool).min(self.caps.total.saturating_sub(u.total)) < min)
     }
 
     pub fn pool(&self) -> Pool {
@@ -161,7 +196,7 @@ impl Ledger {
     /// CU que esta bolsa aún puede gastar hoy.
     pub fn remaining(&self, now: i64) -> Result<u64> {
         let u = self.used(now)?;
-        Ok(self.caps.pool(self.pool).saturating_sub(u.pool).min(self.caps.total.saturating_sub(u.total)))
+        Ok(self.pool_cap(now).saturating_sub(u.pool).min(self.caps.total.saturating_sub(u.total)))
     }
 
     /// Carga una petición de `units` antes de hacerla, de forma atómica entre
@@ -170,10 +205,11 @@ impl Ledger {
         self.db.execute_batch("BEGIN IMMEDIATE")?;
         let r = (|| {
             let u = self.used(now)?;
-            let cap = self.caps.pool(self.pool);
+            let cap = self.pool_cap(now);
             if u.pool + units > cap || u.total + units > self.caps.total {
                 bail!(Exhausted(format!(
-                    "tope diario de CU alcanzado (bolsa {}: {} de {}; total del día: {} de {})",
+                    "tope {} de CU alcanzado (bolsa {}: {} de {}; total del día: {} de {})",
+                    if self.hourly && cap < self.caps.pool(self.pool) { "horario" } else { "diario" },
                     self.pool.name(),
                     u.pool,
                     cap,
@@ -217,8 +253,9 @@ impl Ledger {
     /// Línea de estado del día para stderr.
     pub fn summary(&self, now: i64) -> Result<String> {
         let u = self.used(now)?;
+        let hourly = if self.hourly { format!(" (tope acumulado de esta hora UTC: {})", self.pool_cap(now)) } else { String::new() };
         Ok(format!(
-            "libro de CU (hoy UTC): bolsa {} {} de {}, total {} de {}",
+            "libro de CU (hoy UTC): bolsa {} {} de {}{hourly}, total {} de {}",
             self.pool.name(),
             u.pool,
             self.caps.pool(self.pool),
@@ -286,6 +323,35 @@ mod tests {
             .collect::<rusqlite::Result<_>>()
             .unwrap();
         assert_eq!(runs, vec![("collect".into(), "collect".into(), 18, 720), ("tx".into(), "manual".into(), 7, 280)]);
+    }
+
+    #[test]
+    fn ritmo_horario_reparte_la_bolsa_y_traspasa_lo_no_gastado() {
+        // 2026-10-27 00:00 UTC.
+        const D: i64 = 1_793_059_200;
+        assert_eq!(hourly_cap(700_000, D), 29_166);
+        assert_eq!(hourly_cap(700_000, D + 3_599), 29_166);
+        assert_eq!(hourly_cap(700_000, D + 3_600), 58_333);
+        assert_eq!(hourly_cap(700_000, D + 86_399), 700_000);
+        let p = tmp("ledger_horario.db");
+        let caps = Caps::new(2_400, 2_400).unwrap();
+        let c = Ledger::open(&p, "collect", Pool::Collect, caps, "alchemy", D).unwrap().with_hourly_pacing();
+        // Hora 0: 100 CU.
+        assert_eq!(c.remaining(D).unwrap(), 100);
+        c.charge(40, D).unwrap();
+        c.charge(40, D).unwrap();
+        let e = c.charge(40, D + 10).unwrap_err();
+        assert!(e.is::<Exhausted>() && format!("{e}").contains("tope horario"), "{e}");
+        assert!(!c.day_exhausted(D, 40).unwrap());
+        // Hora 3 sin gastar en la 1 y la 2: lo no gastado se traspasa (400 − 80).
+        assert_eq!(c.remaining(D + 3 * 3_600).unwrap(), 320);
+        for _ in 0..8 {
+            c.charge(40, D + 3 * 3_600).unwrap();
+        }
+        assert!(c.charge(40, D + 3 * 3_600).unwrap_err().is::<Exhausted>());
+        // Sin ritmo horario (comandos manuales), el tope es el diario.
+        let m = Ledger::open(&p, "tx", Pool::Collect, caps, "alchemy", D).unwrap();
+        assert_eq!(m.remaining(D).unwrap(), 2_400 - 400);
     }
 
     #[test]

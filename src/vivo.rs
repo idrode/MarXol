@@ -122,6 +122,21 @@ CREATE TABLE IF NOT EXISTS vivo_gaps (
     detected_at  INTEGER NOT NULL,
     reason       TEXT NOT NULL
 );
+-- Descargas de ventana o precio que collect ya no reintenta (desde
+-- 2026-10-26). 'incompleto_permanente': fallo determinista (tope de tx por
+-- token, max_pages sin llegar a la creación o al rango). 'pendiente_agotado':
+-- fallos transitorios (red, 429, decodificación) en 3 intentos. La fila de
+-- trade_windows / price_windows sigue con complete = 0 y su nota, así que el
+-- token cuenta igual en censura y exclusiones. No se borra.
+CREATE TABLE IF NOT EXISTS vivo_download_final (
+    purpose    TEXT NOT NULL CHECK (purpose IN ('window', 'prices')),
+    mint       TEXT NOT NULL,
+    state      TEXT NOT NULL CHECK (state IN ('incompleto_permanente', 'pendiente_agotado')),
+    reason     TEXT NOT NULL,
+    attempts   INTEGER NOT NULL,
+    marked_at  INTEGER NOT NULL,
+    PRIMARY KEY (purpose, mint)
+);
 -- Exportaciones verificadas (requisito para borrar crudos).
 CREATE TABLE IF NOT EXISTS vivo_exports (
     id           INTEGER PRIMARY KEY,
@@ -281,6 +296,81 @@ pub fn mark_create_failed(db: &Connection, sig: &str, status: &str, note: &str, 
         params![sig, status, note, now],
     )?;
     Ok(())
+}
+
+/// Intentos máximos de una descarga con fallos transitorios antes de
+/// marcarla `pendiente_agotado`.
+pub const MAX_TRANSIENT_ATTEMPTS: i64 = 3;
+
+/// Estado final de una descarga de ventana o precio que collect no reintenta.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DownloadFinal {
+    /// Fallo determinista: reintentar daría lo mismo.
+    Permanent,
+    /// Fallos transitorios en `MAX_TRANSIENT_ATTEMPTS` intentos.
+    Exhausted,
+}
+
+impl DownloadFinal {
+    pub fn name(self) -> &'static str {
+        match self {
+            DownloadFinal::Permanent => "incompleto_permanente",
+            DownloadFinal::Exhausted => "pendiente_agotado",
+        }
+    }
+}
+
+/// Marca una descarga (`purpose` = `window` o `prices`) como final, con su
+/// motivo y los intentos registrados en `download_attempts`.
+pub fn mark_download_final(db: &Connection, purpose: &str, mint: &str, state: DownloadFinal, reason: &str, now: i64) -> Result<()> {
+    db.execute(
+        "INSERT OR IGNORE INTO vivo_download_final (purpose, mint, state, reason, attempts, marked_at)
+         VALUES (?1, ?2, ?3, ?4,
+                 COALESCE((SELECT attempts FROM download_attempts WHERE purpose = ?1 AND mint = ?2), 0), ?5)",
+        params![purpose, mint, state.name(), reason, now],
+    )?;
+    Ok(())
+}
+
+/// Tras un fallo transitorio ya contado en `download_attempts`: si llega a
+/// `MAX_TRANSIENT_ATTEMPTS`, lo marca `pendiente_agotado`. Devuelve si lo marcó.
+pub fn note_transient_failure(st: &Store, purpose: &str, mint: &str, reason: &str, now: i64) -> Result<bool> {
+    if st.attempts(purpose, mint)? < MAX_TRANSIENT_ATTEMPTS {
+        return Ok(false);
+    }
+    mark_download_final(st.conn(), purpose, mint, DownloadFinal::Exhausted, reason, now)?;
+    Ok(true)
+}
+
+/// Clasifica las ventanas incompletas anteriores al cambio del 2026-10-26
+/// (el bucle de reintentos) por la nota que dejó la descarga: tope de tx
+/// por token y max_pages → `incompleto_permanente`; cualquier otra con
+/// ≥ `MAX_TRANSIENT_ATTEMPTS` intentos → `pendiente_agotado`. Idempotente.
+/// Devuelve (permanentes, agotadas) marcadas ahora.
+pub fn sweep_download_backlog(db: &Connection, now: i64) -> Result<(usize, usize)> {
+    let (mut perm, mut exh) = (0, 0);
+    for (purpose, table) in [("window", "trade_windows"), ("prices", "price_windows")] {
+        perm += db.execute(
+            &format!(
+                "INSERT OR IGNORE INTO vivo_download_final (purpose, mint, state, reason, attempts, marked_at)
+                 SELECT ?1, w.mint, 'incompleto_permanente', w.note,
+                        COALESCE((SELECT attempts FROM download_attempts a WHERE a.purpose = ?1 AND a.mint = w.mint), 0), ?2
+                 FROM {table} w
+                 WHERE w.complete = 0 AND (w.note LIKE 'max_pages%' OR w.note LIKE '%más que el tope por token%')"
+            ),
+            params![purpose, now],
+        )?;
+        exh += db.execute(
+            &format!(
+                "INSERT OR IGNORE INTO vivo_download_final (purpose, mint, state, reason, attempts, marked_at)
+                 SELECT ?1, a.mint, 'pendiente_agotado', COALESCE(w.note, 'error listando firmas'), a.attempts, ?2
+                 FROM download_attempts a LEFT JOIN {table} w ON w.mint = a.mint
+                 WHERE a.purpose = ?1 AND a.attempts >= ?3 AND COALESCE(w.complete, 0) = 0"
+            ),
+            params![purpose, now, MAX_TRANSIENT_ATTEMPTS],
+        )?;
+    }
+    Ok((perm, exh))
 }
 
 /// Seguimientos vencidos: (mint, horizonte, bonding curve).
