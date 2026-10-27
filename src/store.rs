@@ -1020,6 +1020,30 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// (firma, creator embebido) de los trades de `entry_trades`, en el mismo
+    /// orden (fase C: tx con varias cuentas e identidades en T_entry2).
+    pub fn entry_trades_tx(&self, mint: &str, t0: i64, window: i64) -> Result<Vec<(String, Option<String>)>> {
+        let mut q = self.db.prepare(
+            "SELECT signature, creator FROM early_trades WHERE mint = ?1 AND timestamp >= ?2 AND timestamp < ?3
+             ORDER BY slot, timestamp, signature, ev_index",
+        )?;
+        let rows = q.query_map(params![mint, t0, t0 + window], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Creator y payer de la creación y cambios de creator con slot < `slot`
+    /// (sin el creator embebido en los trades, que se añade aparte).
+    pub fn creator_identities_base_before(&self, mint: &str, slot: u64) -> Result<std::collections::HashSet<String>> {
+        let mut q = self.db.prepare(
+            "SELECT creator FROM creations WHERE mint = ?1
+             UNION SELECT user FROM creations WHERE mint = ?1
+             UNION SELECT new_creator FROM creator_changes WHERE mint = ?1 AND slot < ?2
+             UNION SELECT old_creator FROM creator_changes WHERE mint = ?1 AND slot < ?2 AND old_creator IS NOT NULL",
+        )?;
+        let rows = q.query_map(params![mint, slot as i64], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// (firma, timestamp) de la creación de cada mint.
     pub fn creation_signatures_ts(&self, mints: &[String]) -> Result<Vec<(String, i64)>> {
         let mut q = self.db.prepare("SELECT signature, timestamp FROM creations WHERE mint = ?1")?;

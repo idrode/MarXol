@@ -237,6 +237,28 @@ enum Cmd {
         #[command(flatten)]
         rate: RateArgs,
     },
+    /// Banco de evaluación (fase B) sobre D2 en la validación 3: modelo
+    /// trivial, MCC, prevalencia, precisión/recall, AUPRC, IC, fragilidad,
+    /// censura y bloques temporales. Comprueba que reproduce los criterios
+    /// congelados. Sin red; abre `--db` en solo lectura.
+    BancoD2 {
+        /// Bloques temporales de igual duración en que se parte el tramo.
+        #[arg(long, default_value_t = 2)]
+        bloques: usize,
+    },
+    /// Fase C (exploratorio, post hoc): tenencia del creador y tx con varias
+    /// cuentas en T_entry2 contra el retorno (a) a +30 min, en V1–V3, con el
+    /// banco de evaluación y control por estratos de actividad. Sin red; `--db`
+    /// en solo lectura.
+    BancoFaseC {
+        /// Añade el control de C1 por terciles de progreso de la curva en
+        /// T_entry2 (docs/fase_c_control_progreso_2026-10-22.md).
+        #[arg(long)]
+        progreso: bool,
+        /// Escribe tokens.tsv y compradores.tsv en este directorio (post hoc).
+        #[arg(long)]
+        volcado: Option<std::path::PathBuf>,
+    },
     /// Recolección continua en `--vivo-db` (24/7): lista las creaciones desde
     /// el punto de reanudación, muestrea por hash de la firma (cubre las 24 h),
     /// descarga creación, ventana temprana y precio, sigue el estado de la
@@ -526,6 +548,16 @@ fn run() -> Result<()> {
             } else {
                 print_operator(&r);
             }
+            Ok(())
+        }
+        Cmd::BancoD2 { bloques } => {
+            let st = store::Store::open_readonly(&cli.db)?;
+            print!("{}", banco_d2_v3(&st, bloques)?);
+            Ok(())
+        }
+        Cmd::BancoFaseC { progreso, ref volcado } => {
+            let st = store::Store::open_readonly(&cli.db)?;
+            print!("{}", banco_fase_c(&st, progreso, volcado.as_deref())?);
             Ok(())
         }
         Cmd::Stats => {

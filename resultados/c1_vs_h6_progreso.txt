@@ -1,0 +1,27 @@
+C1 FRENTE A H6' (LLENADO DE D2) Y AL PROGRESO DE LA CURVA EN T_entry2 — POST HOC, SIN RED, marxol.db V1–V3
+población: 438 tokens (la de banco-fase-c); con H6' evaluable: 438 (n/e si V0 ≠ 1.073e15)
+
+-- Correlaciones de Spearman (IC bootstrap por token = por creator, 2000 réplicas, semilla 20260930) --
+tenencia del creador vs llenado H6': rho = +0.285 [+0.193, +0.374]
+tenencia del creador vs progreso: rho = +0.285 [+0.194, +0.368]
+llenado H6' vs progreso: rho = +1.000 [+1.000, +1.000]
+
+-- Solapamiento C1 × H6' --
+           H6' sí  H6' no
+C1 sí          40      27
+C1 no         104     267
+phi = +0.243; C1 con H6' = 40/67 = 59.7 %; H6' con C1 = 40/144 = 27.8 %
+C1 con D2 (descartado) = 29/67
+tenencia mínima que fuerza llenado: 5 % del supply = 5e13 tokens = 6.30 % de 793.1e12 (las compras del creador ya llenan la curva)
+
+-- Retorno (a) a +30 min: C1 dentro de H6' (descriptivo) --
+H6' sí: n sin C1 104, con C1 40 · mediana sin -37.1 · con -34.9 · diferencia -2.2 pts · MW unilateral p = 0.74
+H6' no: n sin C1 267, con C1 27 · mediana sin -5.8 · con -15.0 · diferencia +9.2 pts · MW unilateral p = 1.91e-11
+
+-- Varianza de rangos de la tenencia explicada (R² de rangos, regresión lineal sobre rangos) --
+por el llenado: R² = 0.081; por el progreso: R² = 0.081
+
+-- Sensibilidad post hoc: C1 dentro de "H6' no", solo con tokens de progreso alcanzable por C1 --
+progreso mínimo con C1: 4.71 %
+H6' no y progreso >= 4.71 %: n sin C1 44, con C1 27 · mediana sin -13.4 · con -15.0 · diferencia +1.6 pts · MW unilateral p = 0.129
+progreso mediano en ese subgrupo: sin C1 6.2 % · con C1 6.9 %

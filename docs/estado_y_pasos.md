@@ -141,6 +141,43 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - Coste de lanzar medido en 187 tx de creación: mediana 0,0097 SOL, p90 0,021.
    - Todo es exploratorio: ninguna razón de veto sale de aquí sin su adenda y el bloque B.
 
+   **Auditoría fase A (2026-10-22, post hoc, sin red, sin retornos)**: resultados/auditoria_fase_a.txt (`scripts/auditoria_fase_a.py`). 530 tokens sin mayhem con T_entry2 de piloto y V1–V3. El script reproduce T_entry2, H4', H5, H7' y H8 de `entry2 --json` sin ninguna discrepancia.
+   - El creador compra en el slot de creación en el 91,3 % [88,6–93,4] de los tokens (88,9 % en la propia tx). Casi no discrimina, así que no entra como variable. Ningún token tiene compras de otra cuenta dentro de la tx de creación.
+   - Tx con compras de ≥ 2 cuentas antes de T_entry2: 13,0 % [10,4–16,2]. D2 ya descarta el 89,9 % de esos tokens (frente al 33,8 % del resto).
+   - Tenencia del top 10 de cuentas ajenas en T_entry2: Spearman 0,82 con el llenado de H6'. Es casi la misma variable.
+   - Tenencia del creador > 5 % del supply: 15,8 % [13,0–19,2]. D2 descarta casi lo mismo con ella que sin ella (41,7 % frente a 41,0 %).
+   - No hay pagador de comisión ni lista de cuentas por tx guardados. El `user` del `TradeEvent` es el firmante del trade.
+   - Mayhem: 0 tx con varias cuentas y 1,1 % con compradores ajenos en el slot de creación.
+
+   **Banco de evaluación, fase B (2026-10-22)**: `src/banco.rs` y `marxol banco-d2` (resultados/banco_d2_v3.txt). Es descriptivo y post hoc: no cambia el veredicto de V3.
+   - Reproduce exactamente los criterios congelados de V3 (46/28, +19,0 pts, p = 0,000159, IC [+11,2, +27,2]).
+   - Las 21 salidas de referencia y los 1 015 `check --offline` son idénticos byte a byte. sha256 de marxol.db intacto.
+   - Con clase positiva "retorno (a) a +30 min ≤ 0", la prevalencia es del 94,6 % [86,9–97,9]. El modelo trivial (vetar todo) tiene una exactitud del 94,6 %, frente al 35,1 % de D2. El MCC de D2 es −0,18 [−0,37, +0,09].
+   - De los 4 tokens con retorno > 0, D2 descarta 3.
+   - D2 separa medianas, pero no clasifica "positivo/negativo" mejor que el modelo trivial: casi todo pierde.
+   - Fragilidad: quitando los 5 casos que más sostienen la diferencia, queda en +16,2 pts (p = 0,0031).
+   - Bloques de 4 min: +12,3 pts (p = 0,057) y +24,0 pts (p = 0,00011).
+   - Censura: a +24 h, 0/75. marxol.db solo tiene 65 min de precio.
+
+   **Fase C (2026-10-22, exploratorio y post hoc, sin veredicto)**: `marxol banco-fase-c` (resultados/fase_c_banco.txt).
+   - Declaración previa escrita antes de cruzar nada con retornos: docs/fase_c_declaracion_2026-10-22.md (sha256 `e8fbe56c…`, 16:27:50 UTC). El cálculo se ejecutó a las 16:31:49 UTC.
+   - Población: 438 tokens de V1–V3, sin mayhem, un token por creator y con retorno (a) a +30 min.
+   - **C1 (tenencia del creador > 5 %), 15,3 %**:
+     - Medianas: −24,7 % con C1 frente a −8,2 % sin C1. Diferencia +16,6 pts [+11,8, +23,9].
+     - Misma dirección en V1 (+11,9), V2 (+25,1) y V3 (+18,4).
+     - Sobrevive al control por estratos de actividad: ≤ 2 trades +9,6, 3–9 trades +17,6, ≥ 10 trades +13,3. Diferencia ponderada +13,5 [+8,7, +19,3].
+     - Dentro de D2 también: +11,2 pts en los que pasan y +10,2 en los descartados. Aporta algo que D2 no tiene.
+     - Como clasificador, MCC ≈ 0: el 97 % de los tokens tiene retorno ≤ 0.
+     - La variable es un % del supply, no de lo que circula, así que no sube con pocos trades: el 10,9 % de los tokens con ≤ 2 trades tienen C1, frente al 22,6 % de los de 3–9 trades.
+   - **C2 (tx con ≥ 2 cuentas), 11,9 %**:
+     - Diferencia bruta de +20,1 pts, pero **no sobrevive** al control: ponderada +11,7 [−1,9, +17,1], van Elteren p = 0,051.
+     - Ningún token con ≤ 2 trades tiene C2.
+   - Con la etiqueta "≤ −50 %" (prevalencia 7,5 %), C1 tiene MCC 0,047 [−0,05, +0,15] y C2 0,163 [+0,04, +0,29].
+   - **Control de C1 por progreso de la curva en T_entry2 (2026-10-22, post hoc, declarado antes: docs/fase_c_control_progreso_2026-10-22.md): C1 NO sobrevive.**
+     - Terciles de progreso: 0/146 con C1 en el bajo; +6,0 pts [+3,7, +7,6] en el medio; −2,5 [−8,9, +3,9] en el alto.
+     - Diferencia ponderada +1,8 [−1,5, +5,0].
+     - Detalle: resultados/fase_c_control_progreso.txt y docs/informe_noche_2026-10-22.md.
+
    **Amenaza a la validez: cambio del `TradeEvent` el 2026-10-19 (verificado contra la chain el 2026-10-22, 880 CU).**
    - Desde el despliegue del **2026-10-19 15:46:16 UTC (slot 458 888 140)**, el `TradeEvent` lleva al final un campo nuevo, `quote_transfer_fee: u64`: 8 bytes, que dan 382 en vez de 374 en un `buy` típico.
      - Acotación: el último evento de 374 se vio en el slot 458 888 128 y el primero de 382 en el 458 921 419. Entre ambos solo hay ese despliegue.

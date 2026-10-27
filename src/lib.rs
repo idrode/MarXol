@@ -2,7 +2,9 @@
 //! decodificación, ingesta, almacenamiento y cálculo. La CLI (`src/main.rs`)
 //! es una capa fina encima.
 
+pub mod banco;
 pub mod check;
+pub mod concentracion;
 pub mod collect;
 pub mod entry;
 pub mod entry2;

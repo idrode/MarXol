@@ -1,0 +1,24 @@
+
+==== CONTROL MECÁNICO DE C1: TERCILES DE PROGRESO DE LA CURVA EN T_entry2 (post hoc; docs/fase_c_control_progreso_2026-10-22.md) ====
+progreso = 1 − reservas virtuales de token justo antes de T_entry2 / iniciales; cortes: 2.2061 % y 9.5404 %
+tokens con tercil distinto por capitalización (precio virtual): 170 de 438
+progreso mediano: con C1 +13.8 · sin C1 +3.2
+tercil 1 (bajo) : n 146 · C1 0/146 = 0.0 % [IC 95 % 0.0–2.6] · progreso mediano +0.7 · tenencia mediana del creador +0.0
+tercil 2        : n 146 · C1 26/146 = 17.8 % [IC 95 % 12.5–24.8] · progreso mediano +4.3 · tenencia mediana del creador +2.7
+tercil 3 (alto) : n 146 · C1 41/146 = 28.1 % [IC 95 % 21.4–35.9] · progreso mediano +19.6 · tenencia mediana del creador +1.6
+-- Por terciles de progreso de la curva --
+tercil 1 (bajo) n 146 · marcados 0/146 = 0.0 % [IC 95 % 0.0–2.6] · mediana no marcados -3.9 pts · marcados n/d · diferencia n/d IC 95 % n/d (réplicas descartadas 2000) · p = n/d
+tercil 2       n 146 · marcados 26/146 = 17.8 % [IC 95 % 12.5–24.8] · mediana no marcados -8.9 pts · marcados -14.9 pts · diferencia +6.0 pts IC 95 % [+3.7, +7.6] (réplicas descartadas 0) · p = 1.2e-6
+tercil 3 (alto) n 146 · marcados 41/146 = 28.1 % [IC 95 % 21.4–35.9] · mediana no marcados -37.1 pts · marcados -34.6 pts · diferencia -2.5 pts IC 95 % [-8.9, +3.9] (réplicas descartadas 0) · p = 0.767784
+van Elteren unilateral (no marcados > marcados): z = 2.508, p = 0.006064
+diferencia ponderada por n_s: +1.8 pts IC 95 % [-1.5, +5.0] (réplicas descartadas 0) (bootstrap estratificado por clúster)
+¿sobrevive al control? NO (dirección declarada, IC > 0 y ningún estrato con ≥ 10 por grupo en contra)
+
+
+-- Sensibilidad post hoc (scratch, Python): solo tokens cotizados en SOL, donde progreso y capitalización ordenan igual --
+cotizados en SOL (reservas virtuales de quote iniciales 30 SOL): 337 de 438; C1 49
+cortes de tercil (progreso ≡ capitalización en SOL): 2.0200 % y 9.1585 %
+tercil 1: n 113 · C1 0 · diferencia n/d · MW unilateral p = n/d
+tercil 2: n 112 · C1 15 · diferencia +5.6 pts · MW unilateral p = 0.000172
+tercil 3: n 112 · C1 34 · diferencia -2.6 pts · MW unilateral p = 0.719
+diferencia ponderada por n_s: +1.5 pts IC 95 % [-3.4, +6.1] (bootstrap estratificado por token = por creator, 2000 réplicas, semilla 20260930)

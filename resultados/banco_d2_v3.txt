@@ -1,0 +1,55 @@
+==== BANCO DE EVALUACIÓN: D2 en la validación 3 (población congelada; métricas del banco descriptivas, post hoc) ====
+clase positiva (la que la regla quiere vetar): retorno neto (a) desde T_entry2 a +30 min ≤ 0
+n = 74; prevalencia 70/74 = 94.6 % [IC 95 % 86.9–97.9]; la regla marca 28/74 = 37.8 % [IC 95 % 27.6–49.2]
+matriz: VP 25 · FP 3 · FN 45 · VN 1
+
+-- Regla frente al modelo trivial --
+                             regla                                      trivial (siempre clase positiva)
+exactitud                    26/74 = 35.1 % [IC 95 % 25.2–46.5]         70/74 = 94.6 % [IC 95 % 86.9–97.9]
+precisión (positiva)         25/28 = 89.3 % [IC 95 % 72.8–96.3]         70/74 = 94.6 % [IC 95 % 86.9–97.9]
+recall (positiva)            25/70 = 35.7 % [IC 95 % 25.5–47.4]         70/70 = 100.0 % [IC 95 % 94.8–100.0]
+precisión (negativa)         1/46 = 2.2 % [IC 95 % 0.4–11.3]            0/0 = n/d
+recall (negativa)            1/4 = 25.0 % [IC 95 % 4.6–69.9]            0/4 = 0.0 % [IC 95 % 0.0–49.0]
+MCC                          -0.183 IC 95 % [-0.370, +0.092] (réplicas descartadas 20) n/d (constante: indefinido; equivale a 0)
+AUPRC (línea base = prev.)   0.927 IC 95 % [+0.851, +0.991] (réplicas descartadas 0) 0.946
+bootstrap: 2000 réplicas, semilla 20260930, por casos
+
+-- Resultado continuo por grupo --
+mediana no marcados -5.6 pts (n 46), marcados -24.7 pts (n 28); diferencia +19.0 pts IC 95 % [+11.2, +27.2] (réplicas descartadas 0); Mann-Whitney unilateral (no marcados > marcados) p = 0.000159
+
+-- Fragilidad --
+sin 1 (mayor |resultado|): n 73 · marcados 27/73 · diferencia +19.1 pts · p = 3.8e-5 · MCC -0.127 · prevalencia 70/73 = 95.9 % [IC 95 % 88.6–98.6]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW
+sin 3 (mayor |resultado|): n 71 · marcados 25/71 · diferencia +19.1 pts · p = 1.6e-5 · MCC -0.053 · prevalencia 69/71 = 97.2 % [IC 95 % 90.3–99.2]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW, 9TZcQmErhRTEgtDFhY6Ljomsp8KZZvsjJe9fu2Papump, GvQKhzvqpdTXxmZXYKpN2CgehLHSu3b6i7pzeSCDAXjU
+sin 5 (mayor |resultado|): n 69 · marcados 24/69 · diferencia +19.0 pts · p = 1.2e-5 · MCC -0.055 · prevalencia 67/69 = 97.1 % [IC 95 % 90.0–99.2]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW, 9TZcQmErhRTEgtDFhY6Ljomsp8KZZvsjJe9fu2Papump, GvQKhzvqpdTXxmZXYKpN2CgehLHSu3b6i7pzeSCDAXjU, Epsf2LqtohSTxMpBHDDBcUtBeQf5kYXwMHCpkYYypump, 6cZ9bbVEGSj2T1e41r2yecqvp6KiDb61RcRXjkqhpump
+sin 1 (los que más sostienen la diferencia): n 73 · marcados 27/73 · diferencia +19.0 pts · p = 0.000279 · MCC -0.190 · prevalencia 69/73 = 94.5 % [IC 95 % 86.7–97.8]
+    quitados: 2bbkrNFXzBkyUXvav9v6gdpASFTHJkaKkpLF8x5fpump
+sin 3 (los que más sostienen la diferencia): n 71 · marcados 25/71 · diferencia +18.2 pts · p = 0.000948 · MCC -0.204 · prevalencia 67/71 = 94.4 % [IC 95 % 86.4–97.8]
+    quitados: 2bbkrNFXzBkyUXvav9v6gdpASFTHJkaKkpLF8x5fpump, 6cZ9bbVEGSj2T1e41r2yecqvp6KiDb61RcRXjkqhpump, 7PESMeMvXfZoRPVL82DzHnZDZPNHjtV3Bp9WywLwXG8L
+sin 5 (los que más sostienen la diferencia): n 69 · marcados 23/69 · diferencia +16.2 pts · p = 0.003102 · MCC -0.219 · prevalencia 65/69 = 94.2 % [IC 95 % 86.0–97.7]
+    quitados: 2bbkrNFXzBkyUXvav9v6gdpASFTHJkaKkpLF8x5fpump, 6cZ9bbVEGSj2T1e41r2yecqvp6KiDb61RcRXjkqhpump, 7PESMeMvXfZoRPVL82DzHnZDZPNHjtV3Bp9WywLwXG8L, 7qwANZfQbC9BTKgmQHRwhLDn7YGwMMu99389LyuFLGVQ, 82Smh76fH2xQcBkxGjXuXT5pTZP2z5JwHQCKb5cCMk7L
+
+-- Censura: horizontes de seguimiento --
++5 min   completan 75/75 = 100.0 % [IC 95 % 95.1–100.0]
++30 min  completan 74/75 = 98.7 % [IC 95 % 92.8–99.8]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 1
++1 h     completan 74/75 = 98.7 % [IC 95 % 92.8–99.8]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 1
++24 h    completan 0/75 = 0.0 % [IC 95 % 0.0–4.9]; no completan: salida fuera del precio descargado 75
+
+-- Excluidos de la población, y por qué --
+creaciones en el tramo: 196; ventana temprana incompleta: 0
+sin precio inicial: 0
+sin T_entry2: 38
+mayhem (aparte): 75
+otro token del mismo creator (un token por creator): 8
+creator sin datos (adenda 7): 0
+sin datos de precio (adenda 3): 0
+D2 no evaluable (adenda 1): 0
+retorno (a) a +30 min n/e: 1
+
+-- Partición temporal (bloques fijos, nunca aleatoria) --
+bloque 1 [1790845200, 1790845440): n 41 · prevalencia 39/41 = 95.1 % [IC 95 % 83.9–98.7] · marcados 16/41 = 39.0 % [IC 95 % 25.7–54.3] · MCC -0.283 · diferencia +12.3 pts · p = 0.057408
+bloque 2 [1790845440, 1790845680): n 33 · prevalencia 31/33 = 93.9 % [IC 95 % 80.4–98.3] · marcados 12/33 = 36.4 % [IC 95 % 22.2–53.4] · MCC -0.072 · diferencia +24.0 pts · p = 0.000114
+
+comprobación: reproduce los criterios congelados de la validación 3 (pasan 46, descartados 28, diferencia +19.0 pts, p = 0.000159, IC [+11.2, +27.2]): idéntico

@@ -1,0 +1,149 @@
+FASE C — EXPLORATORIO, POST HOC, SIN VEREDICTO. marxol.db (V1–V3), sin red. Declaración previa: docs/fase_c_declaracion_2026-10-22.md
+población: 441 tokens (sin mayhem, un token por creator); con retorno (a) a +30 min: 438. Partición en T_entry2 idéntica a entry2::compute en todos.
+
+==== BANCO DE EVALUACIÓN: C1: tenencia del creador en T_entry2 > 5 % del supply (PRINCIPAL) ====
+clase positiva (la que la regla quiere vetar): retorno (a) a +30 min ≤ 0
+n = 438; prevalencia 425/438 = 97.0 % [IC 95 % 95.0–98.3]; la regla marca 67/438 = 15.3 % [IC 95 % 12.2–19.0]
+matriz: VP 65 · FP 2 · FN 360 · VN 11
+
+-- Regla frente al modelo trivial --
+                             regla                                      trivial (siempre clase positiva)
+exactitud                    76/438 = 17.4 % [IC 95 % 14.1–21.2]        425/438 = 97.0 % [IC 95 % 95.0–98.3]
+precisión (positiva)         65/67 = 97.0 % [IC 95 % 89.8–99.2]         425/438 = 97.0 % [IC 95 % 95.0–98.3]
+recall (positiva)            65/425 = 15.3 % [IC 95 % 12.2–19.0]        425/425 = 100.0 % [IC 95 % 99.1–100.0]
+precisión (negativa)         11/371 = 3.0 % [IC 95 % 1.7–5.2]           0/0 = n/d
+recall (negativa)            11/13 = 84.6 % [IC 95 % 57.8–95.7]         0/13 = 0.0 % [IC 95 % 0.0–22.8]
+MCC                          -0.000 IC 95 % [-0.101, +0.078] (réplicas descartadas 0) n/d (constante: indefinido; equivale a 0)
+AUPRC (línea base = prev.)   0.970 IC 95 % [+0.953, +0.985] (réplicas descartadas 0) 0.970
+bootstrap: 2000 réplicas, semilla 20260930, por clúster
+
+-- Resultado continuo por grupo --
+mediana no marcados -8.2 pts (n 371), marcados -24.7 pts (n 67); diferencia +16.6 pts IC 95 % [+11.8, +23.9] (réplicas descartadas 0); Mann-Whitney unilateral (no marcados > marcados) p = 7.1e-12
+
+-- Fragilidad --
+sin 1 (mayor |resultado|): n 437 · marcados 67/437 · diferencia +16.5 pts · p = 8.0e-12 · MCC -0.006 · prevalencia 425/437 = 97.3 % [IC 95 % 95.3–98.4]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW
+sin 3 (mayor |resultado|): n 435 · marcados 66/435 · diferencia +16.6 pts · p = 1.5e-12 · MCC 0.022 · prevalencia 425/435 = 97.7 % [IC 95 % 95.8–98.7]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW, 9TZcQmErhRTEgtDFhY6Ljomsp8KZZvsjJe9fu2Papump, DBQqXnVHLGXruKf75BP3GvF9DaPnEGJSLUsnzQgepump
+sin 5 (mayor |resultado|): n 433 · marcados 66/433 · diferencia +16.6 pts · p = 1.2e-12 · MCC 0.017 · prevalencia 424/433 = 97.9 % [IC 95 % 96.1–98.9]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW, 9TZcQmErhRTEgtDFhY6Ljomsp8KZZvsjJe9fu2Papump, DBQqXnVHLGXruKf75BP3GvF9DaPnEGJSLUsnzQgepump, 9trcArtUpUePNEH6CvnFNDQAd8U9KqcjvPpN4z7LZFDm, FgqJaXkxtezypJT1nVCo5iFP4pQAb4VoagVDCTQsTURq
+sin 1 (los que más sostienen la diferencia): n 437 · marcados 66/437 · diferencia +16.5 pts · p = 1.2e-11 · MCC -0.001 · prevalencia 424/437 = 97.0 % [IC 95 % 95.0–98.3]
+    quitados: 12yjR9wXYH8VkpCta6NhyoZH3coGrQ8Epw6Qifufpump
+sin 3 (los que más sostienen la diferencia): n 435 · marcados 65/435 · diferencia +16.4 pts · p = 2.2e-11 · MCC -0.002 · prevalencia 422/435 = 97.0 % [IC 95 % 95.0–98.2]
+    quitados: 12yjR9wXYH8VkpCta6NhyoZH3coGrQ8Epw6Qifufpump, 14hJrxkB2NKxekZMbe5ALWK5u9SRMHkwtyVsCDTtpump, 21ojyj7derLFpqHn5v9pUS3RzzTLLY37QYAeRYsppump
+sin 5 (los que más sostienen la diferencia): n 433 · marcados 64/433 · diferencia +16.4 pts · p = 3.5e-11 · MCC -0.003 · prevalencia 420/433 = 97.0 % [IC 95 % 94.9–98.2]
+    quitados: 12yjR9wXYH8VkpCta6NhyoZH3coGrQ8Epw6Qifufpump, 14hJrxkB2NKxekZMbe5ALWK5u9SRMHkwtyVsCDTtpump, 21ojyj7derLFpqHn5v9pUS3RzzTLLY37QYAeRYsppump, 26NrFmkFVtYN9YCwL9oPYTbgAKFUWDSzeeNHt6Y7pump, 24zkikRt6NUkM83vwpAmpfFhv4RSw6hPr9ZuUPDnpump
+
+-- Censura: horizontes de seguimiento --
++5 min   completan 440/441 = 99.8 % [IC 95 % 98.7–100.0]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 1
++30 min  completan 438/441 = 99.3 % [IC 95 % 98.0–99.8]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 3
++1 h     completan 438/441 = 99.3 % [IC 95 % 98.0–99.8]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 3
++24 h    completan 0/441 = 0.0 % [IC 95 % 0.0–0.9]; no completan: salida fuera del precio descargado 441
+
+-- Excluidos de la población, y por qué --
+tokens de V1–V3 con ventana temprana completa: 933; sin precio inicial: 0
+sin T_entry2: 241
+mayhem (aparte): 186
+otro token del mismo creator (un token por creator): 65
+retorno (a) a +30 min n/e: 3
+
+-- Partición temporal (bloques fijos, nunca aleatoria) --
+V1 [1790604222, 1790604673): n 192 · prevalencia 186/192 = 96.9 % [IC 95 % 93.4–98.6] · marcados 29/192 = 15.1 % [IC 95 % 10.7–20.9] · MCC 0.076 · diferencia +11.9 pts · p = 0.000143
+V2 [1790730000, 1790730479): n 173 · prevalencia 170/173 = 98.3 % [IC 95 % 95.0–99.4] · marcados 27/173 = 15.6 % [IC 95 % 11.0–21.8] · MCC 0.057 · diferencia +25.1 pts · p = 4.7e-8
+V3 [1790845201, 1790845676): n 73 · prevalencia 69/73 = 94.5 % [IC 95 % 86.7–97.8] · marcados 11/73 = 15.1 % [IC 95 % 8.6–25.0] · MCC -0.235 · diferencia +18.4 pts · p = 0.015734
+
+-- Por estratos fijos de actividad --
+≤ 2 trades     n 129 · marcados 14/129 = 10.9 % [IC 95 % 6.6–17.4] · mediana no marcados -5.0 pts · marcados -14.6 pts · diferencia +9.6 pts IC 95 % [+6.5, +14.7] (réplicas descartadas 0) · p = 5.1e-7
+3–9 trades     n 137 · marcados 31/137 = 22.6 % [IC 95 % 16.4–30.3] · mediana no marcados -7.3 pts · marcados -24.9 pts · diferencia +17.6 pts IC 95 % [+9.5, +25.3] (réplicas descartadas 0) · p = 1.9e-12
+≥ 10 trades    n 172 · marcados 22/172 = 12.8 % [IC 95 % 8.6–18.6] · mediana no marcados -26.0 pts · marcados -39.3 pts · diferencia +13.3 pts IC 95 % [+2.2, +25.3] (réplicas descartadas 0) · p = 0.004891
+van Elteren unilateral (no marcados > marcados): z = 8.396, p = 2.3e-17
+diferencia ponderada por n_s: +13.5 pts IC 95 % [+8.7, +19.3] (réplicas descartadas 0) (bootstrap estratificado por clúster)
+¿sobrevive al control? SÍ (dirección declarada, IC > 0 y ningún estrato con ≥ 10 por grupo en contra)
+
+-- Etiqueta secundaria: pérdida de la mitad o más: retorno (a) a +30 min ≤ −50 % --
+prevalencia 33/438 = 7.5 % [IC 95 % 5.4–10.4]; regla: exactitud 352/438 = 80.4 % [IC 95 % 76.4–83.8] · precisión (+) 7/67 = 10.4 % [IC 95 % 5.2–20.0] · recall (+) 7/33 = 21.2 % [IC 95 % 10.7–37.8] · MCC 0.047 [IC -0.050, +0.154] · AUPRC 0.082 [IC +0.056, +0.120] (línea base 0.075)
+trivial (siempre clase negativa): exactitud 405/438 = 92.5 % [IC 95 % 89.6–94.6] · MCC indefinido
+
+-- C1 dentro de D2 (descriptivo) --
+pasan D2           n 255 · marcados 38/255 = 14.9 % [IC 95 % 11.1–19.8] · mediana sin -5.8 · con -16.9 · diferencia +11.2 · p = 7.5e-16
+descartados por D2 n 183 · marcados 29/183 = 15.8 % [IC 95 % 11.3–21.8] · mediana sin -25.0 · con -35.2 · diferencia +10.2 · p = 0.002066
+
+==== BANCO DE EVALUACIÓN: C2: ≥ 1 tx con compras de ≥ 2 cuentas antes de T_entry2 (SECUNDARIA) ====
+clase positiva (la que la regla quiere vetar): retorno (a) a +30 min ≤ 0
+n = 438; prevalencia 425/438 = 97.0 % [IC 95 % 95.0–98.3]; la regla marca 52/438 = 11.9 % [IC 95 % 9.2–15.2]
+matriz: VP 49 · FP 3 · FN 376 · VN 10
+
+-- Regla frente al modelo trivial --
+                             regla                                      trivial (siempre clase positiva)
+exactitud                    59/438 = 13.5 % [IC 95 % 10.6–17.0]        425/438 = 97.0 % [IC 95 % 95.0–98.3]
+precisión (positiva)         49/52 = 94.2 % [IC 95 % 84.4–98.0]         425/438 = 97.0 % [IC 95 % 95.0–98.3]
+recall (positiva)            49/425 = 11.5 % [IC 95 % 8.8–14.9]         425/425 = 100.0 % [IC 95 % 99.1–100.0]
+precisión (negativa)         10/386 = 2.6 % [IC 95 % 1.4–4.7]           0/0 = n/d
+recall (negativa)            10/13 = 76.9 % [IC 95 % 49.7–91.8]         0/13 = 0.0 % [IC 95 % 0.0–22.8]
+MCC                          -0.061 IC 95 % [-0.188, +0.055] (réplicas descartadas 0) n/d (constante: indefinido; equivale a 0)
+AUPRC (línea base = prev.)   0.967 IC 95 % [+0.947, +0.984] (réplicas descartadas 0) 0.970
+bootstrap: 2000 réplicas, semilla 20260930, por clúster
+
+-- Resultado continuo por grupo --
+mediana no marcados -8.7 pts (n 386), marcados -28.8 pts (n 52); diferencia +20.1 pts IC 95 % [+12.8, +26.5] (réplicas descartadas 0); Mann-Whitney unilateral (no marcados > marcados) p = 5.6e-7
+
+-- Fragilidad --
+sin 1 (mayor |resultado|): n 437 · marcados 52/437 · diferencia +20.1 pts · p = 6.2e-7 · MCC -0.068 · prevalencia 425/437 = 97.3 % [IC 95 % 95.3–98.4]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW
+sin 3 (mayor |resultado|): n 435 · marcados 52/435 · diferencia +19.9 pts · p = 7.5e-7 · MCC -0.085 · prevalencia 425/435 = 97.7 % [IC 95 % 95.8–98.7]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW, 9TZcQmErhRTEgtDFhY6Ljomsp8KZZvsjJe9fu2Papump, DBQqXnVHLGXruKf75BP3GvF9DaPnEGJSLUsnzQgepump
+sin 5 (mayor |resultado|): n 433 · marcados 51/433 · diferencia +17.6 pts · p = 1.9e-6 · MCC -0.097 · prevalencia 424/433 = 97.9 % [IC 95 % 96.1–98.9]
+    quitados: GYwYZ3vU7x4ijuEQR3aVa4amqfFf2cNjUBz6FN4FLHRW, 9TZcQmErhRTEgtDFhY6Ljomsp8KZZvsjJe9fu2Papump, DBQqXnVHLGXruKf75BP3GvF9DaPnEGJSLUsnzQgepump, 9trcArtUpUePNEH6CvnFNDQAd8U9KqcjvPpN4z7LZFDm, FgqJaXkxtezypJT1nVCo5iFP4pQAb4VoagVDCTQsTURq
+sin 1 (los que más sostienen la diferencia): n 437 · marcados 51/437 · diferencia +17.8 pts · p = 1.1e-6 · MCC -0.062 · prevalencia 424/437 = 97.0 % [IC 95 % 95.0–98.3]
+    quitados: 2c17SKjSErE11EHtP6vLmm7i5t6HqGrzLnriLvu6pump
+sin 3 (los que más sostienen la diferencia): n 435 · marcados 49/435 · diferencia +17.2 pts · p = 3.3e-6 · MCC -0.066 · prevalencia 422/435 = 97.0 % [IC 95 % 95.0–98.2]
+    quitados: 2c17SKjSErE11EHtP6vLmm7i5t6HqGrzLnriLvu6pump, 37DKHYHVNjG4ePiVAXRMELg98ij5LfHQ7F9Mh17Lpump, 4CBmysAbaRqDKLPpNbfRS3ynyMLyNmGb6LNvDammpump
+sin 5 (los que más sostienen la diferencia): n 433 · marcados 47/433 · diferencia +16.6 pts · p = 1.7e-5 · MCC -0.069 · prevalencia 420/433 = 97.0 % [IC 95 % 94.9–98.2]
+    quitados: 2c17SKjSErE11EHtP6vLmm7i5t6HqGrzLnriLvu6pump, 37DKHYHVNjG4ePiVAXRMELg98ij5LfHQ7F9Mh17Lpump, 4CBmysAbaRqDKLPpNbfRS3ynyMLyNmGb6LNvDammpump, 4Pjcf2X6WQ8mNWxBo6hTYu9AVWSVJppZN32svCDDw6XE, 4byeuu2qMRavfFHkeKZosKVdzZuioAiGE7ApcHmivrsF
+
+-- Censura: horizontes de seguimiento --
++5 min   completan 440/441 = 99.8 % [IC 95 % 98.7–100.0]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 1
++30 min  completan 438/441 = 99.3 % [IC 95 % 98.0–99.8]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 3
++1 h     completan 438/441 = 99.3 % [IC 95 % 98.0–99.8]; no completan: curva completada antes de la salida (precio en PumpSwap, no descargado) 3
++24 h    completan 0/441 = 0.0 % [IC 95 % 0.0–0.9]; no completan: salida fuera del precio descargado 441
+
+-- Excluidos de la población, y por qué --
+tokens de V1–V3 con ventana temprana completa: 933; sin precio inicial: 0
+sin T_entry2: 241
+mayhem (aparte): 186
+otro token del mismo creator (un token por creator): 65
+retorno (a) a +30 min n/e: 3
+
+-- Partición temporal (bloques fijos, nunca aleatoria) --
+V1 [1790604222, 1790604673): n 192 · prevalencia 186/192 = 96.9 % [IC 95 % 93.4–98.6] · marcados 35/192 = 18.2 % [IC 95 % 13.4–24.3] · MCC -0.148 · diferencia +11.8 pts · p = 0.007791
+V2 [1790730000, 1790730479): n 173 · prevalencia 170/173 = 98.3 % [IC 95 % 95.0–99.4] · marcados 15/173 = 8.7 % [IC 95 % 5.3–13.8] · MCC 0.041 · diferencia +24.1 pts · p = 2.6e-5
+V3 [1790845201, 1790845676): n 73 · prevalencia 69/73 = 94.5 % [IC 95 % 86.7–97.8] · marcados 2/73 = 2.7 % [IC 95 % 0.8–9.5] · MCC 0.040 · diferencia +23.0 pts · p = 0.043951
+
+-- Por estratos fijos de actividad --
+≤ 2 trades     n 129 · marcados 0/129 = 0.0 % [IC 95 % 0.0–2.9] · mediana no marcados -5.6 pts · marcados n/d · diferencia n/d IC 95 % n/d (réplicas descartadas 2000) · p = n/d
+3–9 trades     n 137 · marcados 11/137 = 8.0 % [IC 95 % 4.5–13.8] · mediana no marcados -8.6 pts · marcados -24.9 pts · diferencia +16.3 pts IC 95 % [-1.6, +23.9] (réplicas descartadas 0) · p = 0.027379
+≥ 10 trades    n 172 · marcados 41/172 = 23.8 % [IC 95 % 18.1–30.7] · mediana no marcados -26.5 pts · marcados -34.6 pts · diferencia +8.0 pts IC 95 % [-7.4, +15.6] (réplicas descartadas 0) · p = 0.216689
+van Elteren unilateral (no marcados > marcados): z = 1.634, p = 0.051115
+diferencia ponderada por n_s: +11.7 pts IC 95 % [-1.9, +17.1] (réplicas descartadas 0) (bootstrap estratificado por clúster)
+¿sobrevive al control? NO (dirección declarada, IC > 0 y ningún estrato con ≥ 10 por grupo en contra)
+
+-- Etiqueta secundaria: pérdida de la mitad o más: retorno (a) a +30 min ≤ −50 % --
+prevalencia 33/438 = 7.5 % [IC 95 % 5.4–10.4]; regla: exactitud 373/438 = 85.2 % [IC 95 % 81.5–88.2] · precisión (+) 10/52 = 19.2 % [IC 95 % 10.8–31.9] · recall (+) 10/33 = 30.3 % [IC 95 % 17.4–47.3] · MCC 0.163 [IC +0.042, +0.294] · AUPRC 0.111 [IC +0.067, +0.179] (línea base 0.075)
+trivial (siempre clase negativa): exactitud 405/438 = 92.5 % [IC 95 % 89.6–94.6] · MCC indefinido
+
+-- C2 dentro de D2 (descriptivo) --
+pasan D2           n 255 · marcados 6/255 = 2.4 % [IC 95 % 1.1–5.0] · mediana sin -6.5 · con -10.4 · diferencia +3.9 · p = 0.030488
+descartados por D2 n 183 · marcados 46/183 = 25.1 % [IC 95 % 19.4–31.9] · mediana sin -26.5 · con -32.4 · diferencia +5.9 · p = 0.227249
+
+-- Retorno (a) a +30 min por tramo de tenencia del creador (descriptivo) --
+0 %        n 148 · mediana -10.2 · retorno > 0 5/148 = 3.4 % [IC 95 % 1.5–7.7]
+(0, 1] %   n  97 · mediana -4.1 · retorno > 0 2/97 = 2.1 % [IC 95 % 0.6–7.2]
+(1, 5] %   n 126 · mediana -10.2 · retorno > 0 4/126 = 3.2 % [IC 95 % 1.2–7.9]
+(5, 10] %  n  44 · mediana -18.8 · retorno > 0 1/44 = 2.3 % [IC 95 % 0.4–11.8]
+> 10 %     n  23 · mediana -38.9 · retorno > 0 1/23 = 4.3 % [IC 95 % 0.8–21.0]
+
+-- Solapamiento de C1 (población evaluable) --
+C1 67/438 = 15.3 % [IC 95 % 12.2–19.0] · H8 36/438 = 8.2 % [IC 95 % 6.0–11.2] · C1 y H8 15 · C1 y H4' 13 · C1 y C2 5
+≤ 2 trades  : C1 14/129 = 10.9 % [IC 95 % 6.6–17.4] · C2 0/129 = 0.0 % [IC 95 % 0.0–2.9]
+3–9 trades  : C1 31/137 = 22.6 % [IC 95 % 16.4–30.3] · C2 11/137 = 8.0 % [IC 95 % 4.5–13.8]
+≥ 10 trades : C1 22/172 = 12.8 % [IC 95 % 8.6–18.6] · C2 41/172 = 23.8 % [IC 95 % 18.1–30.7]

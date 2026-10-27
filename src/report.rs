@@ -1537,3 +1537,461 @@ pub fn print_tx(t: &tx::TxEvents, filter: Option<&[String]>, json: bool) {
     }
 }
 
+
+/// Motivo por el que el retorno (a) a `h` s desde T_entry2 es n/e, con las
+/// mismas condiciones y en el mismo orden que `entry2::return_at`; `None` si
+/// es evaluable. `banco_d2_v3` comprueba que coincide con `return_at`.
+pub fn motivo_censura(
+    e: &entry2::Entry2,
+    points: &[(i64, f64)],
+    covered_until: Option<i64>,
+    completed_at: Option<i64>,
+    h: i64,
+) -> Option<&'static str> {
+    let exit_t = e.entry_ts + h;
+    if e.fee_bps.is_none() {
+        return Some("sin comisión en el trade T_entry2");
+    }
+    match covered_until {
+        None => return Some("sin ventana de precio completa"),
+        Some(c) if c < exit_t => return Some("salida fuera del precio descargado"),
+        _ => {}
+    }
+    if completed_at.is_some_and(|c| c <= exit_t) {
+        return Some("curva completada antes de la salida (precio en PumpSwap, no descargado)");
+    }
+    if !points.iter().any(|(t, _)| *t <= exit_t) {
+        return Some("sin punto de precio anterior a la salida");
+    }
+    None
+}
+
+/// Banco de evaluación sobre D2 en la validación 3 (fase B): misma población
+/// y misma comparación que `entry2 --tramo validacion3`, más las métricas de
+/// `banco`. Comprueba que reproduce exactamente los criterios congelados
+/// (n, medianas, Mann-Whitney, diferencia e IC bootstrap). `bloques`: número
+/// de bloques temporales de igual duración en que se parte el tramo.
+pub fn banco_d2_v3(st: &store::Store, bloques: usize) -> Result<String> {
+    use crate::banco;
+    anyhow::ensure!(bloques >= 1, "bloques ≥ 1");
+    let (from, until) = (entry2::VALIDATION3_FROM_TS, entry2::VALIDATION3_UNTIL_TS);
+    let created = st.creations_in_ts(from, until)?;
+    let inputs = st.entry2_inputs_ts(from, until)?;
+    let (rows, no_init, no_entry) = v3_rows(st, &inputs)?;
+
+    // Población y exclusiones, como `entry2_v3_report`.
+    let mut no_window = Vec::new();
+    for (slot, mint, _, complete) in &created {
+        if !complete {
+            let d = v3::data_status(false, st.attempts("window", mint)?);
+            no_window.push((mint.clone(), st.creation_creator(mint)?, *slot, st.is_mayhem(mint)?, d));
+        }
+    }
+    let mut price_data = std::collections::HashMap::new();
+    for r in &rows {
+        let ok = r.i.price_horizon.is_some_and(|h| h >= PRICE_DOWNLOAD_SECS);
+        price_data.insert(r.i.mint.as_str(), v3::data_status(ok, st.attempts("prices", &r.i.mint)?));
+    }
+    anyhow::ensure!(
+        no_window.iter().all(|x| x.4 != v3::Data::Pending) && price_data.values().all(|&d| d != v3::Data::Pending),
+        "banco: descargas pendientes en el tramo"
+    );
+    let cands = v3_cands(&rows);
+    let (pop_idx, _) = v3::population(&cands, false);
+    let pop: Vec<&V3Row> = pop_idx.iter().map(|&i| &rows[i]).collect();
+    let nd_cands: Vec<v3::Cand> = no_window
+        .iter()
+        .filter(|x| x.4 == v3::Data::SinDatos)
+        .map(|x| v3::Cand { mint: &x.0, creator: &x.1, slot: x.2, mayhem: x.3 })
+        .collect();
+    let chosen: Vec<&v3::Cand> = pop_idx.iter().map(|&i| &cands[i]).collect();
+    let creators_out = v3::creators_sin_datos(&chosen, &nd_cands);
+    let items: Vec<v3::Item> = pop
+        .iter()
+        .map(|r| v3::Item {
+            mint: &r.i.mint,
+            slot: r.i.create_slot,
+            window_trades: r.e.window_trades,
+            d2: r.d2,
+            creator_sin_datos: creators_out.contains(&r.creator.as_str()),
+            sin_datos: price_data[r.i.mint.as_str()] == v3::Data::SinDatos,
+            ret: r.ret_a[v3::PRIMARY],
+        })
+        .collect();
+    let (obs, ex) = v3::comparison(&items);
+    let frozen = v3::criteria(&obs, v3::heaviest(&obs));
+
+    // Casos del banco, en el orden de `obs` (el bootstrap por casos depende del orden).
+    let by_mint: std::collections::HashMap<&str, &V3Row> = pop.iter().map(|r| (r.i.mint.as_str(), *r)).collect();
+    let casos: Vec<banco::Caso> = obs
+        .iter()
+        .map(|o| {
+            let r = by_mint[o.mint.as_str()];
+            banco::Caso {
+                id: o.mint.clone(),
+                cluster: r.creator.clone(),
+                t: r.i.t0,
+                marca: o.discarded,
+                score: if o.discarded { 1.0 } else { 0.0 },
+                resultado: o.ret,
+            }
+        })
+        .collect();
+    let paso = (until - from) / bloques as i64;
+    let spec = banco::Spec {
+        titulo: "D2 en la validación 3 (población congelada; métricas del banco descriptivas, post hoc)",
+        positivo: "retorno neto (a) desde T_entry2 a +30 min ≤ 0",
+        es_positivo: &|r| r <= 0.0,
+        unidad: "pts",
+        escala: 100.0,
+        remuestreo: banco::Remuestreo::Casos,
+        bloques: (0..bloques)
+            .map(|b| {
+                let d = from + b as i64 * paso;
+                let h = if b + 1 == bloques { until } else { d + paso };
+                (format!("bloque {}", b + 1), d, h)
+            })
+            .collect(),
+    };
+    let inf = banco::evaluar(&casos, &spec);
+
+    // Reproducción exacta de los criterios congelados.
+    let m = &inf.medida;
+    let same = |a: Option<f64>, b: Option<f64>| a == b;
+    anyhow::ensure!(
+        m.conf.vn + m.conf.fn_ == frozen.n_pass
+            && m.conf.vp + m.conf.fp == frozen.n_disc
+            && same(m.mediana_sin, frozen.median_pass)
+            && same(m.mediana_con, frozen.median_disc)
+            && same(m.dif, frozen.diff)
+            && same(m.mw_p, frozen.mw_p)
+            && (inf.ci_dif.0, inf.ci_dif.1, inf.ci_dif.2) == frozen.ci,
+        "banco: no reproduce los criterios congelados de la validación 3"
+    );
+
+    // Censura de la población (antes de las exclusiones de la comparación).
+    let price = |x: &h1b::Point| x.quote_reserves as f64 / x.token_reserves as f64;
+    let mut censura: Vec<banco::Censura> =
+        banco::HORIZONTES_CENSURA.iter().map(|(_, l)| banco::Censura::nuevo(l)).collect();
+    for r in &pop {
+        let flat: Vec<(i64, f64)> = r.i.points.iter().map(|x| (x.timestamp, price(x))).collect();
+        let covered = r.i.price_horizon.map(|h| r.i.t0 + h - 1);
+        for (c, (h, _)) in censura.iter_mut().zip(banco::HORIZONTES_CENSURA) {
+            let motivo = motivo_censura(&r.e, &flat, covered, r.i.completed_at, h);
+            anyhow::ensure!(
+                motivo.is_none() == entry2::return_at(&r.e, &flat, covered, r.i.completed_at, h).is_some(),
+                "banco: motivo_censura no coincide con return_at en {}",
+                r.i.mint
+            );
+            c.anota(motivo);
+        }
+    }
+    let mayhem = rows.iter().filter(|r| r.mayhem).count();
+    let excluidos = vec![
+        (format!("creaciones en el tramo: {}; ventana temprana incompleta", created.len()), no_window.len()),
+        ("sin precio inicial".into(), no_init),
+        ("sin T_entry2".into(), no_entry),
+        ("mayhem (aparte)".into(), mayhem),
+        ("otro token del mismo creator (un token por creator)".into(), rows.len() - mayhem - pop.len()),
+        ("creator sin datos (adenda 7)".into(), ex.creator_sin_datos),
+        ("sin datos de precio (adenda 3)".into(), ex.sin_datos),
+        ("D2 no evaluable (adenda 1)".into(), ex.no_evaluable),
+        ("retorno (a) a +30 min n/e".into(), ex.ret_ne),
+    ];
+    let mut out = inf.texto(&spec, &excluidos, &censura);
+    out.push_str(&format!(
+        "\ncomprobación: reproduce los criterios congelados de la validación 3 (pasan {}, descartados {}, diferencia {} pts, p = {}, IC [{:+.1}, {:+.1}]): idéntico\n",
+        frozen.n_pass,
+        frozen.n_disc,
+        pct1(frozen.diff),
+        frozen.mw_p.map_or("n/a".into(), |p| format!("{p:.6}")),
+        100.0 * frozen.ci.0,
+        100.0 * frozen.ci.1
+    ));
+    Ok(out)
+}
+
+/// Fase C (exploratorio, post hoc; docs/fase_c_declaracion_2026-10-22.md):
+/// C1 (tenencia del creador en T_entry2 > 5 %) y C2 (tx con compras de ≥ 2
+/// cuentas antes de T_entry2) contra el retorno (a) a +30 min, en V1–V3 de
+/// `marxol.db`, sin mayhem y un token por creator. Sin red. Con `progreso`,
+/// añade el control por terciles de progreso de la curva en T_entry2
+/// (docs/fase_c_control_progreso_2026-10-22.md).
+/// Con `volcado`, escribe en ese directorio `tokens.tsv` (población evaluable)
+/// y `compradores.tsv` (compradores anteriores a T_entry2 de todas las filas
+/// con T_entry2) para análisis post hoc fuera del binario.
+pub fn banco_fase_c(st: &store::Store, progreso: bool, volcado: Option<&std::path::Path>) -> Result<String> {
+    use crate::{banco, concentracion as cc};
+    let p = entry2::PARAMS;
+    let tramo = |i: &store::Entry2Input| -> Option<usize> {
+        if i.create_slot > entry2::PILOT_LAST_SLOT && i.create_slot <= entry2::VALIDATION1_LAST_SLOT {
+            Some(0)
+        } else if (entry2::VALIDATION2_FIRST_SLOT..=entry2::VALIDATION2_LAST_SLOT).contains(&i.create_slot) {
+            Some(1)
+        } else if (entry2::VALIDATION3_FROM_TS..entry2::VALIDATION3_UNTIL_TS).contains(&i.t0) {
+            Some(2)
+        } else {
+            None
+        }
+    };
+    let inputs: Vec<store::Entry2Input> =
+        st.entry2_inputs_ts(0, entry2::VALIDATION3_UNTIL_TS)?.into_iter().filter(|i| tramo(i).is_some()).collect();
+    let (rows, no_init, no_entry) = v3_rows(st, &inputs)?;
+    let cands = v3_cands(&rows);
+    let (pop_idx, _) = v3::population(&cands, false);
+    let mayhem = rows.iter().filter(|r| r.mayhem).count();
+
+    struct Fila<'a> {
+        r: &'a V3Row<'a>,
+        v: cc::Vars,
+        ret: Option<f64>,
+        /// Progreso de la curva justo antes de T_entry2 (1 − token virtual / inicial).
+        prog: f64,
+        /// Precio justo antes de T_entry2 (quote / token virtuales), ∝ capitalización.
+        precio: f64,
+    }
+    let mut filas = Vec::new();
+    let mut censura: Vec<banco::Censura> =
+        banco::HORIZONTES_CENSURA.iter().map(|(_, l)| banco::Censura::nuevo(l)).collect();
+    let price = |x: &h1b::Point| x.quote_reserves as f64 / x.token_reserves as f64;
+    for &k in &pop_idx {
+        let r = &rows[k];
+        let i = r.i;
+        let init = i.initial.context("sin precio inicial")?;
+        let tx = st.entry_trades_tx(&i.mint, i.t0, store::EARLY_WINDOW_SECS)?;
+        anyhow::ensure!(tx.len() == i.trades.len(), "fase C: trades y firmas desalineados en {}", i.mint);
+        let (antes, ent) = cc::antes_de_entry2(i.t0, i.create_slot, init.token_reserves, &i.trades, p.window_secs, p.min_delay_secs)
+            .context("fase C: sin T_entry2 con la partición propia")?;
+        anyhow::ensure!(
+            antes.len() == r.e.trades_before
+                && (i.trades[ent].slot, i.trades[ent].timestamp) == (r.e.entry_slot, r.e.entry_ts),
+            "fase C: la partición no coincide con entry2::compute en {}",
+            i.mint
+        );
+        let ids = st.creator_identities_base_before(&i.mint, r.e.entry_slot)?;
+        let v = cc::variables(&i.trades, &tx, &antes, &ids);
+        let flat: Vec<(i64, f64)> = i.points.iter().map(|x| (x.timestamp, price(x))).collect();
+        let covered = i.price_horizon.map(|h| i.t0 + h - 1);
+        for (c, (h, _)) in censura.iter_mut().zip(banco::HORIZONTES_CENSURA) {
+            let m = motivo_censura(&r.e, &flat, covered, i.completed_at, h);
+            anyhow::ensure!(
+                m.is_none() == entry2::return_at(&r.e, &flat, covered, i.completed_at, h).is_some(),
+                "fase C: motivo_censura no coincide con return_at en {}",
+                i.mint
+            );
+            c.anota(m);
+        }
+        let (tq, qq) = antes
+            .last()
+            .map_or((init.token_reserves, init.quote_reserves), |&j| (i.trades[j].token_reserves, i.trades[j].quote_reserves));
+        let prog = 1.0 - tq as f64 / init.token_reserves as f64;
+        filas.push(Fila { r, v, ret: r.ret_a[v3::PRIMARY], prog, precio: qq as f64 / tq as f64 });
+    }
+    let evaluables: Vec<&Fila> = filas.iter().filter(|f| f.ret.is_some()).collect();
+    let ret_ne = filas.len() - evaluables.len();
+
+    // Bloques temporales: un bloque por tramo, [primer t0, último t0 + 1).
+    let mut bloques = Vec::new();
+    for (b, nombre) in ["V1", "V2", "V3"].iter().enumerate() {
+        let ts: Vec<i64> = rows.iter().filter(|r| tramo(r.i) == Some(b)).map(|r| r.i.t0).collect();
+        if let (Some(lo), Some(hi)) = (ts.iter().min(), ts.iter().max()) {
+            bloques.push((nombre.to_string(), *lo, hi + 1));
+        }
+    }
+    let excluidos = vec![
+        (format!("tokens de V1–V3 con ventana temprana completa: {}; sin precio inicial", inputs.len()), no_init),
+        ("sin T_entry2".into(), no_entry),
+        ("mayhem (aparte)".into(), mayhem),
+        ("otro token del mismo creator (un token por creator)".into(), rows.len() - mayhem - pop_idx.len()),
+        ("retorno (a) a +30 min n/e".into(), ret_ne),
+    ];
+    let estrato = |f: &Fila| match f.v.trades_antes {
+        0..=2 => 0,
+        3..=9 => 1,
+        _ => 2,
+    };
+    let nombres = ["≤ 2 trades", "3–9 trades", "≥ 10 trades"];
+    let casos_de = |marca: &dyn Fn(&Fila) -> bool, pob: &[&Fila]| -> Vec<banco::Caso> {
+        pob.iter()
+            .map(|f| banco::Caso {
+                id: f.r.i.mint.clone(),
+                cluster: f.r.creator.clone(),
+                t: f.r.i.t0,
+                marca: marca(f),
+                score: if marca(f) { 1.0 } else { 0.0 },
+                resultado: f.ret.unwrap(),
+            })
+            .collect()
+    };
+    let spec = |titulo: &'static str, es_pos: &'static dyn Fn(f64) -> bool, positivo: &'static str| banco::Spec {
+        titulo,
+        positivo,
+        es_positivo: es_pos,
+        unidad: "pts",
+        escala: 100.0,
+        remuestreo: banco::Remuestreo::Cluster,
+        bloques: bloques.clone(),
+    };
+    static LE0: fn(f64) -> bool = |x| x <= 0.0;
+    static LE50: fn(f64) -> bool = |x| x <= -0.5;
+    let pos0: &'static dyn Fn(f64) -> bool = &LE0;
+    let pos50: &'static dyn Fn(f64) -> bool = &LE50;
+    const L0: &str = "retorno (a) a +30 min ≤ 0";
+    const L50: &str = "pérdida de la mitad o más: retorno (a) a +30 min ≤ −50 %";
+
+    let mut out = String::new();
+    macro_rules! say { ($($a:tt)*) => { out.push_str(&format!($($a)*)); out.push('\n'); } }
+    say!("FASE C — EXPLORATORIO, POST HOC, SIN VEREDICTO. marxol.db (V1–V3), sin red. Declaración previa: docs/fase_c_declaracion_2026-10-22.md");
+    say!(
+        "población: {} tokens (sin mayhem, un token por creator); con retorno (a) a +30 min: {}. Partición en T_entry2 idéntica a entry2::compute en todos.",
+        filas.len(),
+        evaluables.len()
+    );
+    let ev_ref: Vec<&Fila> = evaluables.clone();
+    let c1 = |f: &Fila| f.v.c1();
+    let c2 = |f: &Fila| f.v.c2();
+    let est: Vec<usize> = ev_ref.iter().map(|f| estrato(f)).collect();
+    for (var, marca, titulo) in [
+        ("C1", &c1 as &dyn Fn(&Fila) -> bool, "C1: tenencia del creador en T_entry2 > 5 % del supply (PRINCIPAL)"),
+        ("C2", &c2 as &dyn Fn(&Fila) -> bool, "C2: ≥ 1 tx con compras de ≥ 2 cuentas antes de T_entry2 (SECUNDARIA)"),
+    ] {
+        let casos = casos_de(marca, &ev_ref);
+        let s0 = spec(titulo, pos0, L0);
+        let inf = banco::evaluar(&casos, &s0);
+        say!("\n{}", inf.texto(&s0, &excluidos, &censura));
+        let ie = banco::estratificar(&casos, &est, &nombres, &s0, 10);
+        say!("{}", ie.texto(&s0));
+        let s50 = spec(titulo, pos50, L50);
+        let i50 = banco::evaluar(&casos, &s50);
+        let (c, t) = (&i50.medida.conf, &i50.trivial);
+        say!("-- Etiqueta secundaria: {L50} --");
+        say!("prevalencia {}; regla: exactitud {} · precisión (+) {} · recall (+) {} · MCC {} [IC {:+.3}, {:+.3}] · AUPRC {} [IC {:+.3}, {:+.3}] (línea base {})",
+            c.prevalencia(), c.exactitud(), c.precision_pos(), c.recall_pos(),
+            i50.medida.mcc.map_or("n/d".into(), |m| format!("{m:.3}")), i50.ci_mcc.0, i50.ci_mcc.1,
+            i50.medida.auprc.map_or("n/d".into(), |m| format!("{m:.3}")), i50.ci_auprc.0, i50.ci_auprc.1,
+            c.prevalencia().valor().map_or("n/d".into(), |v| format!("{v:.3}")));
+        say!("trivial (siempre clase {}): exactitud {} · MCC indefinido", if i50.trivial_positiva { "positiva" } else { "negativa" }, t.exactitud());
+        // Dentro de D2.
+        say!("\n-- {var} dentro de D2 (descriptivo) --");
+        for (lab, g) in [("pasan D2", Some(false)), ("descartados por D2", Some(true))] {
+            let sub: Vec<&Fila> = ev_ref.iter().copied().filter(|f| f.r.d2 == g).collect();
+            let cs = casos_de(marca, &sub);
+            let m = banco::medir(&cs.iter().collect::<Vec<_>>(), pos0);
+            say!(
+                "{lab:18} n {:3} · marcados {} · mediana sin {} · con {} · diferencia {} · p = {}",
+                m.conf.n(),
+                m.conf.marcados(),
+                pct1(m.mediana_sin),
+                pct1(m.mediana_con),
+                pct1(m.dif),
+                banco::fmt_p(m.mw_p)
+            );
+        }
+    }
+
+    say!("\n-- Retorno (a) a +30 min por tramo de tenencia del creador (descriptivo) --");
+    for (lab, lo, hi) in [("0 %", -1.0, 0.0), ("(0, 1] %", 0.0, 1.0), ("(1, 5] %", 1.0, 5.0), ("(5, 10] %", 5.0, 10.0), ("> 10 %", 10.0, f64::INFINITY)] {
+        let mut v: Vec<f64> = ev_ref
+            .iter()
+            .filter(|f| if lo < 0.0 { f.v.creador_pct == 0.0 } else { f.v.creador_pct > lo && f.v.creador_pct <= hi })
+            .map(|f| f.ret.unwrap())
+            .collect();
+        let n = v.len();
+        let pos = v.iter().filter(|&&x| x > 0.0).count();
+        say!("{lab:10} n {n:3} · mediana {} · retorno > 0 {}", pct1(replica::median(&mut v)), banco::Prop { k: pos, n });
+    }
+    say!("\n-- Solapamiento de C1 (población evaluable) --");
+    let n = ev_ref.len();
+    let cnt = |f: &dyn Fn(&Fila) -> bool| ev_ref.iter().filter(|x| f(x)).count();
+    say!("C1 {} · H8 {} · C1 y H8 {} · C1 y H4' {} · C1 y C2 {}",
+        banco::Prop { k: cnt(&|f| f.v.c1()), n },
+        banco::Prop { k: cnt(&|f| f.r.e.h8(&p) == Some(true)), n },
+        cnt(&|f| f.v.c1() && f.r.e.h8(&p) == Some(true)),
+        cnt(&|f| f.v.c1() && f.r.h4),
+        cnt(&|f| f.v.c1() && f.v.c2()));
+    for (s, nombre) in nombres.iter().enumerate() {
+        let g: Vec<&&Fila> = ev_ref.iter().filter(|f| estrato(f) == s).collect();
+        say!("{nombre:12}: C1 {} · C2 {}", banco::Prop { k: g.iter().filter(|f| f.v.c1()).count(), n: g.len() },
+            banco::Prop { k: g.iter().filter(|f| f.v.c2()).count(), n: g.len() });
+    }
+    if let Some(dir) = volcado {
+        use std::fmt::Write as _;
+        let mut t = String::from("mint\tcreator\ttramo\tt0\tc1\tc2\tcreador_pct\ttrades_antes\tprogreso\td2\tret30\tfill_pct\th6\th4\th7\n");
+        for f in &ev_ref {
+            let _ = writeln!(t, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", f.r.i.mint, f.r.creator, tramo(f.r.i).unwrap(), f.r.i.t0,
+                f.v.c1() as u8, f.v.c2() as u8, f.v.creador_pct, f.v.trades_antes, f.prog, f.r.d2.map_or("".into(), |d| (d as u8).to_string()), f.ret.unwrap(),
+                f.r.e.fill_pct.map_or("".into(), |x| x.to_string()), f.r.h6.map_or("".into(), |d| (d as u8).to_string()), f.r.h4 as u8, f.r.h7 as u8);
+        }
+        std::fs::write(dir.join("tokens.tsv"), t)?;
+        let mut c = String::from("mint\twallet\tidentidad_creador\tmayhem\ten_poblacion\n");
+        let en_pob: std::collections::HashSet<usize> = pop_idx.iter().copied().collect();
+        for (k, r) in rows.iter().enumerate() {
+            let i = r.i;
+            let init = i.initial.context("sin precio inicial")?;
+            let tx = st.entry_trades_tx(&i.mint, i.t0, store::EARLY_WINDOW_SECS)?;
+            let Some((antes, _)) = cc::antes_de_entry2(i.t0, i.create_slot, init.token_reserves, &i.trades, p.window_secs, p.min_delay_secs) else { continue };
+            let mut ids = st.creator_identities_base_before(&i.mint, r.e.entry_slot)?;
+            ids.extend(antes.iter().filter_map(|&j| tx[j].1.clone()));
+            let mut vistos = std::collections::HashSet::new();
+            for &j in antes.iter().filter(|&&j| i.trades[j].is_buy) {
+                let w = &i.trades[j].user;
+                if vistos.insert(w.clone()) {
+                    let _ = writeln!(c, "{}\t{}\t{}\t{}\t{}", i.mint, w, ids.contains(w) as u8, r.mayhem as u8, en_pob.contains(&k) as u8);
+                }
+            }
+        }
+        std::fs::write(dir.join("compradores.tsv"), c)?;
+    }
+    if progreso {
+        out.push_str(&control_progreso(&ev_ref, &|f| f.prog, &|f| f.precio, &|f| f.v.c1(), &|f| f.v.creador_pct, &casos_de(&c1, &ev_ref), &spec("C1 por progreso", pos0, L0)));
+    }
+    Ok(out)
+}
+
+/// Terciles de `x` (cortes en los cuantiles 1/3 y 2/3 de la población; un
+/// valor igual al corte va al tercil inferior).
+fn terciles(x: &[f64]) -> (Vec<usize>, f64, f64) {
+    let mut s = x.to_vec();
+    s.sort_by(f64::total_cmp);
+    let q = |f: f64| s[(((s.len() as f64) * f).ceil() as usize).saturating_sub(1).min(s.len() - 1)];
+    let (a, b) = (q(1.0 / 3.0), q(2.0 / 3.0));
+    (x.iter().map(|&v| if v <= a { 0 } else if v <= b { 1 } else { 2 }).collect(), a, b)
+}
+
+/// Control mecánico de C1 por terciles de progreso de la curva en T_entry2
+/// (docs/fase_c_control_progreso_2026-10-22.md). Exploratorio y post hoc.
+fn control_progreso<F>(
+    pob: &[&F],
+    prog: &dyn Fn(&F) -> f64,
+    precio: &dyn Fn(&F) -> f64,
+    c1: &dyn Fn(&F) -> bool,
+    pct: &dyn Fn(&F) -> f64,
+    casos: &[crate::banco::Caso],
+    spec: &crate::banco::Spec,
+) -> String {
+    use crate::banco;
+    let mut out = String::new();
+    macro_rules! say { ($($a:tt)*) => { out.push_str(&format!($($a)*)); out.push('\n'); } }
+    let x: Vec<f64> = pob.iter().map(|f| prog(f)).collect();
+    let (est, a, b) = terciles(&x);
+    let (est_cap, _, _) = terciles(&pob.iter().map(|f| precio(f)).collect::<Vec<_>>());
+    say!("\n==== CONTROL MECÁNICO DE C1: TERCILES DE PROGRESO DE LA CURVA EN T_entry2 (post hoc; docs/fase_c_control_progreso_2026-10-22.md) ====");
+    say!("progreso = 1 − reservas virtuales de token justo antes de T_entry2 / iniciales; cortes: {:.4} % y {:.4} %", 100.0 * a, 100.0 * b);
+    say!("tokens con tercil distinto por capitalización (precio virtual): {} de {}", est.iter().zip(&est_cap).filter(|(p, q)| p != q).count(), pob.len());
+    let med = |sel: &dyn Fn(&F) -> bool| {
+        let mut v: Vec<f64> = pob.iter().filter(|f| sel(f)).map(|f| prog(f)).collect();
+        replica::median(&mut v)
+    };
+    say!("progreso mediano: con C1 {} · sin C1 {}", pct1(med(&|f| c1(f))), pct1(med(&|f| !c1(f))));
+    let nombres = ["tercil 1 (bajo)", "tercil 2", "tercil 3 (alto)"];
+    for (s, nombre) in nombres.iter().enumerate() {
+        let g: Vec<&&F> = pob.iter().zip(&est).filter(|(_, &e)| e == s).map(|(f, _)| f).collect();
+        let mut xs: Vec<f64> = g.iter().map(|f| prog(f)).collect();
+        let mut ps: Vec<f64> = g.iter().map(|f| pct(f) / 100.0).collect();
+        say!("{nombre:16}: n {} · C1 {} · progreso mediano {} · tenencia mediana del creador {}",
+            g.len(), banco::Prop { k: g.iter().filter(|f| c1(f)).count(), n: g.len() }, pct1(replica::median(&mut xs)), pct1(replica::median(&mut ps)));
+    }
+    let ie = banco::estratificar(casos, &est, &nombres, spec, 10);
+    say!("{}", ie.texto(spec).replace("estratos fijos de actividad", "terciles de progreso de la curva"));
+    out
+}

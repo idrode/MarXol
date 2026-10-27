@@ -1,0 +1,114 @@
+Auditoría fase A — POST HOC, SIN VEREDICTO, sin red. Solo recuentos; ningún cruce con retornos.
+
+tokens en entry2 (4 tramos): 935; con T_entry2: 720
+controles contra entry2 --json (deben ser 0): H4' distinto 0, H5 distinto 0, H7' distinto 0, H8 distinto 0, entry distinto 0
+
+=== SIN MAYHEM: 530 tokens con T_entry2 ===
+trades antes de T_entry2: n = 530: p10 1, p25 2, mediana 5, p75 17.8, p90 41, máx 174
+  con 0 trades antes: 6/530 = 1.1 % [IC 95 % 0.5–2.4]; con ≤ 2: 167/530 = 31.5 % [IC 95 % 27.7–35.6]
+compradores distintos antes de T_entry2: n = 530: p10 1, p25 2, mediana 4, p75 11, p90 25.1, máx 111
+
+-- Creador en el slot de creación --
+identidad de creador compra en el slot de creación: 484/530 = 91.3 % [IC 95 % 88.6–93.4]
+  ... en la propia tx de creación: 471/530 = 88.9 % [IC 95 % 85.9–91.3]
+otra cuenta compra en la propia tx de creación: 0/530 = 0.0 % [IC 95 % 0.0–0.7]
+cuentas ajenas que compran en el slot de creación (H5 con identidades en T_entry2): n = 530: p10 0, p25 0, mediana 1, p75 3, p90 5, máx 23
+  ≥ 1: 333/530 = 62.8 % [IC 95 % 58.6–66.8]
+  ≥ 2: 237/530 = 44.7 % [IC 95 % 40.5–49.0]
+  ≥ 3: 187/530 = 35.3 % [IC 95 % 31.3–39.4]
+  ≥ 5: 57/530 = 10.8 % [IC 95 % 8.4–13.7]
+
+-- (a) Tx con compras de ≥ 2 cuentas, antes de T_entry2 --
+≥ 1 tx así: 69/530 = 13.0 % [IC 95 % 10.4–16.2]
+≥ 1 tx así con alguna cuenta ajena al creador: 69/530 = 13.0 % [IC 95 % 10.4–16.2]
+tx así por token: n = 530: p10 0, p25 0, mediana 0, p75 0, p90 1, máx 3
+  entre los que tienen ≥ 1: n = 69: p10 1, p25 1, mediana 1, p75 2, p90 2, máx 3
+cuentas por tx (máx. por token, entre los que tienen ≥ 1): n = 69: p10 2, p25 2, mediana 2, p75 3, p90 3, máx 3
+cuentas distintas en esas tx (entre los que tienen ≥ 1): n = 69: p10 2, p25 2, mediana 3, p75 4, p90 5, máx 9
+
+-- (b) Tenencia en T_entry2 (% del supply, compras − ventas) --
+identidades de creador: n = 530: p10 0 %, p25 0 %, mediana 0.288 %, p75 3.42 %, p90 6.98 %, máx 35.4 %
+  > 0.0 %: 333/530 = 62.8 % [IC 95 % 58.6–66.8]
+  > 1 %: 223/530 = 42.1 % [IC 95 % 37.9–46.3]
+  > 5 %: 84/530 = 15.8 % [IC 95 % 13.0–19.2]
+  > 10 %: 32/530 = 6.0 % [IC 95 % 4.3–8.4]
+  > 20 %: 3/530 = 0.6 % [IC 95 % 0.2–1.7]
+top 1 cuentas ajenas: n = 530: p10 0 %, p25 0.0129 %, mediana 1.73 %, p75 3.8 %, p90 5.56 %, máx 18.6 %
+  > 5 %: 68/530 = 12.8 % [IC 95 % 10.2–15.9]; > 10 %: 6/530 = 1.1 % [IC 95 % 0.5–2.4]; > 20 %: 0/530 = 0.0 % [IC 95 % 0.0–0.7]; > 30 %: 0/530 = 0.0 % [IC 95 % 0.0–0.7]
+top 3 cuentas ajenas: n = 530: p10 0 %, p25 0.0129 %, mediana 1.74 %, p75 8.37 %, p90 12.3 %, máx 35.2 %
+  > 5 %: 195/530 = 36.8 % [IC 95 % 32.8–41.0]; > 10 %: 86/530 = 16.2 % [IC 95 % 13.3–19.6]; > 20 %: 8/530 = 1.5 % [IC 95 % 0.8–2.9]; > 30 %: 1/530 = 0.2 % [IC 95 % 0.0–1.1]
+top 5 cuentas ajenas: n = 530: p10 0 %, p25 0.0129 %, mediana 1.76 %, p75 10.3 %, p90 16.9 %, máx 40.3 %
+  > 5 %: 197/530 = 37.2 % [IC 95 % 33.2–41.4]; > 10 %: 138/530 = 26.0 % [IC 95 % 22.5–29.9]; > 20 %: 29/530 = 5.5 % [IC 95 % 3.8–7.7]; > 30 %: 3/530 = 0.6 % [IC 95 % 0.2–1.7]
+top 10 cuentas ajenas: n = 530: p10 0 %, p25 0.0129 %, mediana 1.79 %, p75 11.7 %, p90 22.2 %, máx 40.3 %
+  > 5 %: 198/530 = 37.4 % [IC 95 % 33.3–41.6]; > 10 %: 149/530 = 28.1 % [IC 95 % 24.5–32.1]; > 20 %: 69/530 = 13.0 % [IC 95 % 10.4–16.2]; > 30 %: 18/530 = 3.4 % [IC 95 % 2.2–5.3]
+cuentas ajenas de tx con ≥ 2 cuentas: n = 69: p10 0 %, p25 0.164 %, mediana 7.02 %, p75 10.7 %, p90 16 %, máx 32.5 % (solo tokens con ≥ 1 tx así)
+
+-- Solapamiento con los indicadores de D2 (sin retornos) --
+tx ≥ 2 cuentas, con: H4' 57/69 = 82.6 % [IC 95 % 72.0–89.8]; H6' 49/69 = 71.0 % [IC 95 % 59.4–80.4]; H7' 51/69 = 73.9 % [IC 95 % 62.5–82.8]; D2 descarta 62/69 = 89.9 % [IC 95 % 80.5–95.0]
+tx ≥ 2 cuentas, sin: H4' 126/461 = 27.3 % [IC 95 % 23.5–31.6]; H6' 122/461 = 26.5 % [IC 95 % 22.6–30.7]; H7' 224/461 = 48.6 % [IC 95 % 44.1–53.1]; D2 descarta 156/461 = 33.8 % [IC 95 % 29.7–38.3]
+top 10 ajenas > 10 %, con: H4' 97/149 = 65.1 % [IC 95 % 57.2–72.3]; H6' 144/149 = 96.6 % [IC 95 % 92.4–98.6]; H7' 119/149 = 79.9 % [IC 95 % 72.7–85.5]; D2 descarta 137/149 = 91.9 % [IC 95 % 86.5–95.3]
+top 10 ajenas > 10 %, sin: H4' 86/381 = 22.6 % [IC 95 % 18.7–27.0]; H6' 27/381 = 7.1 % [IC 95 % 4.9–10.1]; H7' 156/381 = 40.9 % [IC 95 % 36.1–45.9]; D2 descarta 81/381 = 21.3 % [IC 95 % 17.4–25.6]
+creador > 5 %, con: H4' 19/84 = 22.6 % [IC 95 % 15.0–32.6]; H6' 50/84 = 59.5 % [IC 95 % 48.8–69.4]; H7' 43/84 = 51.2 % [IC 95 % 40.7–61.6]; D2 descarta 35/84 = 41.7 % [IC 95 % 31.7–52.3]
+creador > 5 %, sin: H4' 164/446 = 36.8 % [IC 95 % 32.4–41.3]; H6' 121/446 = 27.1 % [IC 95 % 23.2–31.4]; H7' 232/446 = 52.0 % [IC 95 % 47.4–56.6]; D2 descarta 183/446 = 41.0 % [IC 95 % 36.6–45.7]
+Spearman(llenado, top 10 ajenas) = 0.822 (n = 530)
+Spearman(llenado, tenencia del creador) = 0.297 (n = 530)
+
+-- Firmas (para estimar coste de lo no guardado) --
+firmas con trades antes de T_entry2: n = 530: p10 1, p25 2, mediana 5, p75 17, p90 40, máx 174; total 7849
+firmas con trades en el slot de creación: n = 530: p10 1, p25 1, mediana 2, p75 4, p90 5, máx 24; total 1381
+firmas con trades en la ventana de 300 s: n = 530: p10 2, p25 4, mediana 19, p75 57, p90 160, máx 1.53e+03; total 33186
+
+=== MAYHEM (aparte): 190 tokens con T_entry2 ===
+trades antes de T_entry2: n = 190: p10 2, p25 5, mediana 11.5, p75 15, p90 19.1, máx 35
+  con 0 trades antes: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; con ≤ 2: 22/190 = 11.6 % [IC 95 % 7.8–16.9]
+compradores distintos antes de T_entry2: n = 190: p10 1, p25 2, mediana 3, p75 3, p90 4, máx 8
+
+-- Creador en el slot de creación --
+identidad de creador compra en el slot de creación: 190/190 = 100.0 % [IC 95 % 98.0–100.0]
+  ... en la propia tx de creación: 190/190 = 100.0 % [IC 95 % 98.0–100.0]
+otra cuenta compra en la propia tx de creación: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+cuentas ajenas que compran en el slot de creación (H5 con identidades en T_entry2): n = 190: p10 0, p25 0, mediana 0, p75 0, p90 0, máx 1
+  ≥ 1: 2/190 = 1.1 % [IC 95 % 0.3–3.8]
+  ≥ 2: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+  ≥ 3: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+  ≥ 5: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+
+-- (a) Tx con compras de ≥ 2 cuentas, antes de T_entry2 --
+≥ 1 tx así: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+≥ 1 tx así con alguna cuenta ajena al creador: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+tx así por token: n = 190: p10 0, p25 0, mediana 0, p75 0, p90 0, máx 0
+  entre los que tienen ≥ 1: n = 0
+cuentas por tx (máx. por token, entre los que tienen ≥ 1): n = 0
+cuentas distintas en esas tx (entre los que tienen ≥ 1): n = 0
+
+-- (b) Tenencia en T_entry2 (% del supply, compras − ventas) --
+identidades de creador: n = 190: p10 0 %, p25 0.212 %, mediana 0.352 %, p75 1.09 %, p90 3.42 %, máx 13.9 %
+  > 0.0 %: 167/190 = 87.9 % [IC 95 % 82.5–91.8]
+  > 1 %: 50/190 = 26.3 % [IC 95 % 20.6–33.0]
+  > 5 %: 8/190 = 4.2 % [IC 95 % 2.1–8.1]
+  > 10 %: 4/190 = 2.1 % [IC 95 % 0.8–5.3]
+  > 20 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+top 1 cuentas ajenas: n = 190: p10 0 %, p25 0 %, mediana 0.186 %, p75 0.736 %, p90 2.14 %, máx 8.37 %
+  > 5 %: 6/190 = 3.2 % [IC 95 % 1.5–6.7]; > 10 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 20 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 30 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+top 3 cuentas ajenas: n = 190: p10 0 %, p25 0 %, mediana 0.2 %, p75 0.946 %, p90 2.35 %, máx 8.37 %
+  > 5 %: 8/190 = 4.2 % [IC 95 % 2.1–8.1]; > 10 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 20 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 30 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+top 5 cuentas ajenas: n = 190: p10 0 %, p25 0 %, mediana 0.2 %, p75 0.946 %, p90 2.35 %, máx 8.37 %
+  > 5 %: 8/190 = 4.2 % [IC 95 % 2.1–8.1]; > 10 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 20 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 30 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+top 10 cuentas ajenas: n = 190: p10 0 %, p25 0 %, mediana 0.2 %, p75 0.946 %, p90 2.35 %, máx 8.37 %
+  > 5 %: 8/190 = 4.2 % [IC 95 % 2.1–8.1]; > 10 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 20 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]; > 30 %: 0/190 = 0.0 % [IC 95 % 0.0–2.0]
+cuentas ajenas de tx con ≥ 2 cuentas: n = 0 (solo tokens con ≥ 1 tx así)
+
+-- Solapamiento con los indicadores de D2 (sin retornos) --
+tx ≥ 2 cuentas, con: H4' 0/0; H6' 0/0; H7' 0/0; D2 descarta 0/0
+tx ≥ 2 cuentas, sin: H4' 39/190 = 20.5 % [IC 95 % 15.4–26.8]; H6' 3/190 = 1.6 % [IC 95 % 0.5–4.5]; H7' 38/190 = 20.0 % [IC 95 % 14.9–26.3]; D2 descarta 9/190 = 4.7 % [IC 95 % 2.5–8.8]
+top 10 ajenas > 10 %, con: H4' 0/0; H6' 0/0; H7' 0/0; D2 descarta 0/0
+top 10 ajenas > 10 %, sin: H4' 39/190 = 20.5 % [IC 95 % 15.4–26.8]; H6' 3/190 = 1.6 % [IC 95 % 0.5–4.5]; H7' 38/190 = 20.0 % [IC 95 % 14.9–26.3]; D2 descarta 9/190 = 4.7 % [IC 95 % 2.5–8.8]
+creador > 5 %, con: H4' 2/8 = 25.0 % [IC 95 % 7.1–59.1]; H6' 2/8 = 25.0 % [IC 95 % 7.1–59.1]; H7' 1/8 = 12.5 % [IC 95 % 2.2–47.1]; D2 descarta 1/8 = 12.5 % [IC 95 % 2.2–47.1]
+creador > 5 %, sin: H4' 37/182 = 20.3 % [IC 95 % 15.1–26.8]; H6' 1/182 = 0.5 % [IC 95 % 0.1–3.0]; H7' 37/182 = 20.3 % [IC 95 % 15.1–26.8]; D2 descarta 8/182 = 4.4 % [IC 95 % 2.2–8.4]
+Spearman(llenado, top 10 ajenas) = 0.475 (n = 190)
+Spearman(llenado, tenencia del creador) = 0.645 (n = 190)
+
+-- Firmas (para estimar coste de lo no guardado) --
+firmas con trades antes de T_entry2: n = 190: p10 2, p25 5, mediana 11.5, p75 15, p90 19.1, máx 35; total 2124
+firmas con trades en el slot de creación: n = 190: p10 1, p25 1, mediana 1, p75 1, p90 1, máx 2; total 192
+firmas con trades en la ventana de 300 s: n = 190: p10 8.9, p25 19, mediana 37, p75 88.8, p90 190, máx 735; total 14713
