@@ -1,0 +1,11 @@
+POTENCIA DEL CRITERIO DE LA ADENDA 2 (BORRADOR), C1. Post hoc, sin red, solo marxol.db.
+marxol.db: n sin C1 371, con C1 67; diferencia observada +16.6 pts; mitad +8.3 pts
+criterio simulado: MW unilateral p < 0.0033, diferencia >= 10 pts, IC bootstrap 95 % > 0; 300 simulaciones, 300 réplicas bootstrap, semilla 20261022
+n  240 (sin 203, con 37): d +8.3: 0.21 · d +10.0: 0.49 · d +12.5: 0.71 · d +15.0: 0.94 · d +16.6: 0.98
+n  480 (sin 407, con 73): d +8.3: 0.19 · d +10.0: 0.52 · d +12.5: 0.78 · d +15.0: 0.99 · d +16.6: 1.00
+n  720 (sin 610, con 110): d +8.3: 0.20 · d +10.0: 0.51 · d +12.5: 0.87 · d +15.0: 1.00 · d +16.6: 1.00
+n  960 (sin 813, con 147): d +8.3: 0.21 · d +10.0: 0.48 · d +12.5: 0.87 · d +15.0: 1.00 · d +16.6: 1.00
+solo el criterio 2 (MW unilateral p < 0.0033), sin el suelo de 10 pts ni el IC; 500 simulaciones, semilla 20261022:
+solo MW, n 240 d +4.0: 0.01 · d +6.0: 0.08 · d +8.3: 0.37 · d +10.0: 0.72
+solo MW, n 480 d +4.0: 0.01 · d +6.0: 0.16 · d +8.3: 0.71 · d +10.0: 0.98
+solo MW, n 960 d +4.0: 0.02 · d +6.0: 0.37 · d +8.3: 0.98 · d +10.0: 1.00
