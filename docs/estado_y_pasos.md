@@ -141,6 +141,12 @@ Las referencias a "sección N" usan la numeración de `CLAUDE.md` anterior al 20
    - Coste de lanzar medido en 187 tx de creación: mediana 0,0097 SOL, p90 0,021.
    - Todo es exploratorio: ninguna razón de veto sale de aquí sin su adenda y el bloque B.
 
+   **Adenda 3 (2026-10-27, aprobada por el dueño; sin red, sin resultados de marxol_vivo.db)**: docs/adenda_3_2026-10-27.md (sha256 en el commit); plan de commits y escaneos en docs/plan_commit_adenda_3.md. Solo tablas de operación de marxol_vivo.db (resultados/cobertura_adenda3.txt, `scripts/cobertura_adenda3.py`).
+     - Mínimos en tokens evaluables (con T_entry2, ventanas completas y en SOL): A ≥ 900 y B ≥ 1 800. Ampliación por días UTC; sustituye la regla «no se amplía el bloque» (pre-registro y adenda 1). Ritmo esperado ≈ 47 evaluables/día (prudente 39): A ≈ hasta 2026-11-12 (tope 2026-11-16), B ≈ 39 días (tope inicio + 47 días, como muy tarde 2027-01-02).
+     - Bloque A hasta el 27-10 19:27 UTC: 880 `creado`, 544 con un token por creator y sin mayhem (113/día). Tope de 400 tx: 39/880 = 4,4 %. Incompletos 59 (39 tope, 20 max_pages; 0 `pendiente_agotado`). Franjas > 10 %: 3 de 19. Retraso de captura: mediana 3,2 h, p90 14,0 h; incompletos < 1 h / 1–6 h / 6–24 h: 6,4 / 8,6 / 6,2 %.
+     - Sin campo nuevo de creación (BOOST u otro); creator_fee_bps > 0 pasa del 9,6 % (V1–V3) al 21,6 %; quote ≠ SOL 29 %. `depth` no se guarda (no medido).
+     - Potencia (resultados/potencia_adenda3.txt, retornos de V1–V3 agregados): por el suelo de 10 pts el MDE80 queda en 11–12 pts y nunca baja de 11; con 10 pts verdaderos la potencia es 0,43–0,61 con cualquier n. "No concluyente" es un resultado esperable y válido para R1 y R2.
+
    **Compras ajenas tras el slot de creación (2026-10-27, post hoc, descriptivo, sin red, sin retornos)**: resultados/compras_ajenas_posthoc.txt (`scripts/compras_ajenas_posthoc.py`). Solo marxol.db + marxol_fase3.db (R1); no abre marxol_vivo.db.
    - Población: 538 tokens con ventana completa, sin mayhem, un token por creator. Compra ajena = compra de una cuenta ≠ creator y ≠ pagador en slot > slot de creación.
    - Todos: ≥ 1 compra ajena en 60 s 67,1 % [63,0–70,9]; en 5 min 69,5 % [65,5–73,3]; ≥ 3 cuentas ajenas en 5 min 53,3 % [49,1–57,5]. 1.ª compra ajena: mediana 3 s, p90 > 300 s (censura); entre los 374 que la tienen, mediana 1 s, p90 14 s. Casi todo lo que llega, llega en segundos.

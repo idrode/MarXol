@@ -176,3 +176,4 @@ Se puede revisar, con commit y anotándolo en el registro de cambios, **hasta qu
 
 - 2026-10-22: versión inicial, antes de leer ningún resultado de `marxol_vivo.db`.
 - 2026-10-22: adenda 1 (R1 pagador en serie, R2 creador con resultado positivo en T_entry2; Bonferroni k = 2), antes de calcular nada sobre el bloque B y sin cruzar R1/R2 con retornos.
+- 2026-10-27: adenda 3 (docs/adenda_3_2026-10-27.md, sha256 `e6364813b582d4d384bcbbfe2e2bdff6a7323a856a9663d3618be81c08787a8b`): protocolo de recolección y amenazas a la validez, reglas de cobertura, mínimos en tokens evaluables (A ≥ 900, B ≥ 1 800) con ampliación por días UTC y fecha tope (sustituye «no se amplía el bloque» de V4-D2 y de la adenda 1, y las fechas fijas de B y C), sensibilidad por retraso de captura (2 h), huecos, inventario de cortes exploratorios. Incorpora la adenda 2 (k = 2, p < 0,005; C1 solo descriptiva). Comprometida antes del fin nominal de A y sin leer resultados de `marxol_vivo.db`.

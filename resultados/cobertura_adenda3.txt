@@ -1,0 +1,54 @@
+COBERTURA DE LA RECOLECCIÓN (adenda 3) — OPERACIÓN, SIN RETORNOS
+marxol_vivo.db en solo lectura; corte 2026-10-27 19:27 UTC. No se lee vivo_results, price_points ni vivo_outcomes. IC 95 % de Wilson.
+
+1. HORAS UTC LISTADAS POR DÍA (vivo_hourly) Y HUECOS (vivo_gaps)
+   10-22: 23/24; faltan [0]
+   10-23: 24/24
+   10-24: 24/24
+   10-25: 24/24
+   10-26: 24/24
+   10-27: 20/24; faltan [20, 21, 22, 23]
+   filas en vivo_gaps: 0
+
+2. TOKENS POR DÍA UTC DE CREACIÓN: estado, mayhem, un token por creator y campos del CreateEvent
+   día   | muestreados | creado | mayhem | 1/creator sin mayhem | cashback | holder_reward | creator_fee_bps > 0 | quote ≠ SOL (de ellos …pump)
+   10-22 |         190 |    189 |     50 |                  129 |        0 |            41 |                  43 |          62 (3)
+   10-23 |         197 |    195 |     65 |                  111 |        0 |            30 |                  41 |          56 (4)
+   10-24 |         156 |    154 |     40 |                   93 |        0 |            20 |                  44 |          51 (7)
+   10-25 |         146 |    145 |     37 |                   95 |        0 |            29 |                  30 |          49 (17)
+   10-26 |         203 |    203 |     43 |                  140 |        0 |            34 |                  51 |          63 (12)
+   10-27 |         183 |    183 |     43 |                  126 |        0 |            20 |                  22 |          30 (6)
+   TradeEvent.ix_name por día (early_trades): 10-22: buy 1725, buy_exact_quote_in 1815, buy_exact_sol_in 172, multi_hop_swap 38, sell 3169; 10-23: buy 2040, buy_exact_quote_in 1417, buy_exact_sol_in 159, multi_hop_swap 1, sell 3280; 10-24: buy 1664, buy_exact_quote_in 1245, buy_exact_sol_in 103, multi_hop_swap 81, sell 2589; 10-25: buy 1238, buy_exact_quote_in 1293, buy_exact_sol_in 146, multi_hop_swap 74, sell 2326; 10-26: buy 1323, buy_exact_quote_in 1898, buy_exact_sol_in 199, multi_hop_swap 9, sell 3068; 10-27: buy 1153, buy_exact_quote_in 822, buy_exact_sol_in 125, multi_hop_swap 76, sell 1904
+
+3. BLOQUE A HASTA EL CORTE
+   días transcurridos 4.81; creado 880; un token por creator y sin mayhem 544 (113/día → 792 esperados en 7 días; B: 1583 en 14)
+   proporción que queda tras un token por creator y sin mayhem: 544/880 = 61.8 % [58.6–65.0]
+
+4. RETRASO DE CAPTURA (captured_at − blockTime), tokens creado desde el inicio de A
+   todos       n  880: mediana 3.2 h, p75 9.1 h, p90 14.0 h, máx 20.2 h
+   protocolo 1 n  521: mediana 4.3 h, p75 9.9 h, p90 15.1 h, máx 20.2 h
+   protocolo 2 n  359: mediana 1.7 h, p75 8.1 h, p90 12.1 h, máx 17.8 h
+   incompletos por tramo de retraso (sin los pendientes):
+     < 1 h   22/345 = 6.4 % [4.2–9.5]
+     1–6 h   17/198 = 8.6 % [5.4–13.3]
+     6–24 h  20/324 = 6.2 % [4.0–9.3]
+     > 24 h  0/0
+   por día: mediana / p90 del retraso
+     10-23: n 195, 4.3 h / 14.1 h
+     10-24: n 154, 5.6 h / 18.0 h
+     10-25: n 145, 4.6 h / 12.3 h
+     10-26: n 203, 7.0 h / 14.2 h
+     10-27: n 183, 0.4 h / 1.7 h
+
+5. INCOMPLETOS POR DÍA Y FRANJA DE 6 h (creado; sin pendientes) Y MOTIVOS
+   10-23: 00–06 1/37 · 06–12 3/38 · 12–18 9/59 · 18–24 2/61
+   10-24: 00–06 2/38 · 06–12 0/21 · 12–18 1/48 · 18–24 2/47
+   10-25: 00–06 1/35 · 06–12 4/25 · 12–18 1/44 · 18–24 3/41
+   10-26: 00–06 0/27 · 06–12 2/36 · 12–18 7/82 · 18–24 4/58
+   10-27: 00–06 5/42 · 06–12 3/47 · 12–18 6/76 · 18–24 3/5
+     34  incompleto_permanente · window · tope de 400 tx
+     20  incompleto_permanente · window · max_pages
+      5  incompleto_permanente · prices · tope de 400 tx
+   tokens incompletos: 59 (un token puede tener ventana y precio marcados)
+   pendientes (dentro de plazo): 13
+   sin_create desde A: 5
