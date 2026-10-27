@@ -1,0 +1,104 @@
+COMPRAS DE CUENTAS AJENAS TRAS EL SLOT DE CREACIÓN — POST HOC, DESCRIPTIVO, SIN VEREDICTO
+Solo marxol.db (+ marxol_fase3.db para R1), sin red, sin retornos, sin marxol_vivo.db.
+Población: ventana temprana completa, sin mayhem, un token por creator (menor slot, empate por mint).
+Compra ajena = is_buy de una cuenta ≠ creator y ≠ pagador, en slot > slot de creación; tiempo desde t0
+(blockTime, 1 s). Porcentajes con IC 95 % de Wilson. 1.ª compra ajena censurada en 300 s.
+
+  TODOS — n = 538
+    ≥ 1 compra ajena en 60 s    361/538 = 67.1 % [63.0–70.9]
+    ≥ 1 compra ajena en 5 min   374/538 = 69.5 % [65.5–73.3]
+    ≥ 3 cuentas ajenas en 5 min 287/538 = 53.3 % [49.1–57.5]
+    1.ª compra ajena: mediana 3 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 14 s (n = 374)
+
+POR TRAMO (contexto; el piloto es calibración)
+  piloto — n = 35
+    ≥ 1 compra ajena en 60 s    23/35 = 65.7 % [49.2–79.2]
+    ≥ 1 compra ajena en 5 min   23/35 = 65.7 % [49.2–79.2]
+    ≥ 3 cuentas ajenas en 5 min 18/35 = 51.4 % [35.6–67.0]
+    1.ª compra ajena: mediana 2 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 7 s (n = 23)
+  V1 — n = 218
+    ≥ 1 compra ajena en 60 s    150/218 = 68.8 % [62.4–74.6]
+    ≥ 1 compra ajena en 5 min   153/218 = 70.2 % [63.8–75.9]
+    ≥ 3 cuentas ajenas en 5 min 120/218 = 55.0 % [48.4–61.5]
+    1.ª compra ajena: mediana 3 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 11 s (n = 153)
+  V2 — n = 202
+    ≥ 1 compra ajena en 60 s    129/202 = 63.9 % [57.0–70.2]
+    ≥ 1 compra ajena en 5 min   137/202 = 67.8 % [61.1–73.9]
+    ≥ 3 cuentas ajenas en 5 min 100/202 = 49.5 % [42.7–56.3]
+    1.ª compra ajena: mediana 3 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 24 s (n = 137)
+  V3 — n = 83
+    ≥ 1 compra ajena en 60 s    59/83 = 71.1 % [60.6–79.7]
+    ≥ 1 compra ajena en 5 min   61/83 = 73.5 % [63.1–81.8]
+    ≥ 3 cuentas ajenas en 5 min 49/83 = 59.0 % [48.3–69.0]
+    1.ª compra ajena: mediana 2 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 31 s (n = 61)
+
+POR COMPRA DEL CREADOR EN EL SLOT DE CREACIÓN (% del supply, creator + pagador)
+  0 % — n = 34
+    ≥ 1 compra ajena en 60 s    16/34 = 47.1 % [31.5–63.3]
+    ≥ 1 compra ajena en 5 min   16/34 = 47.1 % [31.5–63.3]
+    ≥ 3 cuentas ajenas en 5 min 13/34 = 38.2 % [23.9–55.0]
+    1.ª compra ajena: mediana > 300 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 14 s (n = 16)
+  (0, 2] % — n = 185
+    ≥ 1 compra ajena en 60 s    95/185 = 51.4 % [44.2–58.5]
+    ≥ 1 compra ajena en 5 min   105/185 = 56.8 % [49.6–63.7]
+    ≥ 3 cuentas ajenas en 5 min 75/185 = 40.5 % [33.7–47.7]
+    1.ª compra ajena: mediana 31 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 44 s (n = 105)
+  (2, 5] % — n = 122
+    ≥ 1 compra ajena en 60 s    88/122 = 72.1 % [63.6–79.3]
+    ≥ 1 compra ajena en 5 min   91/122 = 74.6 % [66.2–81.5]
+    ≥ 3 cuentas ajenas en 5 min 73/122 = 59.8 % [51.0–68.1]
+    1.ª compra ajena: mediana 1 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 11 s (n = 91)
+  (5, 10] % — n = 105
+    ≥ 1 compra ajena en 60 s    84/105 = 80.0 % [71.4–86.5]
+    ≥ 1 compra ajena en 5 min   84/105 = 80.0 % [71.4–86.5]
+    ≥ 3 cuentas ajenas en 5 min 60/105 = 57.1 % [47.6–66.2]
+    1.ª compra ajena: mediana 2 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 10 s (n = 84)
+  > 10 % — n = 92
+    ≥ 1 compra ajena en 60 s    78/92 = 84.8 % [76.1–90.7]
+    ≥ 1 compra ajena en 5 min   78/92 = 84.8 % [76.1–90.7]
+    ≥ 3 cuentas ajenas en 5 min 66/92 = 71.7 % [61.8–79.9]
+    1.ª compra ajena: mediana 2 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 12 s (n = 78)
+
+POR OTRAS CUENTAS COMPRANDO EN EL MISMO SLOT DE CREACIÓN
+  sí — n = 314
+    ≥ 1 compra ajena en 60 s    264/314 = 84.1 % [79.6–87.7]
+    ≥ 1 compra ajena en 5 min   270/314 = 86.0 % [81.7–89.4]
+    ≥ 3 cuentas ajenas en 5 min 228/314 = 72.6 % [67.4–77.2]
+    1.ª compra ajena: mediana 1 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 12 s (n = 270)
+  no — n = 224
+    ≥ 1 compra ajena en 60 s    97/224 = 43.3 % [37.0–49.9]
+    ≥ 1 compra ajena en 5 min   104/224 = 46.4 % [40.0–53.0]
+    ≥ 3 cuentas ajenas en 5 min 59/224 = 26.3 % [21.0–32.5]
+    1.ª compra ajena: mediana > 300 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 31 s (n = 104)
+
+POR R1 (adenda 1: previos del pagador en 7 d ≥ 5; mínimo; solo V1–V3 tienen C')
+  R1 sí (total) — n = 223
+    ≥ 1 compra ajena en 60 s    140/223 = 62.8 % [56.3–68.9]
+    ≥ 1 compra ajena en 5 min   146/223 = 65.5 % [59.0–71.4]
+    ≥ 3 cuentas ajenas en 5 min 104/223 = 46.6 % [40.2–53.2]
+    1.ª compra ajena: mediana 6 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 2 s, p90 17 s (n = 146)
+  R1 sí (5–49) — n = 123
+    ≥ 1 compra ajena en 60 s    62/123 = 50.4 % [41.7–59.1]
+    ≥ 1 compra ajena en 5 min   67/123 = 54.5 % [45.7–63.0]
+    ≥ 3 cuentas ajenas en 5 min 49/123 = 39.8 % [31.6–48.7]
+    1.ª compra ajena: mediana 20 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 2 s, p90 17 s (n = 67)
+  R1 sí (≥ 50) — n = 100
+    ≥ 1 compra ajena en 60 s    78/100 = 78.0 % [68.9–85.0]
+    ≥ 1 compra ajena en 5 min   79/100 = 79.0 % [70.0–85.8]
+    ≥ 3 cuentas ajenas en 5 min 55/100 = 55.0 % [45.2–64.4]
+    1.ª compra ajena: mediana 3 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 2 s, p90 13 s (n = 79)
+  R1 no — n = 271
+    ≥ 1 compra ajena en 60 s    192/271 = 70.8 % [65.2–75.9]
+    ≥ 1 compra ajena en 5 min   199/271 = 73.4 % [67.9–78.3]
+    ≥ 3 cuentas ajenas en 5 min 159/271 = 58.7 % [52.7–64.4]
+    1.ª compra ajena: mediana 1 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 14 s (n = 199)
+  n/e — n = 9
+    ≥ 1 compra ajena en 60 s    6/9 = 66.7 % [35.4–87.9]
+    ≥ 1 compra ajena en 5 min   6/9 = 66.7 % [35.4–87.9]
+    ≥ 3 cuentas ajenas en 5 min 6/9 = 66.7 % [35.4–87.9]
+    1.ª compra ajena: mediana 1 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 0 s, p90 2 s (n = 6)
+  sin dato — n = 35
+    ≥ 1 compra ajena en 60 s    23/35 = 65.7 % [49.2–79.2]
+    ≥ 1 compra ajena en 5 min   23/35 = 65.7 % [49.2–79.2]
+    ≥ 3 cuentas ajenas en 5 min 18/35 = 51.4 % [35.6–67.0]
+    1.ª compra ajena: mediana 2 s, p90 > 300 s (todos, censura > 300 s); entre los que la tienen: mediana 1 s, p90 7 s (n = 23)
